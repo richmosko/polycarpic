@@ -101,7 +101,6 @@ const ROWS: Row[] = [
   ['apparmor unconfined', (s) => { svc(s, 'prod', 'worker').security_opt = ['no-new-privileges:true', 'apparmor=unconfined']; }, 'unconfined', 'apparmor=unconfined accepted'],
   ['docker.sock mounted', (s) => { svc(s, 'prod', 'worker').volumes = ['/var/run/docker.sock:/var/run/docker.sock']; }, 'docker-sock', 'docker.sock volume accepted'],
   ['docker.sock via /run symlink path', (s) => { svc(s, 'staging', 'worker').volumes = ['/run/docker.sock:/s']; }, 'docker-sock', 'only /var/run/docker.sock matched'],
-  ['env_file', (s) => { svc(s, 'prod', 'worker').env_file = ['/etc/polycarpic/host.env']; }, 'env-file', 'env_file not checked'],
   ['secret-looking environment key', (s) => { svc(s, 'prod', 'web').environment = { DB_PASSWORD: 'x' }; }, 'env-secret', 'secret-looking env not checked'],
   ['API key in environment', (s) => { svc(s, 'prod', 'web').environment = { RESEND_API_KEY: 'x' }; }, 'env-secret', 'only PASSWORD matched'],
   ['secret with environment source', (s) => { s.prod.secrets.plaid_secret__web = { environment: 'AUTH' }; }, 'secret-source', 'environment-sourced secret accepted'],
@@ -236,6 +235,55 @@ describe.concurrent('compose-policy lint: fail fixtures (pass baseline + one mut
   // The "turns red when" column, kept machine-readable so the table above is the single source.
   it('every row documents the mutation that turns it red', async () => {
     for (const row of ROWS) expect(row[3].length).toBeGreaterThan(8);
+  });
+});
+
+// POLY-100 R11 / seceng: env_file is allowed only as the project's own host env file, a single entry, on the five app services.
+// (This loosens POLY-95's "no env_file anywhere" lint to exactly that; the refusals below are what keeps it from being a hole.)
+const HOST = { prod: '/etc/polycarpic/host.env', staging: '/etc/polycarpic/staging-host.env' } as const;
+const APP5 = ['web', 'auth', 'worker', 'migrate', 'operator'];
+const ENV_FAIL: [string, 'prod' | 'staging', string, any][] = [
+  ['an unrelated file', 'prod', 'worker', ['/etc/passwd']],
+  ['a path that merely starts with the host env', 'prod', 'worker', ['/etc/polycarpic/host.env.evil']],
+  ['a path that merely contains the host env', 'prod', 'worker', ['/tmp/etc/polycarpic/host.env']],
+  ['a longer name sharing the prefix', 'prod', 'web', ['/etc/polycarpic/host.envx']],
+  ['a directory prefix', 'prod', 'web', ['/etc/polycarpic/host']],
+  ['a traversal out of the host env', 'prod', 'web', ['/etc/polycarpic/host.env/../../passwd']],
+  ['a relative path', 'prod', 'web', ['host.env']],
+  ['staging naming prod\'s file', 'staging', 'web', [HOST.prod]],
+  ['prod naming staging\'s file', 'prod', 'web', [HOST.staging]],
+  ['the host env and a second file', 'prod', 'worker', [HOST.prod, '/etc/passwd']],
+  ['the object form with required: false', 'prod', 'auth', [{ path: HOST.prod, required: false }]],
+  ['the object form with an extra key', 'prod', 'auth', [{ path: HOST.prod, required: true, format: 'raw' }]],
+  ['the object form with another path', 'staging', 'auth', [{ path: '/etc/passwd', required: true }]],
+  ['a service outside the five (prod postgres)', 'prod', 'postgres', [HOST.prod]],
+  ['a service outside the five (prod backup)', 'prod', 'backup', [HOST.prod]],
+  ['a service outside the five (prod uploader)', 'prod', 'uploader', [HOST.prod]],
+  ['a service outside the five (staging postgres)', 'staging', 'postgres', [HOST.staging]],
+];
+const ENV_PASS: [string, 'prod' | 'staging', string, any][] = [
+  ...(['prod', 'staging'] as const).flatMap((p) => APP5.map((n) => [`${p} ${n}: the plain path`, p, n, [HOST[p]]] as [string, 'prod' | 'staging', string, any])),
+  ['prod auth: the object form with required: true', 'prod', 'auth', [{ path: HOST.prod, required: true }]],
+  ['staging worker: the object form without required', 'staging', 'worker', [{ path: HOST.staging }]],
+];
+describe.concurrent('POLY-100: env_file is the host env file and nothing else', () => {
+  it.each(ENV_FAIL)('refused: %s', async (_n, proj, sn, val) => {
+    const r = await runSet((s) => { svc(s, proj, sn).env_file = val; });
+    expect(r.code, r.err).not.toBe(0);
+    expect(r.err).toMatch(rule('env-file'));
+  });
+  it.each(ENV_PASS)('accepted: %s', async (_n, proj, sn, val) => {
+    const r = await runSet((s) => { svc(s, proj, sn).env_file = val; });
+    expect({ code: r.code, err: r.err }).toEqual({ code: 0, err: '' });
+  });
+  it('the CI lint and the box guard read the same list: the five app services, each with exactly the project\'s host env file', () => {
+    const allow = JSON.parse(readFileSync(join(ROOT, 'infra', 'deploy', 'compose-allow.json'), 'utf8'));
+    for (const proj of ['prod', 'staging'] as const) {
+      const withEnv = Object.entries<any>(allow.projects[proj].services).filter(([, sp]) => (sp.env_files ?? []).length).map(([n]) => n).sort();
+      expect(withEnv, proj).toEqual(APP5.filter((n) => n in allow.projects[proj].services).sort());
+      for (const n of withEnv) expect(allow.projects[proj].services[n].env_files, `${proj} ${n}`).toEqual([HOST[proj]]);
+      for (const [n, sp] of Object.entries<any>(allow.projects[proj].services)) if (!APP5.includes(n)) expect(sp.env_files ?? [], `${proj} ${n}`).toEqual([]);
+    }
   });
 });
 

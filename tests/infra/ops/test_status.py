@@ -37,6 +37,7 @@ REVOKES_OK = line("OK", "revokes", "prod", "plpgsql and 17 built-ins closed to P
 GREEN_PROD = [APP_OK, CERT_OK, BACKUP_OK, BDB_OK, SLOTS_OK, REVOKES_OK]
 GREEN_STAGING = [line("OK", "app", "staging", "sha256:1a2b3c4d5e6f, deployed 2026-11-22 18:21Z (19 m)"), line("OK", "cert", "staging", "staging.example.com, 84 days left"),
                  line("OK", "slots", "staging", "no non-temporary replication slot"), line("OK", "revokes", "staging", "plpgsql and 17 built-ins closed to PUBLIC")]
+NEW = re.compile(r"^(OK|RED|WAIT|WARN) +(deploy|token) ")  # POLY-100's items (08_deploy, 09_token)
 FIX = lambda p: "run: sudo polycarpic-ops provision --stage database --project " + p
 
 
@@ -62,6 +63,13 @@ class Status(OpsTest):
         self.host.write("/var/lib/polycarpic/state/jobs.log", "")
         self.timeouts = set()
         self.psql_calls = []
+        # POLY-100 R10: a deployed, freshly polled box with a token that has weeks left (the new items are tested in test_deploy_status.py)
+        for proj in ("prod", "staging"):
+            self.host.write("/var/lib/polycarpic/state/deploy/%s/current" % proj, "sha256:%s v1.0.0 %s %s 2026-11-22T18:21:00Z\n" % ("1a2b3c4d5e6f" + "0" * 52, "a" * 40, "0" * 64))
+            self.host.write("/var/lib/polycarpic/state/deploy/%s/last-poll" % proj, "2026-11-22T18:35:00Z\n")
+        self.host.mkdir("/etc/polycarpic/secrets/host", 0o700)
+        self.host.write("/etc/polycarpic/secrets/host/github_read_token", "github_pat_" + "a" * 82 + "\n", 0o400)
+        self.host.write("/var/lib/polycarpic/state/deploy/token-expiry", "2027-02-01T00:00:00Z\n")
 
     def go(self, **_):
         r = Runner(None)
@@ -108,7 +116,8 @@ class Status(OpsTest):
         self.assertEqual(r.rc, 0, r.out + r.err)
         lines = r.out.splitlines()
         self.assertRegex(lines[0], r"^polycarpic-ops status  box1  2026-11-22 18:40Z  ops git-aaaaaaaaaaaa$")
-        self.assertEqual(lines[1:-1], [DISK_OK] + GREEN_PROD + GREEN_STAGING)
+        self.assertEqual([l for l in lines[1:-1] if not NEW.match(l)], [DISK_OK] + GREEN_PROD + GREEN_STAGING)
+        self.assertEqual(sorted(l.split()[:3] for l in lines if NEW.match(l)), [["OK", "deploy", "prod"], ["OK", "deploy", "staging"], ["OK", "token", "host"]])
         self.assertEqual(lines[-1], "STATUS GREEN")
 
     def test_waiting_items_make_a_green_with_waiting_summary_and_exit_3(self):
@@ -134,7 +143,7 @@ class Status(OpsTest):
 
     def test_prod_lines_come_before_staging_lines_disk_first_backup_items_prod_only(self):
         r = self.go()
-        items = [(l.split()[1], l.split()[2]) for l in r.out.splitlines()[1:-1]]
+        items = [(l.split()[1], l.split()[2]) for l in r.out.splitlines()[1:-1] if not NEW.match(l)]
         self.assertEqual(items[0], ("disk", "host"))
         self.assertNotIn(("backup", "staging"), items)
         self.assertNotIn(("backupdb", "staging"), items)

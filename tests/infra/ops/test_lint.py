@@ -15,7 +15,14 @@ def sources():
     return files
 
 
+def listish(node):
+    """POLY-100: `["gh"] + argv` is list concatenation, not a string argv."""
+    return isinstance(node, ast.List) or (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add) and (listish(node.left) or listish(node.right)))
+
+
 def stringish(node):
+    if isinstance(node, ast.BinOp) and listish(node):
+        return False
     if isinstance(node, (ast.JoinedStr, ast.BinOp)):
         return True
     if isinstance(node, ast.Constant):
@@ -24,6 +31,13 @@ def stringish(node):
 
 
 class Lint(unittest.TestCase):
+    def test_the_string_argv_rule_still_fires_on_string_building_and_not_on_list_concatenation(self):
+        parse = lambda src: ast.parse(src, mode="eval").body
+        for bad in ('"docker " + x', 'f"docker {x}"', '"a %s" % x', '"a" + x + "b"'):
+            self.assertTrue(stringish(parse(bad)), bad)
+        for ok in ('["gh"] + argv', 'base(r) + ["exec"]', '["a"] + b + ["c"]'):
+            self.assertFalse(stringish(parse(ok)), ok)
+
     def calls(self):
         for f in sources():
             for node in ast.walk(ast.parse(f.read_text(), str(f))):

@@ -16,18 +16,20 @@ SENT = {"POSTGRES": "a", "TOOLS": "b", "CADDY": "c", "APP": "d"}
 REPOS = {"POSTGRES": "polycarpic-postgres", "TOOLS": "polycarpic-tools", "CADDY": "polycarpic-caddy", "APP": "polycarpic"}
 
 
-def render(files, project, env_files, raw):
+def render(files, project, env_files, raw, src=None):
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
-        empty = tmp / "empty.env"
-        empty.write_text("")
         rel = tmp / "rel"
         d = rel / "infra" / "compose"
         d.mkdir(parents=True)
-        for f in files:
-            text = (REPO / "infra" / "compose" / f).read_text()
-            for host in ("/etc/polycarpic/host.env", "/etc/polycarpic/staging-host.env"):
-                text = text.replace(host, str(empty))
+        hosts = {"/etc/polycarpic/host.env": tmp / "prod-host.env", "/etc/polycarpic/staging-host.env": tmp / "staging-host.env"}
+        for h in hosts.values():
+            h.write_text("")
+        src_dir = Path(src) if src else REPO / "infra" / "compose"
+        for f in sorted(p.name for p in src_dir.glob("*.yml")):  # every file: an `include:` may name a sibling
+            text = (src_dir / f).read_text()
+            for host, tmp_path in hosts.items():
+                text = text.replace(host, str(tmp_path))
             (d / f).write_text(text)
         img = tmp / "images.env"
         img.write_text("".join("POLY_%s_IMAGE=ghcr.io/richmosko/%s@sha256:%s\n" % (k, REPOS[k], SENT[k] * 64) for k in SENT))
@@ -44,21 +46,30 @@ def render(files, project, env_files, raw):
         p = subprocess.run(argv, capture_output=True, text=True)
         if p.returncode:
             sys.exit("compose config failed: " + p.stderr)
-        host = "/etc/polycarpic/staging-host.env" if "staging" in project else "/etc/polycarpic/host.env"
-        return p.stdout.replace(str(empty), host).replace(str(rel), "@@REL@@")
+        text = p.stdout
+        for host, tmp_path in hosts.items():
+            text = text.replace(str(tmp_path), host)
+        return text.replace(str(rel), "@@REL@@")
 
 
 def main():
-    OUT.mkdir(parents=True, exist_ok=True)
+    # usage: gen_compose.py [--from <compose dir>] [--out <dir>]  (defaults: the repo's infra/compose and the committed fixtures)
+    args = sys.argv[1:]
+    src = args[args.index("--from") + 1] if "--from" in args else None
+    out = Path(args[args.index("--out") + 1]) if "--out" in args else OUT
+    only = args[args.index("--only") + 1] if "--only" in args else None
+    out.mkdir(parents=True, exist_ok=True)
     edge_env = [("edge.env", "POLY_DOMAIN=example.com\nPOLY_BIND_ADDR=0.0.0.0\nPOLY_STAGING_ALLOW=10.0.0.0/8\nPOLY_TLS=internal\n")]
     sets = {"prod": (["prod.yml"], "polycarpic-prod", []), "staging": (["staging.yml"], "polycarpic-staging", []),
             "prod-edge": (["prod.yml", "edge.yml"], "polycarpic-prod", edge_env), "edge": (["edge.yml"], "polycarpic-edge", edge_env)}
     for name, (files, project, envs) in sets.items():
+        if only and name != only:
+            continue
         for raw in (True, False):
-            text = render(files, project, envs, raw)
+            text = render(files, project, envs, raw, src)
             json.loads(text)
-            (OUT / ("%s.%s.json" % (name, "raw" if raw else "plain"))).write_text(text)
-    print("wrote", sorted(p.name for p in OUT.iterdir()))
+            (out / ("%s.%s.json" % (name, "raw" if raw else "plain"))).write_text(text)
+    print("wrote", sorted(p.name for p in out.iterdir()))
 
 
 if __name__ == "__main__":

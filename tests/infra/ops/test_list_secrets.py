@@ -20,7 +20,7 @@ class ListSecrets(OpsTest):
         counts = dict(set=0, missing=0, wrong=0)
         rows = list(mounts(project))
         if project == "prod":
-            rows = sorted(rows + [("host", "heartbeat_url", "")])  # POLY-99 H-1: host-only, root:root 0400, no service mounts it
+            rows = sorted(rows + [("host", "heartbeat_url", ""), ("host", "github_read_token", "")])  # POLY-99 H-1: host-only, root:root 0400, no service mounts it
         for svc, name, _ in rows:
             f = self.host.secret_path(svc, name, staging)
             if not f.exists() and not f.is_symlink():
@@ -56,12 +56,12 @@ class ListSecrets(OpsTest):
     def test_the_host_only_heartbeat_url_is_listed_0400_set_and_0440_is_wrong(self):
         self.host.secret("host", "heartbeat_url", "https://hc-ping.example/u\n", mode=0o400)
         r = self.host.go("list-secrets")
-        self.assertIn("set      0400", [l for l in r.out.splitlines() if l.startswith("host ")][0])
+        self.assertIn("set      0400", [l for l in r.out.splitlines() if l.startswith("host ") and "heartbeat_url" in l][0])
         os.unlink(str(self.host.secret_path("host", "heartbeat_url")))
         self.host.secret("host", "heartbeat_url", "https://hc-ping.example/u\n", mode=0o440)
         r = self.host.go("list-secrets")
         self.assertEqual(r.rc, 1)
-        self.assertIn("WRONG    0440", [l for l in r.out.splitlines() if l.startswith("host ")][0])
+        self.assertIn("WRONG    0440", [l for l in r.out.splitlines() if l.startswith("host ") and "heartbeat_url" in l][0])
 
     def test_staging_reads_the_staging_tree_and_compose_file(self):
         self.plant_some(staging=True)

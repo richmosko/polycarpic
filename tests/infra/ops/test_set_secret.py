@@ -15,7 +15,7 @@ def settable(project="prod"):
     refused = REFUSED_PROVISION | {"credential_keyring", "staging_basic_auth"}
     names = set(n for _, n, _ in mounts(project) if n not in refused)
     if project == "prod":
-        names |= {"heartbeat_url"}  # POLY-99 H-1: host-only, written by set-secret under secrets/host/, mounted by no service
+        names |= {"heartbeat_url", "github_read_token"}  # POLY-99 H-1: host-only, written by set-secret under secrets/host/, mounted by no service
     return sorted(names)
 
 
@@ -150,7 +150,7 @@ class SetSecret(OpsTest):
         ctx_class()
         import importlib
         rules = importlib.import_module("lib.secrets")
-        self.assertEqual(rules.HOST_ONLY, {"heartbeat_url": "host"})
+        self.assertEqual(rules.HOST_ONLY, {"heartbeat_url": "host", "github_read_token": "host"})  # POLY-100 S8: exactly two names
         mounted = set(n for p in ("prod", "staging") for _, n, _ in mounts(p))
         self.assertEqual(mounted & set(rules.HOST_ONLY), set())
 

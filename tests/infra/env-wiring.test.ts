@@ -15,19 +15,20 @@ function hostEnv(): Record<string, string> {
   const body = /host_env\(\) \{[\s\S]*?put_file "\$file" 0644 "([\s\S]*?)"\n\}/.exec(readFileSync(join(ROOT, 'infra', 'provision.sh'), 'utf8'));
   if (!body) throw new Error('host_env() not found in provision.sh');
   const out: Record<string, string> = {};
-  for (const line of body[1].split('\n')) {
+  for (const line of body[1].replace(/\\"/g, '"').split('\n')) {
     const m = /^([A-Z_]+)=(.*)$/.exec(line);
     if (m) out[m[1]] = m[2].replace(/\$origin/, 'https://app.example.com').replace(/\$instance/, 'polycarpic-x').replace(/^"\$from"$/, '"Polycarpic <no-reply@mail.example.com>"').replace(/^"|"$/g, '');
   }
   return out;
 }
 
+const FAULTS_THAT_MEAN_WIRING = new Set(['not_set', 'mismatch', 'invalid', 'forbidden', 'secret_in_env']); // not: a secret file that is absent on the runner
 export function notSet(cfg: any, svc: Service): string[] {
   const s = cfg.services[svc];
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(s.environment ?? {})) env[k] = String(v);
   for (const f of s.env_file ?? []) if ((typeof f === 'string' ? f : f.path).includes('host.env')) Object.assign(env, hostEnv());
-  return checkConfig(svc, env).filter((p) => p.fault === 'not_set').map((p) => p.var);
+  return checkConfig(svc, env).filter((p) => FAULTS_THAT_MEAN_WIRING.has(p.fault)).map((p) => `${p.var}:${p.fault}`);
 }
 
 describe('T-env: every app service is wired for check-config', () => {
@@ -47,12 +48,26 @@ describe('T-env: every app service is wired for check-config', () => {
       const e = cfg.services[svc].environment;
       e.DB_PASSWORD_FILE = e.DATABASE_PASSWORD_FILE;
       delete e.DATABASE_PASSWORD_FILE;
-      expect(notSet(cfg, svc)).toContain('DATABASE_PASSWORD_FILE');
+      expect(notSet(cfg, svc)).toContain('DATABASE_PASSWORD_FILE:not_set');
     }
   });
   it('the detector is live: a service with no env_file loses TLS_MODE and PUBLIC_ORIGIN', () => {
     const cfg = render('prod');
     delete cfg.services.web.env_file;
-    expect(notSet(cfg, 'web')).toEqual(expect.arrayContaining(['TLS_MODE', 'PUBLIC_ORIGIN']));
+    expect(notSet(cfg, 'web')).toEqual(expect.arrayContaining(['TLS_MODE:not_set', 'PUBLIC_ORIGIN:not_set']));
+  });
+  it('the detector is live: PLAID_ENV absent is reported, and the two projects\' values swapped are reported as a mismatch', () => {
+    for (const [project, other] of [['staging', 'prod'], ['prod', 'staging']]) {
+      const cfg = render(project);
+      for (const svc of APP) {
+        const e = cfg.services[svc].environment;
+        const kept = e.PLAID_ENV;
+        delete e.PLAID_ENV;
+        expect(notSet(cfg, svc), `${project} ${svc}`).toContain('PLAID_ENV:not_set');
+        e.PLAID_ENV = render(other).services[svc].environment.PLAID_ENV;
+        expect(e.PLAID_ENV).not.toBe(kept);
+        expect(notSet(cfg, svc), `${project} ${svc} swapped`).toContain('PLAID_ENV:mismatch');
+      }
+    }
   });
 });

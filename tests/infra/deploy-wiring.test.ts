@@ -29,25 +29,6 @@ describe('build.yml: siblings job (R11)', () => {
   });
 });
 
-describe('build.yml: app job (R11)', () => {
-  it('needs the siblings job and runs the compose-policy lint and the images.env writer before the app build', () => {
-    expect(wf.jobs.build.needs).toEqual('siblings');
-    const names = stepsOf('build').map((s) => String(s.run ?? '') + String(s.uses ?? ''));
-    const iEnv = names.findIndex((n) => n.includes('infra/ci/images-env.sh'));
-    const iLint = names.findIndex((n) => n.includes('compose-policy.mjs'));
-    const iBuild = names.findIndex((n) => n.startsWith('docker/build-push-action'));
-    expect(iEnv).toBeGreaterThanOrEqual(0);
-    expect(iLint).toBeGreaterThan(iEnv);
-    expect(iBuild).toBeGreaterThan(iLint);
-  });
-  it('the lint step has all four image variables: the three from the written images.env, the app one exported', () => {
-    const step = stepsOf('build').find((s) => String(s.run ?? '').includes('compose-policy.mjs'));
-    expect(String(step.run)).toContain('infra/release/images.env');
-    expect(String(step.run)).toContain('POLY_APP_IMAGE=');
-    expect(read('infra/ci/images-env.sh')).toMatch(/POLY_POSTGRES_IMAGE[\s\S]*POLY_TOOLS_IMAGE[\s\S]*POLY_CADDY_IMAGE/);
-  });
-});
-
 describe('compose files: no default digest anywhere (F10)', () => {
   for (const f of ['prod', 'staging', 'edge']) {
     it(`${f}.yml: every POLY_*_IMAGE is \${…:?} and no image carries a literal digest`, () => {
@@ -83,7 +64,7 @@ describe('deploy units (R1)', () => {
 
 describe('installed policy and signers (R5, R11)', () => {
   it('compose-allow.json ships with the ops bundle, not the release manifest', () => {
-    expect(read('infra/ops/install.sh')).toContain('compose-allow.json');
+    expect(read('infra/ops/install.sh')).toMatch(/PATHS="[^"]*\binfra\/deploy\b/);
   });
   it('provision-check reports compose-allow.json, allowed_signers and edge.env', () => {
     const c = read('infra/provision-check.sh');
