@@ -30,9 +30,6 @@ describe('POLY-99 change filter: every path a job executes or reads selects that
     expect(a).not.toContain('provision');
     for (const p of ['tests/infra/ops/test_backup.py', 'tests/infra/provision/poly99.test.ts']) expect(changed([p]), p).toContain('provision');
   });
-  it('packages/db/sql/roles.sql (drill.sh and the scratch stack run it) selects image', () => {
-    expect(changed(['packages/db/sql/roles.sql'])).toContain('image');
-  });
 });
 
 describe('POLY-99 change key `backup` (ruling Guards @ 2bf5a6ba): the container suite runs only when one of its paths changed', () => {

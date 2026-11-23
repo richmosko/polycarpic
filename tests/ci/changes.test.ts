@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { ci, node } from './helpers.ts';
 
-const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e'] as const;
+const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e'] as const; // `backup` (POLY-99) has its own cases in tests/infra/backup-wiring.test.ts
 const run = (paths: string[]) => {
   const r = node('changes.mjs', { input: paths.join('\0') + '\0' });
   const out: Record<string, string> = {};
