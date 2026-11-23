@@ -102,7 +102,7 @@ box_ssh() { # <name or empty> <verb>
 
 # from_box: the newest premigration set (or --set) from `list-premigration`, each file checked against root's record on the box
 from_box() {
-  local list line n ts d dsha g gsha state f1 f2 f3 f4 f5 f6 extra pick=''
+  local list line n kind rest ts d dsha g gsha state f1 f2 f3 f4 f5 f6 extra pick=''
 
   list=$(box_ssh "" list-premigration) || die 5 "the box refused list-premigration"
   while IFS= read -r line; do
@@ -115,12 +115,14 @@ from_box() {
   [ -n "$pick" ] || die 3 "no premigration set on the box${SETTS:+ for $SETTS}"
   read -r ts d dsha g gsha state <<< "$pick"
   SET_TS=$ts
-  for n in "$d:$dsha" "$g:$gsha"; do
-    box_ssh "${n%%:*}" fetch-premigration > "$WORK/${n%%:*}" || die 5 "the box refused fetch-premigration"
-    [ "$(sha256f "$WORK/${n%%:*}")" = "${n##*:}" ] || die 4 "${n%%:*} does not match the spool record"
+  # local files carry fixed names: a name from the box is never a path here (C5)
+  for n in "dump:$d:$dsha" "globals:$g:$gsha"; do
+    kind=${n%%:*}; rest=${n#*:}
+    box_ssh "${rest%%:*}" fetch-premigration > "$WORK/fetched-$kind" || die 5 "the box refused fetch-premigration"
+    [ "$(sha256f "$WORK/fetched-$kind")" = "${rest##*:}" ] || die 4 "${rest%%:*} does not match the spool record"
   done
-  decrypt "$WORK/$d" "$WORK/dump.dec" || exit 4
-  decrypt "$WORK/$g" "$WORK/globals.dec" || exit 4
+  decrypt "$WORK/fetched-dump" "$WORK/dump.dec" || exit 4
+  decrypt "$WORK/fetched-globals" "$WORK/globals.dec" || exit 4
   check_time dump "$WORK/dump.dec" "$ts" 1800 || exit 4 # T17
   DUMP_PLAIN=$WORK/dump.dec; GLOBALS_PLAIN=$WORK/globals.dec
   if [ -n "$CRED" ]; then
