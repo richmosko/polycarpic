@@ -195,6 +195,49 @@ class Bundle(DeployTest):
         self.assertEqual([a for a in r.world.docker_log if a[1] == "create"][0][:3], ["docker", "create", "--name"])
 
 
+class Siblings(Bundle):
+    """T5 (S1, R3 V5): every sibling image passes V1 with the same C and the same flags, then V2 and V3."""
+
+    def verifies(self, r):
+        return [c["argv"] for c in r.runner.calls if c["argv"][:3] == ["gh", "attestation", "verify"]]
+
+    def test_t5_a_sibling_failing_v1_stops_the_deploy_and_is_not_quarantined(self):
+        for name in ("postgres", "tools", "caddy"):
+            self.tearDown_world()
+            x = self.candidate(make_tar(good_files()))
+            self.world.attested.discard((sibling_digests()[name], self.world.commit_b))
+            r = self.deploy("staging")
+            self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused sibling-" + name), name)
+            self.assertEqual((self.state("staging", "quarantine") or "").strip(), "", "V1 of a sibling is not a Q row")
+            self.assertEqual([a for a in r.world.docker_log if a[1] in ("compose", "run")], [])
+
+    def test_t5_a_sibling_attested_at_another_commit_is_refused(self):
+        self.candidate(make_tar(good_files()))
+        d = sibling_digests()["tools"]
+        self.world.attested.discard((d, self.world.commit_b))
+        self.world.attested.add((d, self.world.commit_a))
+        r = self.deploy("staging")
+        self.assertEqual(r.err.splitlines()[-1], "deploy: refused sibling-tools")
+
+    def test_t5_a_sibling_with_the_wrong_label_is_refused_and_quarantined(self):
+        x = self.candidate(make_tar(good_files()))
+        self.world.image("polycarpic-caddy", sibling_digests()["caddy"], self.world.commit_a)
+        r = self.deploy("staging")
+        self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused sibling-caddy"))
+        self.assertIn(x, self.state("staging", "quarantine"))
+
+    def test_t5_each_sibling_is_verified_with_the_same_flags_and_c(self):
+        x = self.candidate(make_tar(good_files()))
+        r = self.deploy("staging")
+        v = self.verifies(r)
+        self.assertEqual(len(v), 4)
+        refs = sorted(a[3] for a in v)
+        want = sorted(["oci://ghcr.io/richmosko/polycarpic@" + x] + ["oci://ghcr.io/richmosko/polycarpic-%s@%s" % (n, d) for n, d in sibling_digests().items()])
+        self.assertEqual(refs, want)
+        flagsets = set(tuple(sorted(a[4:])) for a in v)
+        self.assertEqual(len(flagsets), 1, "the same six flags and the same C for every image")
+
+
 class RealRunBytes(unittest.TestCase):
     """ctx.run_bytes in production: reads at most 64 MiB + 1 of a child's stdout, then kills the child (red on a mutant that reads it all first)."""
 
