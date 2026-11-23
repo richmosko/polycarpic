@@ -937,3 +937,25 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Defer to POLY-103's alerting design.
 **Approved by:** Mosko
+
+### 2026-11-23 — The box's GitHub token reads public repositories only
+**Decision:** `github_read_token` is a fine-grained token limited to public repositories, read-only, with no permissions (POLY-100 ruling §D1 option (b)). Classic tokens are refused by `set-secret`. Before the first staging deploy (POLY-104) it must be shown to download the staging digest artifact and to run `gh attestation verify`; if it cannot, the choice returns to the Principal and is never widened quietly.
+**Why:** The box needs a token only because GitHub refuses the attestation check and the artifact download to anonymous callers and caps them at 60 requests an hour; everything it reads is public. The token sits in a root-only file, so its own reach is what matters if root on the box or the laptop is compromised. This scope reads nothing a stranger cannot, now or if the repository is later made private; a thief can only exhaust the hourly allowance and stall deploys. The architect and seceng both recommended it.
+**Alternatives considered:**
+- INFRA's earlier spec: this repository, `contents:read` and `packages:read`, which would read private code if the repository went private and may force a classic token for packages (unmeasured).
+**Approved by:** Mosko
+
+### 2026-11-23 — Staging never deploys the shared Caddy edge (strict)
+**Decision:** Caddy's image, Caddyfile and `edge.yml` come only from a signed prod release, on every host, with no exception for a staging-only host (POLY-100 ruling §D2, strict). The Principal first chose the exception and reversed it the same day. The CI lint allowlists Caddyfile directives per block and in order (A12, S20), and each prod deploy after the first checks health through Caddy (A13).
+**Why:** One Caddy decrypts all prod traffic. Staging deploys every `main` build with no signature, so staging-owned Caddy puts unsigned code on ports 80 and 443. The exception was meant to save one setup step before the first staging deploy; it needed five security conditions (S11, S15, S16, S17, A11), several of which failed open in the built code, and it still left a DNS check that is a glance at poll time, for one name, with no way to revoke a certificate already issued, and a destructive wipe never run live. The lead's first description of the exception to the Principal overstated the safety net: health catches a Caddy that will not start, not one that starts and is configured wrongly; nothing on the box stops that under any option. seceng and the lead changed their recommendation to strict.
+**Alternatives considered:**
+- The exception: staging owns Caddy on a host with no prod, guarded by DNS checks and a wipe at prod's first deploy.
+- Caddy follows staging always, which bypasses the signed-tag gate.
+**Approved by:** Mosko
+
+### 2026-11-23 — The box's compose guard policy ships only by `install.sh`
+**Decision:** The compose guard and its allowlist (`infra/deploy/compose-allow.json`) are installed tooling, never read from a release (POLY-100 ruling §D3 option (a)). A release that needs a wider policy is refused and quarantined until the operator runs `infra/ops/install.sh` from a reviewed checkout; the next poll then re-checks it in full with nothing to clear. By the Principal's requirement, the refusal's alert, log and status carry the exact commands, review first and install second, built only from installed and verified values.
+**Why:** Staging has no human gate after a merge and shares the box with prod, so a release judging itself would let any `main` merge widen the policy and mount host paths in the same change. The cost is one laptop command on releases that change mounts, services, networks or pinned settings. The architect and seceng both recommended it.
+**Alternatives considered:**
+- The release carries its own policy, checked by the installed code.
+**Approved by:** Mosko
