@@ -174,8 +174,11 @@ The guard judges `current`'s render before step 2's `up`, on staging too. Every 
 project has never had a release, and before `provision --stage database` poly_backup does not exist. It refuses
 (`existing-data`, exit 4) when the project's Postgres data directory is non-empty (seceng A8), with two ways through:
 - **Its own earlier attempt.** When the directory is empty and there is no `current`, `first-deploy` writes the root file
-  `state/deploy/<project>/first-attempt` before starting Postgres, and removes it when healthy. While it exists a rerun
-  proceeds and skips step 3. Without it the normal path is blocked: the first run starts Postgres, stops at
+  `state/deploy/<project>/first-attempt` before starting Postgres, and removes it when healthy. A rerun
+  skips step 3 only when the file exists, there is no `current`, **and** the project's database holds no table outside the
+  system schemas, read over the container's local socket just before step 5 (S19). A table, or a failed or unparsable read,
+  makes step 3 required; when that backup then fails, the run also prints the provision command. The file is ignored and
+  removed whenever `current` exists. Without it the normal path is blocked: the first run starts Postgres, stops at
   `roles-missing`, and the rerun finds a non-empty directory. A lost state directory has no such file.
 - **`--existing-data`,** which makes step 3 required on prod. No release exists then, so `backup.py` renders the ops
   bundle's `prod.yml`, with `POLY_POSTGRES_IMAGE` from the running container and, for `POLY_APP_IMAGE` and
@@ -413,7 +416,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
 | T10q | A `guard-<rule>` digest is skipped while the bundle id is unchanged; after the id changes it is judged again in full (deploys if it passes, is refused again if not). An `unhealthy` digest stays skipped after the same change, as does one with both reasons, or with a missing or malformed id stored or installed (S18) | mutant lifting every reason; mutant never lifting; mutant lifting without V1 |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
-| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty |
+| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; the same with one user table, or the read failing: step 3 runs; a leftover file beside `current` has no effect (S19); `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty; mutant trusting the file alone |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
 | T14 | `--pull never --no-build` on every compose up/run; only R4's `-f` files | mutant without `--pull never` |
 | T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
@@ -500,7 +503,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S18 (seceng `ruling-review.md` @ `0afb1c26`): met by
+## S1–S19 (seceng `ruling-review.md` @ `2ce7c225`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -524,4 +527,5 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S16 one edge-ownership decision per run | R9; T9 |
 | S17 malformed `current` is not absent | R10; T9 |
 | S18 unreadable bundle id keeps the quarantine | R8; T10q |
+| S19 rerun skips the backup only on an empty database | R6; T12 |
 | A12, A13 (adopted) | R11 `caddy-allow`, T-caddy; R7 through Caddy, T-probe |
