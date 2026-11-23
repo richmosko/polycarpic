@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -119,7 +120,18 @@ class BackupBase(OpsTest):
     def mutant_dispatcher(self, rel, old, new):
         """A mutant COPY of infra/ops with one textual change in `rel` (never a fake of the module under test)."""
         tmp = Path(tempfile.mkdtemp(prefix="poly99-mutant-"))
-        self.addCleanup(shutil.rmtree, str(tmp), True)
+        # Loading a mutant copy puts ITS `lib` package in sys.modules and its directory on sys.path; once the copy is deleted every later
+        # `from lib import x` in the same process would search a directory that is gone (found on Linux in CI: 97 import errors in every file after test_backup).
+        # Restore both when the test ends.
+        saved_path, saved_modules = list(sys.path), set(sys.modules)
+
+        def _restore():
+            sys.path[:] = saved_path
+            for name in list(sys.modules):
+                if name not in saved_modules:
+                    del sys.modules[name]
+            shutil.rmtree(str(tmp), True)
+        self.addCleanup(_restore)
         dst = tmp / "ops"
         shutil.copytree(str(OPS), str(dst), ignore=shutil.ignore_patterns("__pycache__"))
         f = dst / rel

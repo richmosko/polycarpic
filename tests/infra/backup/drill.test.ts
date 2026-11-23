@@ -9,7 +9,7 @@
 // version (by fileId) still downloads with its original sha256. The drill must continue past a failed check so one run reports every FAIL id.
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Files, fixtures, msToTs, plantObject, plantVersion, tsToMs } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
 import { APP_KEY, INSTANCE, KEY_ID, PROJECT, type Stack, attach, sh } from './stack.ts';
@@ -32,6 +32,7 @@ beforeAll(() => {
 afterAll(() => { if (lap) lap.cleanup(); if (fake) fake.reset(); });
 beforeEach(() => { if (setupError) throw new Error(setupError); lap.resetLogs(); lap.setFdesetup(0); fake.reset(); });
 
+afterEach(() => { const ids = lap.scratches(); if (ids.length) sh('docker', ['rm', '-f', '-v', ...ids]); }); // a failed case must not leave a labelled scratch for the next file's WARN check
 const tsOf = (n: string) => /-(\d{8}T\d{6}Z)\.age$/.exec(n)![1]!;
 const TS0 = () => tsOf(Object.keys(SET)[0]!);
 /** plant the set (as the uploader leaves it) and the WAL; `rename` maps each set name, `replace` swaps the bytes of one kind, `siblingWrong` names kinds whose sibling lies */

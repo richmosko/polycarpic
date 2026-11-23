@@ -55,6 +55,21 @@ Each run puts the named files back to the commit before the fix, runs the named 
 
 A leftover scratch container from the F4 red run was removed by hand afterwards.
 
+## Shared state a test changes that another file relies on (audit after the Linux CI failures)
+
+Two real cases, both found by CI on Linux and fixed; the rest checked and kept.
+
+| State | Who changes it | Verdict |
+|---|---|---|
+| the shared fake-b2's networks (its published port) | `uploader.test.ts` T3 attached and detached it | **fixed**: T3 uses a throwaway listener; `attachFake` checks host reachability and fails setup with facts. Reproduced on a Linux daemon (docker:dind): reachable, then unreachable after `network connect`, still unreachable after `disconnect -f` |
+| Python `sys.path` and `sys.modules` | `backup_base.mutant_dispatcher` loaded a mutant copy of `infra/ops` from `/tmp`; the copy's `lib` stayed in `sys.modules` after the copy was deleted | **fixed**: both are restored in the test's cleanup. Reproduced in the CI image (poly97-box, Python 3.12): 132 errors in every file after `test_backup` before, 222/222 after |
+| fake-b2 store, mode, apiUrl | most container files | kept: every file resets it in `beforeEach` and the files that set a mode reset it in `afterAll` |
+| the canary table | `roundtrip.test.ts` inserts a row after the base | kept: deleted in its `afterAll` |
+| the spool and the WAL volume | backup, uploader, roundtrip | kept: cleared at the start of each test or in `afterAll`; WAL keeps accumulating, harmless |
+| the host recipients file | `backup.test.ts` rewrites it per case | kept: restored in a `finally`; a fresh container per file because Docker Desktop shows a stale view |
+| labelled scratch containers | restore, roundtrip, drill | **tightened**: an `afterEach` removes any labelled scratch, so a failed case cannot make the next file's WARN check fail |
+| `docker volume ls` and `docker ps` sets | the F4 real-Docker case and the WARN case | kept, but they assume nothing else touches the daemon during the run: one suite at a time (CI runs the steps in sequence) |
+
 ## Every test commit since the red run (`1cd28a70`)
 
 Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **loosened**, with one line of why. Nothing is loosened without a ruling, and the two that are marked loosened say which (`738c8e87` was accepted by the architect at `3f635dc3`).

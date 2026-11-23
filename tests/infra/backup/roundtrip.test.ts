@@ -4,7 +4,7 @@
 // must be present after WAL recovery and absent from the dump restore.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { fixtures, plantVersion, sha256 } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
 import { INSTANCE, PROJECT, type Stack, attach, sh } from './stack.ts';
@@ -37,6 +37,7 @@ afterAll(() => {
   if (fake) fake.reset();
 });
 beforeEach(() => { if (setupError) throw new Error(setupError); lap.resetLogs(); lap.setFdesetup(0); });
+afterEach(() => { const ids = lap.scratches(); if (ids.length) sh('docker', ['rm', '-f', '-v', ...ids]); }); // a failed case must not leave a labelled scratch for the next file's WARN check
 const B = (what: string) => ['--identity', lap.identity, '--read-credential', lap.credential, '--bucket', 'poly-test-bucket', what, '--instance', INSTANCE];
 const scratch = (out: string) => /^scratch container: (\S+)$/m.exec(out)?.[1] ?? '';
 const q = (c: string, sql: string) => sh('docker', ['exec', c, 'psql', '-U', 'postgres', '-d', 'polycarpic', '-tAc', sql]).out.trim();

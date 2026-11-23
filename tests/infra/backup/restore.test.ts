@@ -5,7 +5,7 @@
 // the other real restores are in roundtrip.test.ts (--base, --dump, --premigration) and drill.test.ts.
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Files, fixtures, msToTs, plantObject, plantVersion, sha256, tsToMs } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
 import { INSTANCE, PROJECT, type Stack, attach, sh } from './stack.ts';
@@ -43,6 +43,8 @@ export function dataOnlyRestores(text: string): string[] {
     return false;
   });
 }
+afterEach(() => { const ids = lap.scratches(); if (ids.length) sh('docker', ['rm', '-f', '-v', ...ids]); }); // a failed case must not leave a labelled scratch for the next file's WARN check
+
 const NOSCRATCH = { POLY99_SCRATCH_FAIL: '1' };
 /** the nightly set A as the uploader leaves it, uploaded a minute after its <TS> */
 const plantA = (o: { uploadedMs?: number } = {}) => { for (const [n, b] of Object.entries(A)) plantObject(fake, s.major, 'dump', n, b, o.uploadedMs ?? tsToMs(tsA) + 60_000); };
