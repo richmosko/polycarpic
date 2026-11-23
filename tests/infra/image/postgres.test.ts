@@ -148,7 +148,7 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
     expect(s.root(`ls ${walDir()}/${T(SEG)}`).code).toBe(0);
     const plain = s.exec('sh', '-c', 'sha256sum < /tmp/seg1').out;
     const dec = sh('docker', ['run', '--rm', '-i', '-v', `${s.dir}:/w`, '--entrypoint', 'sh', IMG, '-c',
-      `cat > /tmp/id; age -d -i /tmp/id ${walDir()}/${T(SEG)} | sha256sum`], { input: s.identity });
+      `cat > /tmp/id; age -d -i /tmp/id ${walDir()}/${T(SEG)} | gunzip | sha256sum`], { input: s.identity });
     expect(dec.out).toBe(plain); // red: encrypted to the wrong recipient, or not encrypted
     expect(s.root(`! grep -q AAAAAAAAAAAAAAAA ${walDir()}/${T(SEG)}`).code).toBe(0); // red: a plaintext copy in the spool
   });

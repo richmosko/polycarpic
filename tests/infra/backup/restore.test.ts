@@ -226,6 +226,12 @@ describe('restore --dump from the bucket (R7, T10, C5, C7, C7\', C9)', () => {
     const log = fake.log().join('\n');
     expect(log).toContain('b2_authorize_account');
     expect(log).not.toMatch(/^(PUT|DELETE|HEAD) /m);
+    // C11: the read key and the identity reach no docker call, no age call and no output
+    const key = readFileSync(lap.identity, 'utf8').split('\n').find((l) => l.startsWith('AGE-SECRET-KEY-'))!;
+    for (const blob of [lap.dockerCalls().join('\n'), lap.ageCalls().join('\n'), r.out, r.err, lap.sshLog()]) {
+      expect(blob).not.toContain(key);
+      expect(blob).not.toContain('K004FIXTUREREADAPPKEY0000000000000');
+    }
   });
   it('T10: two versions of the dump and a hide marker -> exit 3 listing every version (fileId, upload time); no download', () => {
     plantA();
@@ -319,6 +325,18 @@ describe('restore --dump from the bucket (R7, T10, C5, C7, C7\', C9)', () => {
       expect({ code: r.code, err: r.err.slice(-400) }).toEqual({ code: 0, err: expect.any(String) });
       expect(r.err).toContain('WARN late upload');
     });
+    it("C7': a dump whose archive time is 2 h after its name's <TS> restores in a NIGHTLY set (window TS+3 h) and is refused (exit 4) in a PREMIGRATION set (window TS+30 min)", () => {
+      const older = msToTs(tsToMs(tsA) - 2 * 3600_000);
+      for (const [n, b] of Object.entries(A)) plantObject(fake, s.major, 'dump', n.replace(tsA, older), b, tsToMs(tsA) + 60_000);
+      const nightly = lap.run('restore.sh', REST_BUCKET());
+      expect({ code: nightly.code, err: nightly.err.slice(-300) }).toEqual({ code: 0, err: expect.any(String) });
+      const olderP = msToTs(tsToMs(tsP) - 2 * 3600_000);
+      const renamed = Object.fromEntries(Object.entries(P).map(([n, b]) => [n.replace(tsP, olderP), b]));
+      lap.setBox({ files: renamed, record: Object.entries(renamed).map(([n, b]) => [sha256(b), `premigration/${n}`] as [string, string]) });
+      const prem = lap.run('restore.sh', ['--identity', lap.identity, '--premigration', '--from-box', 'polyops@box.example']);
+      expect(prem.code).toBe(4);
+      expect(prem.out + prem.err).toMatch(/archive time|replay/i);
+    }, 300_000);
     it('T17: a dump whose own archive time is more than a minute before its name\'s <TS> (an old file under a fresh name) -> exit 4, no scratch', async () => {
       const wait = tsToMs(tsA) + 75_000 - Date.now();
       if (wait > 0) await new Promise((res) => setTimeout(res, wait));

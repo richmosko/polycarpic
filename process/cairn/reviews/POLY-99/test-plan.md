@@ -94,3 +94,61 @@ The scripts run on the host with shims first on PATH: `ssh` (logs argv and stdin
 | bucket dump restore; T10 (refusal list, `--before`, + mutant); C9; C5 key | R7, T10, C5, C9 |
 | C7′ (future TS, two sets/day, late and early upload, `--set`); T17 (+ mutant) | C7′, T17 |
 | C6 flags; T11 decoy (+ detector); globals first, whole dump | R7, C6, T11, F4 |
+
+## More pins (tranche 5)
+
+34. **drill output:** `PASS|FAIL|SKIP <id> <text>`, last line `DRILL PASSED` (0) / `DRILL PASSED WITH SKIPS: <ids>` (3) / `DRILL FAILED: <ids>` (1), usage 2 (`usage: drill.sh …`). Today the happy run is exit 3 with `DRILL PASSED WITH SKIPS: DR9`. DR8 is PASS when neither `public.session` nor `app.session_handle` exists. `--report <path>` writes markdown holding the date, every object name, every `fileId` (as the fake issues them, `4_zfake_<n>`), and each check id with its result. Scratch containers are gone on exit.
+35. **DR10 verbs (my reading of "refused", tell me if wrong):** with the box key against the S3 half, DELETE of an object, a conditional PUT `If-None-Match: *` over an existing name, `PUT ?retention` and `PUT ?object-lock`; fake-b2 refuses them (403, 412) and allows them in `permissive`. A plain PUT of an existing name is a new version in B2 and is not a refusal.
+36. **C1 padding:** the scratch stack pads a table with 6 MiB of random hex so a dump exceeds the 1 MiB `/tmp` cap.
+37. **Uploader suite fact found against the real image:** rclone adds `?x-id=PutObject` to every PUT; fake-b2 logs the plain path (the query only for the DR10 verbs). `--ignore-checksum` defeats the ETag compare only when it is on every rclone call (the object and its sibling), so the T5 mutant adds it to every `--no-check-dest`.
+38. **C4 mutant marker:** the hash comparison in `fetch-premigration` (commands/backup.py) is ONE `if` line ending in `# C4`.
+39. **N1 mutant marker:** the dir and name validation of a `verified` line (commands/upload.py) is ONE `if` line ending in `# N1`.
+40. **Wiring pair for devops-99 (names are mine, tell me if you prefer others):** `changes.mjs`: the `provision` key gains `^infra\/backup\/`, `^infra\/restore\.sh$`, `^infra\/drill\.sh$`, `^infra\/postgres\/archive-wal\.sh$`; the `image` key gains `^packages\/db\/sql\/roles\.sql$`. `ci.yml`: the `provision` job's shellcheck step lists `infra/backup/backup.sh`, `upload.sh`, `restore-lib.sh`, `infra/restore.sh`, `infra/drill.sh`, `infra/postgres/archive-wal.sh`; the `image` job gains one step before its vitest step that runs `apt-get install` for `age` and `postgresql-client`. `tests/infra/backup-wiring.test.ts` holds these pins.
+41. **set-secret wording (H-1):** after writing `heartbeat_url` the last stdout line is `set-secret: heartbeat_url written; root reads it on the next backup or upload run`.
+
+## Where every condition and behaviour is tested
+
+| Item | Test (file :: case) |
+|---|---|
+| R1 stdout, exit codes, preconditions, premigration, leftovers | backup.test.ts (preconditions table, premigration, leftovers); slice0.test.ts |
+| R2 grammar | uploader.test.ts :: R2 grammar through the uploader (4 good WAL forms, 10 bad names); test_backup/test_upload N1 tables |
+| R3 target name, exists, stale temp, age failure | tests/infra/image/postgres.test.ts (archive cases, R3 names, data-dir cwd, gunzip) |
+| R4 run order, siblings, skip, strays, exit 1/2/3, config 0600, argv | uploader.test.ts (41 cases) |
+| R5, R6 runner | tests/infra/ops/test_backup.py, test_upload.py |
+| R7 restore | restore.test.ts; roundtrip.test.ts |
+| R8 drill | drill.test.ts |
+| R9 windows, status | test_status.py (T12 cases, premigration cap); test_set_secret, test_list_secrets (H-1) |
+| R10 compose, lint | lint-poly99.test.ts; baseline.ts |
+| R10 provision, provision-check (ACLs, units, records, endpoint, H6, H7, H8, H16, H-1) | tests/infra/provision/poly99.test.ts; ops/test_provision.py (`--b2-endpoint`) |
+| R13 guards, CI wiring | backup-wiring.test.ts |
+| C1 | backup.test.ts :: C1 (no space); lint-poly99 (`tmp-size`, `mount-allowlist`) |
+| C2 | backup.test.ts and uploader.test.ts :: C2 (`ulimit -c` is 0); lint-poly99 (`core-dump`); restore/drill static checks |
+| C3 | provision/poly99.test.ts (real filesystem, EACCES, rwx fault); lint-poly99 (`uploader-spool-ro`); uploader T14; backup T13 |
+| C4 | test_backup.py (fetch refusals, `# C4` mutant); restore.test.ts :: C4 |
+| C5 | restore.test.ts :: T16 (5 names), control characters, key with `..`, files by fileId; test_backup list `stray <n>` |
+| C6 | restore.test.ts :: C6 flags; roundtrip (a real run under them) |
+| C7′ | restore.test.ts :: C7′ (future TS, two sets a day, early/late upload, `--set`, nightly 2 h vs premigration, T17) |
+| C8 | restore.test.ts :: C8 (five bad URLs, bad apiUrl) |
+| C9 | restore.test.ts :: C9 |
+| C10 | test_backup.py (list refuses), test_status T12, lint-poly99 (`state-mount`) |
+| C11 | uploader.test.ts (argv/environ sweep); test_backup/test_upload (heartbeat hygiene); restore.test.ts (read key and identity sweep) |
+| C12 | restore.test.ts :: C12 |
+| N1, A5 | test_upload.py (N1 table, symlink/directory, one bad line, A5, `# N1` mutant); test_backup.py (published-line table) |
+| H-1 | test_set_secret.py, test_list_secrets.py, provision/poly99.test.ts (H6, move), lint-poly99 (`host-secrets`), uploader.test.ts (no heartbeat secret) |
+| T1 | backup.test.ts :: T1 (watcher + two mutants) |
+| T2 | backup.test.ts :: T2 (pg_dump killed; no-pipefail mutant) |
+| T3, T4 | uploader.test.ts :: T4, T3 (each with the connect-succeeds fault) |
+| T5, T7 | uploader.test.ts :: T7, T5 (+ `--ignore-checksum` mutant) |
+| T6 | uploader.test.ts :: T6 (two mutants) |
+| T8 | uploader.test.ts :: T8 |
+| T9, T16 | restore.test.ts :: T9 (+ mutant), T16 (+ mutant) |
+| T10 | restore.test.ts :: T10 (+ mutant) |
+| T11 | restore.test.ts :: T11 (decoy + detector) |
+| T12 | test_status.py :: T12 |
+| T13 | backup.test.ts :: T13 (+ chmod mutant); provision/poly99 |
+| T14 | uploader.test.ts :: T14 (mount, ACL, rwx fault) |
+| T15 | test_upload.py :: T15 (+ mutant) |
+| T17 | restore.test.ts :: T17 (+ mutant) |
+| T18, criterion 5 | roundtrip.test.ts (real backup.sh and archive via the box shim; the box side is fake_box.py, the real list/fetch are in test_backup.py) |
+| Criterion 3 | roundtrip.test.ts (canary inserted after the base is present after recovery) |
+| D1 cross-check cases | not written: the Principal has not chosen |

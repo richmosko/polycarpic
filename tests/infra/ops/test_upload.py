@@ -254,6 +254,18 @@ class Upload(BackupBase):
             blob = res.out + res.err + res.term.getvalue()
             self.assertNotIn(HB.split("/")[-1], blob)  # stdin to curl carries it by design; no output, argv or env does
 
+    def test_RED_ON_THE_FAULT_N1_a_mutant_that_joins_the_path_without_the_checks_deletes_a_host_file(self):
+        """pin 39: the dir and name validation of a `verified` line is ONE `if` line ending in the comment `# N1`."""
+        import re
+        mutant = self.mutant_dispatcher("commands/upload.py", re.compile(r"^(\s*)if .*:\s*# N1\s*$", re.M), r"\1if False:  # N1")
+        victim = self.host.write("/etc/polycarpic/ops.conf", "B2_BUCKET=polycarpic-hetzner-backups\n")
+        res, _ = self.go("verified wal ../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()), mutant=mutant)
+        self.assertFalse(victim.exists())  # the fault: the uploader steered root's unlink out of the spool
+        victim = self.host.write("/etc/polycarpic/ops.conf", "B2_BUCKET=polycarpic-hetzner-backups\n")
+        res, _ = self.go("verified wal ../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()))
+        self.assertTrue(victim.exists())
+        self.assertEqual(res.rc, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

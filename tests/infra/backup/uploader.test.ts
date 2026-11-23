@@ -303,6 +303,13 @@ describe('T4, T3: no route where there must be none', () => {
   });
 });
 
+describe('C2: no core dumps', () => {
+  it('`ulimit -c` is 0 inside the rendered uploader container', () => {
+    const r = s.compose('run', '--rm', '--no-deps', '-T', '--entrypoint', 'bash', 'uploader', '-c', 'ulimit -c');
+    expect(r.out.trim()).toBe('0');
+  });
+});
+
 describe('T14: the uploader cannot change the spool', () => {
   const inUploader = (cmd: string) => s.compose('run', '--rm', '--no-deps', '-T', '--entrypoint', 'bash', 'uploader', '-c', cmd);
   it('from the rendered service: creating, replacing and deleting a spool file each fail (read-only mount)', () => {

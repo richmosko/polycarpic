@@ -84,7 +84,8 @@ class S3(Base):
         data = self.body()
         u = urlparse(self.path)
         qs = parse_qs(u.query, keep_blank_values=True)
-        log("PUT", self.who(), u.path + ("?" + u.query if u.query else ""))
+        special = "retention" in qs or "object-lock" in qs
+        log("PUT", self.who(), u.path + ("?" + u.query if special else ""))  # rclone adds ?x-id=PutObject to every PUT; only the DR10 verbs show their query
         mode = STATE["mode"]
         if "retention" in qs or "object-lock" in qs:  # PutObjectRetention / PutObjectLockConfiguration: a writeFiles key may do neither
             return self.send(200) if mode == "permissive" else self.deny()

@@ -155,6 +155,21 @@ describe('T1: no plaintext in the spool, ever (the watcher is the check; the mut
     const bad = plaintextSeen(r);
     expect(bad.some((l) => /\.plain PLAINTEXT-(HEADER|CANARY)$/.test(l))).toBe(true);
   });
+  it('C1: a /tmp detour (a mutant dumping to /tmp) fails with no space on the 1 MiB tmpfs and publishes nothing, because the scratch dump exceeds 1 MiB', () => {
+    need();
+    const m = mutate(text(), 'pg_dump -Fc | age -R "$rcpt" -o "$t"', 'pg_dump -Fc > /tmp/leak && age -R "$rcpt" -o "$t" < /tmp/leak');
+    const r = run(['nightly'], { mutant: m });
+    expect(r.res.code).not.toBe(0);
+    expect(r.res.err).toMatch(/No space left on device/i);
+    expect(nothingPublished()).toEqual(EMPTY);
+  });
+  it('C2: `ulimit -c` is 0 inside the rendered backup container', () => {
+    need();
+    const name = s.startBackupContainer();
+    const r = sh('docker', ['exec', name, 'bash', '-c', 'ulimit -c']);
+    sh('docker', ['rm', '-f', name]);
+    expect(r.out.trim()).toBe('0');
+  });
   it('RED ON THE FAULT: a mutant that dumps to a file in /tmp is flagged by the /tmp rule (only /tmp/pgpass may appear)', () => {
     need();
     const m = mutate(text(), 'pg_dump -Fc | age -R "$rcpt" -o "$t"', 'pg_dump -Fc > /tmp/leak; age -R "$rcpt" -o "$t" < /tmp/leak');

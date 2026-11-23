@@ -310,6 +310,19 @@ class Backup(BackupBase):
             with self.subTest(label):
                 self.assertEqual((res.rc, res.err, res.stdout_bytes.getvalue(), res.out), (rc, err, b"", ""))
 
+    def test_RED_ON_THE_FAULT_C4_a_mutant_fetch_without_the_comparison_serves_a_swapped_file(self):
+        """pin 38: the hash comparison in fetch-premigration is ONE `if` line ending in the comment `# C4`."""
+        import re
+        mutant = self.mutant_dispatcher("commands/backup.py", re.compile(r"^(\s*)if .*:\s*# C4\s*$", re.M), r"\1if False:  # C4")
+        e = self.plant_set(TS)
+        self.write_record(e)
+        n = nm("dump")
+        self.host.write("%s/premigration/%s" % (SPOOL, n), b"tampered by root after the record", 0o644)
+        res = self.host.go("backup", "fetch-premigration", n, runner=self.runner(), dispatcher=mutant)
+        self.assertEqual(res.stdout_bytes.getvalue(), b"tampered by root after the record")  # the fault: it is served
+        real = self.host.go("backup", "fetch-premigration", n, runner=self.runner())
+        self.assertEqual((real.rc, real.stdout_bytes.getvalue()), (1, b""))  # the same input, the real module: refused, nothing written
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -193,6 +193,8 @@ export function up(opts: UpOpts = {}): Stack {
   superSql(`SET password_encryption='scram-sha-256'; ALTER ROLE poly_backup PASSWORD '${pw}'`);
   const canary = `CANARY-${randomBytes(12).toString('hex')}`;
   superSql(`CREATE TABLE public.canary_t (v text); ALTER TABLE public.canary_t ENABLE ROW LEVEL SECURITY; ALTER TABLE public.canary_t FORCE ROW LEVEL SECURITY; CREATE POLICY p ON public.canary_t USING (true); INSERT INTO public.canary_t VALUES ('${canary}'); GRANT SELECT ON public.canary_t TO poly_backup`);
+  // C1: the scratch dump must exceed 1 MiB (the backup container's /tmp cap) or a /tmp detour would fit and stay invisible: 6 MiB of random hex
+  superSql("CREATE TABLE public.pad_t (g int, v text); INSERT INTO public.pad_t SELECT g, string_agg(md5(random()::text || g || i), '') FROM generate_series(1, 6) g, generate_series(1, 32768) i GROUP BY g; GRANT SELECT ON public.pad_t TO poly_backup");
   const sys = superSql('SELECT system_identifier FROM pg_control_system()');
   const major = superSql("SELECT current_setting('server_version_num')::int / 10000");
 
