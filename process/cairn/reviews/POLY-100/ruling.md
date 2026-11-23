@@ -2,8 +2,8 @@
 
 Architect, 2026-11-23. Tree read at `aa8247f327a68b619342e27a06f895232f293d32`. Sources: the description, seven criteria and
 twelve comments on `POLY-100.md`; POLY-99 ruling R5/R6 and verdict §8; INFRA §2.2, §3.2–§3.3, §4.4–§4.6, §6.4, §6.8, §7.1,
-§8.6–§8.10; ARCH §8.1; SECURITY C-83, T-64, T-92, TB-12, R-29; DECISIONS 2026-11-23; seceng-100's prep (attacker table
-A1–A6, holes 1–5, conditions D1–D15, advisories A-a–A-d), mapped in §S. A claim is measured (§M) or tagged `(unmeasured)`.
+§8.6–§8.10; ARCH §8.1; SECURITY C-83, T-64, T-92, TB-12, R-29; DECISIONS 2026-11-23; seceng-100's prep (holes 1–5, D1–D15,
+A-a–A-d) and review conditions S1–S9 (mapped at the end). A claim is measured (§M) or tagged `(unmeasured)`.
 The ruling proceeds on each recommendation in §D unless the issue file says otherwise.
 
 ## M — Measurements (this Mac, gh 2.105.0, 2026-11-23, digest of build run 45196636649)
@@ -66,7 +66,8 @@ Then: digest equal to `current` → exit 0. Digest in `quarantine` → exit 0, l
 - A downgrade happens only through `rollback`.
 
 `gh` gets `GH_TOKEN` from `secrets/host/github_read_token` in its environment only: never argv, never `docker login`, with
-`GH_CONFIG_DIR` an empty root 0700 dir. git and docker get no token (M1, M2).
+`GH_CONFIG_DIR` an empty root 0700 dir. Docker, compose and git children get `fixed_env` without it (M1, M2); V4's fetches
+run with `-c credential.helper=`, `GIT_TERMINAL_PROMPT=0` and a bare URL, so git never sends a credential (S6).
 
 ## R3 — Verify, all before anything runs
 
@@ -100,8 +101,8 @@ next poll.
     0755), and a rename to `releases/sha256-<64 hex>/`.
   - Root records a sha256 tree hash in `state/deploy/<project>/current`. Rollback re-checks it.
   - Kept: each project's `current` and `previous`; anything older is pruned after a healthy run.
-- **The host executes nothing from `releases/`.** No argv[0] under it, ever. Its scripts run only inside containers, as
-  mounts. The host's own programs are the installed ops bundle, changed only by `install.sh` (§D3).
+- **The host executes nothing from `releases/`.** No argv element resolves to a path under it, except as the value of
+  `-f`, `--env-file` or `--project-directory` (S7). Its scripts run only inside containers, as mounts. The host's own programs are the installed ops bundle, changed only by `install.sh` (§D3).
 - `releases/<d>/images.env` is the bundle's `infra/release/images.env` plus
   `POLY_APP_IMAGE=ghcr.io/richmosko/polycarpic@<digest>`. The bundle file holds exactly `POLY_POSTGRES_IMAGE`,
   `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE`, each `=ghcr.io/richmosko/polycarpic-<postgres|tools|caddy>@sha256:<64>`,
@@ -116,67 +117,45 @@ next poll.
 ## R5 — The compose guard: the bundle does not judge itself (seceng holes 1, 2, 4; D6, D9, D10)
 
 `lib/compose_guard.py` is part of the **installed** ops bundle, not the release. Its policy is installed with it at
-`infra/deploy/compose-allow.json`. It runs after V6 and before any `compose run` or `up`.
+`infra/deploy/compose-allow.json`. It runs as V7: before R6 step 2's postgres `up`, before every `compose run`/`up` of a
+candidate, and again before rollback's `up` of `previous` (S3). Steps: (1) refuse any bundle compose line matching
+`^\s*(include|extends)\s*:`; (2) render `docker compose … config --format json` with R4's exact argv; (3) check by
+allowlist. Refusal `guard-<rule>`, quarantined:
 
-1. **Pre-render.** Refuse if any bundle compose file has a line matching `^\s*(include|extends)\s*:`, so the render
-   cannot pull in other files.
-2. **Render.** `docker compose … config --format json`, with R4's fixed arguments.
-3. **Check by allowlist,** not denylist. The guard refuses each of these:
-   - a service not in the allowlist for that project;
-   - an `image` that is not one of the digests V1–V5 just verified;
-   - a top-level `name` other than the `-p` value, or any `container_name`;
-   - `privileged`, `cap_add`, `devices`, `pid`/`ipc`/`userns_mode`/`network_mode` set to `host`, or a `security_opt`
-     other than `no-new-privileges:true`;
-   - a bind-mount source outside that service's allowlisted host paths, which never include `/`, the Docker socket,
-     `/opt/polycarpic/ops`, `/var/lib/polycarpic/state` or `secrets/host/`;
-   - a secret file outside the service's own directory;
-   - a network outside the project's own set;
-   - a `ports:` mapping on anything but caddy.
+| Rule | Refuses |
+|---|---|
+| `service` | a service not allowlisted for the project; any `build` |
+| `image` | an `image` not exactly one of the four refs V1–V5 just verified |
+| `name` | a top-level `name` ≠ the `-p` value; any `container_name` |
+| `priv` | `privileged`; any `cap_add`; `devices`; `pid`/`ipc`/`userns_mode: host`; any `network_mode`; `security_opt` without `no-new-privileges:true` or with `unconfined` |
+| `bind` | a bind source not allowlisted for that service, or writable where the allowlist says `:ro`; always: `/`, `/run`, the Docker or containerd socket, `/opt/polycarpic/ops`, `/var/lib/polycarpic/state`, `secrets/host/`, any `releases/` path but the allowlisted read-only config files |
+| `secret` | a secret file outside the project's prefix and the service's own directory |
+| `network` | a network outside the project's allowlist (e.g. a staging service on `polycarpic-prod_default` or `polycarpic-prod-edge`) |
+| `ports` | a `ports` entry on anything but caddy, or not on `POLY_BIND_ADDR` |
 
 This guard is **narrower** than the CI lint (C-70), which stays the full check on every PR. The guard is the trust
 boundary, because staging runs `main` with no human gate. Changing its policy needs an operator `install.sh` (§D3).
 
-## R6 — Order of a run (prod; staging differs where marked)
+## R6 — Order of a run
 
-1. Lock (R1), candidate (R2), V1–V7 (R3–R5).
-2. If Postgres is not running in the project, start it with `up -d --no-deps postgres` from the candidate bundle. It must be
-   healthy within 120 s, or stop (`postgres-start`).
-3. **Prod only, and before any candidate container holds a credential** (seceng A-a): run `polycarpic-ops backup premigration`
-   as a subprocess, timeout 65 min.
-   - Continue only on exit 0 **and** a last stdout line matching
-     `^premigration-set <TS> dump-…\.age=<64 hex> globals-…\.age=<64 hex>$`. This is the form `backup.py` prints and INFRA
-     §6.4 states. The line goes to `deploy.log` verbatim.
-   - On 1, 3, 4 or anything else: stop with `premigration-<code>`, no quarantine; the next poll retries.
-   - Prod deploys are tag-rare, so one dump per deploy is affordable (its duration is `(unmeasured)`; POLY-104).
-   - `first-deploy` skips this step: the project has never had a release, so there is no data to protect, and before
-     `provision --stage database` poly_backup does not exist. The timer's `deploy` never skips it, and refuses to run at
-     all while the project has no `current` (`not-first-deployed`).
-   - Staging has no backup service and skips steps 3 and 4.
-4. **Prod only:** take `backup.lock` (wait at most 30 min, else stop with `backup-lock`) and hold it to the end, so no
-   nightly starts during migrate or recreate.
-5. `check-config` in migrate, web, auth and worker: `compose run --rm --no-deps -T <svc> <svc> check-config`. Each must
-   exit 0, or stop (`check-config`, Q).
-6. `migrate --plan`:
+Q = quarantine. Steps 3–4 are prod only (staging has no backup service).
 
-   | Exit | Action |
-   |---|---|
-   | 0 | skip to step 8 |
-   | 3 | continue |
-   | 2 | stop (`plan-diverged`, Q) |
-   | other | stop (`plan-error`, no Q) |
+| # | Step | Stops on (refusal, Q?) |
+|---|---|---|
+| 1 | Lock (R1), candidate (R2), V1–V7 (R3–R5) | as R3 |
+| 2 | Postgres not running in the project → `up -d --no-deps postgres` from the candidate bundle, healthy ≤ 120 s | `postgres-start` |
+| 3 | `polycarpic-ops backup premigration` (subprocess, 65 min timeout) **before any candidate container holds a credential** (seceng A-a). Go on only on exit 0 **and** a last line `^premigration-set <TS> dump-…\.age=<64 hex> globals-…\.age=<64 hex>$` (as `backup.py` prints, INFRA §6.4); that line goes to `deploy.log` verbatim. One dump per tag-rare prod deploy; duration `(unmeasured)`, POLY-104 | `premigration-<code>`, no Q; next poll retries |
+| 4 | Take `backup.lock` (≤ 30 min) and hold it to the end, so no nightly starts during migrate or recreate | `backup-lock` |
+| 5 | `compose run --rm --no-deps -T <svc> <svc> check-config` for migrate, web, auth, worker; each exit 0 | `check-config`, Q |
+| 6 | `migrate --plan`: 0 → step 8; 3 → on | 2 `plan-diverged`, Q; other `plan-error`, no Q |
+| 7 | `migrate` | 1 or 2 `migrate-<code>`, Q (old containers never touched); 4, no Q |
+| 8 | `up -d --pull never --no-build` for the project; edge per R9 | — |
+| 9 | Health (R7): healthy → state (R10), prune (R4), clear alert | unhealthy → R8 |
 
-   On the first deploy, exit 2 naming `roles-missing` prints `run: sudo polycarpic-ops provision --stage database --project <p>`
-   and exits 4. The operator then runs `first-deploy` again.
-7. `migrate`:
-
-   | Exit | Action |
-   |---|---|
-   | 0 | continue |
-   | 1 or 2 | stop (`migrate-<code>`, Q); the old containers were never touched |
-   | 4 | stop, no Q |
-
-8. `up -d --pull never --no-build` for the project; edge as R9 says.
-9. Health (R7). Healthy → state (R10), prune (R4), clear the alert. Unhealthy → rollback (R8).
+`first-deploy` skips step 3: the project has never had a release, and before `provision --stage database` poly_backup
+does not exist. The timer's `deploy` never skips it and refuses while the project has no `current` (`not-first-deployed`).
+On the first deploy, `--plan` exit 2 naming `roles-missing` prints
+`run: sudo polycarpic-ops provision --stage database --project <p>` and exits 4.
 
 ## R7 — Healthy
 
@@ -193,14 +172,14 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 
 - **Automatic:** at the 120 s mark:
   1. Quarantine the candidate (`<digest> <UTC> unhealthy`).
-  2. Re-check `previous`'s tree hash, then `up -d` from its bundle and its `images.env`.
+  2. Re-check `previous`'s tree hash, run the R5 guard on its render (S3), then `up -d` from its bundle and `images.env`.
   3. Run R7 again.
   - Healthy → `rolled-back`, alert.
   - Unhealthy, or no `previous` (first deploy) → `rollback-unhealthy`, alert, change nothing else (INFRA §8.6).
   - **Rollback never migrates.**
   - Criterion 3's "within 120 s" means the rollback **starts** no later than 120 s after `up -d`.
 - **Manual:** `polycarpic-ops rollback <project>` makes no GitHub call. It quarantines `current` and ups `previous` from
-  `releases/`, after the tree-hash re-check and R1's integrity check, then runs R7.
+  `releases/`, after the tree-hash re-check, R1's integrity check and the R5 guard, then runs R7.
 
 ## R9 — Edge (seceng hole 3; §D2)
 
@@ -208,7 +187,10 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   a prod run.
 - **One exception:** on a host where prod has no `current` and no `polycarpic-prod` container exists, staging's run owns
   edge. Without it a staging-only host (POLY-104, before any `v1.*` tag) cannot be reached. No prod traffic exists then.
-- Prod's first deploy always recreates caddy, so no staging-built edge survives into prod. R7 then includes caddy.
+- Once prod has a `current`, a staging run renders no `edge.yml` and issues no argv naming the edge project or `caddy`;
+  R5's `network` rule refuses a staging service on an edge network (S4).
+- Prod's first deploy recreates caddy from prod's bundle unconditionally (`--force-recreate caddy`), even when the digest
+  is unchanged, so no staging-era Caddy image or Caddyfile survives into prod (S4). R7 then includes caddy.
 - `/etc/polycarpic/edge.env` (`POLY_DOMAIN`, `POLY_BIND_ADDR`, `POLY_STAGING_ALLOW`, `POLY_TLS`; root 0644) is written by
   `provision.sh`, with a provision-check line.
 
@@ -224,19 +206,10 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 | `alert` | one line `<UTC> <refusal or event>`. Written on every stop or rollback; removed on the next healthy run |
 | `last-poll` | UTC of the last run that read GitHub successfully (seceng A-c) |
 
-New status modules:
-- `08_deploy.py`:
-  - OK: digest, tag and age.
-  - RED while `alert` exists, naming it.
-  - WARN when `last-poll` is older than 1 h, which means a freeze or an outage.
-  - WAIT when not deployed.
-- `09_token.py`: reads `token-expiry`, which the deploy writes from the `github-authentication-token-expiration` header
-  when it is present `(unmeasured)`.
-  - OK: more than 14 days left.
-  - WARN: 14 days or fewer, or the expiry is unknown.
-  - RED: expired.
-
-POLY-103 sends `alert` outward.
+New status modules: `08_deploy.py` — OK digest, tag, age; RED while `alert` exists, naming it; WARN when `last-poll`
+is older than 1 h (freeze or outage); WAIT not deployed. `09_token.py` — from `token-expiry`, which the deploy writes from
+the `github-authentication-token-expiration` header when present `(unmeasured)`: OK > 14 d; WARN ≤ 14 d or unknown; RED
+expired. POLY-103 sends `alert` outward.
 
 ## R11 — CI, images, env wiring, signers (F3, F10; POLY-85, 97, 98 comments)
 
@@ -256,10 +229,13 @@ POLY-103 sends `alert` outward.
 
   `DB_PASSWORD_FILE` is removed: no service passes `check-config` with it today. This covers the operator (POLY-98 M4) and
   the worker (POLY-142).
-- `HOST_ONLY` becomes exactly `{heartbeat_url, github_read_token}`, in both `lib/secrets.py` and `provision-check.sh`
-  (root:root 0400). This lands **only with seceng's pinned-set sign-off in 100b**.
+- `HOST_ONLY` becomes exactly `{"heartbeat_url": "host", "github_read_token": "host"}` in `lib/secrets.py` and the
+  `provision-check.sh` mirror; the file is `secrets/host/github_read_token`, root:root 0400 (seceng's pinned-set review:
+  S8, approved). `set-secret` accepts only the fine-grained form (`github_pat_` then 82 word characters) and refuses a
+  classic `ghp_` token with exit 2. `list-secrets` and `09_token.py` print path, mode and expiry, never the value.
 - **`polycarpic-ops allowed-signers install`.** It reads the file on stdin from the laptop. Each line must be
-  `<principal> namespaces="git" ssh-ed25519 <base64>`, and there must be at least one. It writes
+  exactly `<principal> namespaces="git" ssh-ed25519 <base64>`, and there must be at least one. Any other option
+  (`cert-authority` above all, `valid-before`/`valid-after`, a second namespace) or key type exits 2, nothing written (S9). It writes
   `/etc/polycarpic/allowed_signers` root:root 0644, asks for `yes` before replacing, and prints the fingerprints. The file
   is never fetched.
 - **provision-check lines,** in the POLY-97 R6 format:
@@ -287,32 +263,22 @@ These checks go into `assertRoles`, which runs for both apply and `--plan`, befo
 - **(b)** poly_backup's attributes must be exactly roles.sql's: LOGIN, REPLICATION, BYPASSRLS, not
   SUPERUSER/CREATEDB/CREATEROLE, CONNECTION LIMIT 3. Its `pg_db_role_setting` must be exactly
   `{default_transaction_read_only=on}`.
+- **(c)** Memberships, which `pg_shdepend` does not record (S5): poly_backup is a member of exactly `{pg_read_all_data}`,
+  without ADMIN, and no role is a member of poly_backup.
 - Whether `pg_shdepend` records every T-pre case is `(unmeasured)`. A case it misses gets an explicit catalog read.
 
 ## R13 — The tests
 
-**Seam.**
-- **Unit level:** `tests/infra/ops/test_deploy.py`, on the POLY-98 harness (`base.py`: temp root, every outside call faked,
-  subprocess and sockets raise). `ctx.run` dispatches on `argv[0]`.
-- **Fake registry (`docker`):** a dict `ref@digest → {labels, bundle tar}`.
-  - `pull` succeeds only if the digest is present.
-  - `inspect`, `create` and `cp` answer from the dict.
-  - `compose … config` renders the bundle's real files: it shells out to real `docker compose config` only where the
-    test runner has it; otherwise a fixture JSON is committed beside the test.
-  - `compose up` and `compose run` follow scripted health over fake time.
-  - Every argv is logged.
-- **Fake gh:**
-  - `api` routes (runs, releases) and `run download` answer from fixtures.
-  - `attestation verify` passes or fails per (digest, `--source-digest`), and its argv is logged.
-- **Real git:** `git` and `ssh-keygen` run in the temp root for V4 and for the staging ancestry check. Two test keys are
-  used, one in `allowed_signers` and one not. So the signature and ancestry checks are real, not scripted.
-- **Premigration:** `polycarpic-ops backup premigration` has a scripted exit and stdout. The backup command is POLY-99's,
-  tested there.
-- **Box fixture** (vitest, provision job): the POLY-97 box, with the real ops bundle installed and `fakes-ops/` extended
-  with the same fake `docker` and `gh`. At most three cases:
-  - a staging deploy end to end;
-  - one refusal;
-  - the units and paths under a real root.
+**Seam.** Unit level is `tests/infra/ops/test_deploy.py` on the POLY-98 harness (`base.py`: temp root, every outside call
+faked, subprocess and sockets raise); `ctx.run` dispatches on `argv[0]` and logs every argv and child env.
+
+| Seam | Behaviour |
+|---|---|
+| fake registry (`docker`) | dict `ref@digest → {labels, bundle tar}`; `pull` only if present; `inspect`/`create`/`cp` from the dict; `compose … config` is real `docker compose config` where the runner has it, else a committed fixture JSON; `compose up`/`run` follow scripted health over fake time |
+| fake gh | `api` (runs, releases) and `run download` from fixtures; `attestation verify` passes or fails per (digest, `--source-digest`) |
+| real git | `git` and `ssh-keygen` in the temp root for V4 and the staging ancestry check; two keys, one in `allowed_signers` |
+| premigration | `polycarpic-ops backup premigration` scripted exit and stdout (the command is POLY-99's, tested there) |
+| box fixture (vitest, provision job) | the POLY-97 box with the real ops bundle and `fakes-ops/` extended with the same fakes; at most three cases: a staging deploy end to end, one refusal, units and paths under a real root |
 
 **Slice 0** (green before qa writes the rest):
 - The fake registry holds digest X, and gh fails V1 for X.
@@ -328,21 +294,23 @@ qa commits the harness and this one test first, with any contract pins; the buil
 |---|---|---|
 | T1 | V1's argv is exactly R3's seven flags with C; V1 precedes any pull; a failure stops all | mutant without `--source-ref`; without `--source-digest`; that pulls first |
 | T2 | **Label alone does not bind:** an image labelled X, attested at H; `--source-digest X` refuses it (the label check alone would pass) | mutant using the label as C |
-| T3 | V4 real: a tag signed by a key not in `allowed_signers`, a lightweight tag, a GPG-signed tag, a signed tag on another commit, a tag object whose `tag` field ≠ ref ≠ Release name: each refused | mutant without `-c gpg.ssh.allowedSignersFile`; without the name compare; honouring a global git config that sets another signers file |
+| T3 | V4 real: a tag signed by a key not in `allowed_signers`, a lightweight tag, a GPG-signed tag, a signed tag on another commit, a correctly signed `v1.0` tag object fetched as ref `v1.99` with Release `v1.99` (S2): each refused | mutant without `-c gpg.ssh.allowedSignersFile`; without the name compare; honouring a global git config that sets another signers file |
 | T4 | Monotonic: prod highest semver, not newest; lower than `current` refused; staging candidate not descending from `current` (a re-run of an old run) refused | mutant picking by date; mutant without the ancestry check |
 | T5 | A sibling failing V1, or attested at another commit, stops the deploy | mutant skipping siblings |
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
-| T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv[0] is under `releases/` | mutant copying the bundle's `infra/ops` into `ops/`; mutant running a bundle script |
-| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; `container_name`; an `include:` line | mutant guard that denylists instead of allowlisting; mutant without the image-set check |
-| T9 | Staging never renders `edge.yml` once prod has a `current`; prod's first deploy recreates caddy | mutant letting staging up edge |
+| T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
+| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; the same for rollback's `previous` | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check |
+| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest |
 | T10 | Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log` | mutant running `check-config` first; mutant ignoring the line |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
 | T14 | `--pull never --no-build` on every compose up/run; only R4's `-f` files | mutant without `--pull never` |
-| T15 | `GH_TOKEN` is never in argv, never in any file under the root, never in `deploy.log`; gh's config dir is empty after a run; no `/root/.docker/config.json`. A gh outage is `transient`, not quarantined | mutant passing `--token`; mutant quarantining on gh exit 1 with a network stderr |
+| T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
 | T16 | Two deploys together: the second exits 0 `busy` and touches nothing | mutant without `-n` |
-| T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep |
+| T17 | `allowed-signers install`: a `cert-authority` line, a second-namespace line, an `ecdsa` key: each exit 2, nothing written; the plain form passes (S9) | mutant accepting any options |
+| T18 | `HOST_ONLY` pin test fails on a third name; `set-secret github_read_token` refuses a `ghp_` value with exit 2; the sweep finds the token in no output or log (S8) | mutant pin with a third name; mutant without the shape check |
+| T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5). It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it | mutant compose keeping `DB_PASSWORD_FILE` |
 
@@ -354,16 +322,12 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | Job | May add | Holds |
 |---|---|---|
 | image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
-| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T16 |
+| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18 |
 | db | ≤ 10 s | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 5 s | T-env; workflow statics for R11 |
 
-**Builder split.** R12 goes to **backend-lead** as its own sub-issue, which the lead files:
-- about 40 lines in `packages/db/src/migrate.ts`, plus the T-pre and T-lock cases;
-- disjoint from every infra path;
-- backend-lead owns the runner's refusal codes that the deploy reads.
-
-The cost is one more spawn. devops-engineer builds R1–R11.
+**Builder split.** R12 is backend-lead's, as POLY-100f (filed): about 40 lines in `packages/db/src/migrate.ts` plus T-pre
+and T-lock, disjoint from every infra path; backend-lead owns the refusal codes the deploy reads. devops-engineer builds R1–R11.
 
 ## D — Decisions for the Principal
 
@@ -391,49 +355,18 @@ The cost is one more spawn. devops-engineer builds R1–R11.
     bypasses C-83's signed-tag gate.
 - **Recommend (a).**
 
-**D3 — Box-guard policy changes ship only by an operator step** (R5; seceng P-b).
-- *Mechanism:* the guard and `compose-allow.json` are installed tooling. A release that adds a mount, a service or a
-  network is refused (`guard-…`, quarantined) until the operator runs `install.sh` (later `self-update`) from a reviewed
-  checkout.
-- *Why:* staging has no human gate, so the bundle judging itself would let any `main` merge mount host paths on the box
-  that also runs prod.
-- *Cost:* a compose change becomes a two-step release. The guard refuses loudly, so it is a cost, not a silent breakage.
-- Options:
-  - **(a)** As ruled.
-  - **(b)** The release's own policy, checked by the installed guard code. This is weaker: a `main` merge widens the policy
-    itself.
-- **Recommend (a).**
-
-## S — seceng-100 prep, mapped
-
-| seceng | Where |
-|---|---|
-| Hole 1 (bundle judges itself), D9 | R5. Python guard in the installed bundle, not the node lint in an image: the tools image has no node, and the candidate's node is the A2 attacker |
-| Hole 2 (literal image refs), D6 | R5 image-set rule, R4, R11 F10 |
-| Hole 3 (edge from staging), D10 | R9, §D2 (staging-only-host exception, and why) |
-| Hole 4 (project identity), D10 | R4 fixed `-p` and `-f`; R5 `name` and `container_name` |
-| Hole 5 (host programs from the bundle), D8, D11 | R4, T7 |
-| D1 flags, verify before pull | R3 V1 (M6, M7), T1. SBOM-only attestation refused by `--predicate-type` |
-| D2 commit binding | R2 run fields, R3 V1 `--source-digest`, T2 |
-| D3 monotonic, tag names | R2, T3, T4 |
-| D4 pinned git config | R3 V4 (`GIT_CONFIG_GLOBAL=/dev/null`, SSH only), R11 signers, T3 |
-| D5 strict inputs | R2, R1 |
-| D7 extraction manifest, tree hash | R4, T6, T10 |
-| D12 token | R2, R11 `HOST_ONLY`, T15, §D1 |
-| D13 fail closed; outage not quarantined | R3 Q column, T15 |
-| D14 locks | R1, T16 |
-| D15 health by status only; rollback never migrates | R7, R8 |
-| A-a | R6 step 3: prod backup before any candidate credential |
-| A-b | Scope → POLY-103 |
-| A-c | R10 `last-poll`, `08_deploy` WARN |
-| A-d | §E: INFRA §4.4's re-run sentence is wrong |
+**D3 — Box-guard policy changes ship only by an operator step** (R5; seceng P-b). *Mechanism:* the guard and
+`compose-allow.json` are installed tooling; a release that adds a mount, service or network is refused (`guard-…`,
+quarantined) until the operator runs `install.sh` from a reviewed checkout. *Why:* staging has no human gate, so a bundle
+judging itself would let any `main` merge mount host paths on the box that runs prod. *Cost:* a compose change becomes a
+two-step release, refused loudly. Options: **(a)** as ruled; **(b)** the release's own policy checked by the installed
+code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 
 ## L — For the lead
 
 - **L1.** Criterion 5 says "measured in the restore drill", but the drill and its timing are POLY-116's. Amend the
   criterion to "the runbook's inputs are proven (T13); the 60 minutes is POLY-116's", or say otherwise.
 - **L2.** `self-update` has no issue; I suggest the ops follow-up umbrella.
-- **L3.** File the R12 sub-issue for backend-lead.
 - **L4.** User steps before the first real deploy:
   - create the token (§D1), and run the one-call check;
   - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment);
@@ -449,3 +382,20 @@ The cost is one more spawn. devops-engineer builds R1–R11.
   - §8.6.
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
+
+## S1–S9 (seceng `ruling-review.md` @ `7196ebfd`, read against `43af9303`): met by
+
+Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
+
+| Cond. | Met by |
+|---|---|
+| S1 `--source-digest` + `--predicate-type`, app and siblings | R3 V1, V5 (M6, M7); T1, T2, T5 |
+| S2 tag object's name = ref = Release | R2 (prod), R3 V4; T3 (`v1.0` as `v1.99`). release.yml mirror: advisory, §E |
+| S3 installed-policy guard before any candidate container, and before rollback's `up` | R5 (table), R6 step 1, R8; T8 |
+| S4 edge never from staging once prod exists; first prod deploy force-recreates caddy | R9; T9 |
+| S5 poly_backup memberships | R12 (c); T-pre |
+| S6 token in gh's env only; git without credentials | R2; T15 |
+| S7 no argv element under `releases/` but `-f`/`--env-file`/`--project-directory` | R4; T7 |
+| S8 `HOST_ONLY` exactly two names; `github_pat_` shape; never printed | R11; T18 |
+| S9 signers plain form only | R11; T17 |
+
