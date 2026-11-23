@@ -5,7 +5,7 @@ name: polycarpic-edge
 
 services:
   caddy:
-    image: ${POLY_CADDY_IMAGE:-ghcr.io/richmosko/polycarpic-caddy@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    image: ${POLY_CADDY_IMAGE:?}
     user: "10010:10010"
     read_only: true
     cap_drop: [ALL]

@@ -73,7 +73,7 @@ const renderEnv = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', 
 for (const k of ['POLY_POSTGRES_IMAGE', 'POLY_BIND_ADDR']) if (process.env[k]) renderEnv[k] = process.env[k];
 for (const k of ['DOCKER_HOST', 'DOCKER_CONFIG', 'DOCKER_CONTEXT', 'XDG_RUNTIME_DIR']) if (process.env[k]) renderEnv[k] = process.env[k];
 
-const BYPASS = { network_mode: 'network-mode', privileged: 'privileged', cap_add: 'cap-add', devices: 'devices', sysctls: 'sysctls', env_file: 'env-file', extra_hosts: 'extra-hosts', links: 'links', external_links: 'links', group_add: 'group-add', build: 'no-build', extends: 'bypass' };
+const BYPASS = { network_mode: 'network-mode', privileged: 'privileged', cap_add: 'cap-add', devices: 'devices', sysctls: 'sysctls', extra_hosts: 'extra-hosts', links: 'links', external_links: 'links', group_add: 'group-add', build: 'no-build', extends: 'bypass' };
 const SECRETISH = /(SECRET|PASSWORD|PASSWD|TOKEN|KEY|CREDENTIAL|DSN|DATABASE_URL)/;
 const varsIn = (s) => [...String(s).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]);
 const hasVar = (x) => /\$\{|\$[A-Za-z_]/.test(JSON.stringify(x ?? ''));
@@ -83,7 +83,7 @@ const pending = [];
 // The three renders run concurrently; each reports its own violations.
 function render(kind, path, rel) {
   return new Promise((done) => {
-    const c = spawn('docker', ['compose', '-f', path, '--profile', '*', 'config', '--format', 'json'], { env: renderEnv });
+    const c = spawn('docker', ['compose', '-f', path, '--profile', '*', 'config', '--no-env-resolution', '--format', 'json'], { env: renderEnv });
     let out = '', err = '';
     c.stdout.on('data', (d) => { out += d; });
     c.stderr.on('data', (d) => { err += d; });
@@ -172,7 +172,11 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     if (list(s.devices).length) v('devices', rel, `${at}: devices`);
     if (list(s.security_opt).some((o) => /unconfined/.test(o))) v('unconfined', rel, `${at}: unconfined security_opt`);
     if (s.sysctls && Object.keys(s.sysctls).length) v('sysctls', rel, `${at}: sysctls`);
-    if (list(s.env_file).length) v('env-file', rel, `${at}: env_file`);
+    // POLY-100 R11: the five app services read the host env file named for their project, and nothing else reads any env_file
+    const envFiles = list(s.env_file);
+    const hostEnv = kind === 'prod' ? '/etc/polycarpic/host.env' : '/etc/polycarpic/staging-host.env';
+    const hostOnly = envFiles.length === 1 && envFiles[0]?.path === hostEnv && envFiles[0]?.required !== false && Object.keys(envFiles[0]).every((k) => k === 'path' || k === 'required');
+    if (envFiles.length && !(hostOnly && ['web', 'auth', 'worker', 'migrate', 'operator'].includes(sn))) v('env-file', rel, `${at}: env_file`);
     for (const [ek, ev] of Object.entries(s.environment ?? {})) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
       if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);

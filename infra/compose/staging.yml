@@ -8,7 +8,7 @@ x-hardened: &hardened
   restart: unless-stopped
   ulimits: {core: 0}
 
-x-app-image: &app-image ${POLY_APP_IMAGE:-ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+x-app-image: &app-image ${POLY_APP_IMAGE:?}
 
 services:
   postgres:
@@ -40,8 +40,15 @@ services:
     <<: *hardened
     image: *app-image
     user: "10101:10101"
+    env_file: [/etc/polycarpic/staging-host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_app
+      APP_ENV: staging
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_app
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_app
     secrets:
       - {source: db_password_app__web, target: db_password_app}
       - {source: plaid_secret__web, target: plaid_secret}
@@ -61,8 +68,15 @@ services:
     image: *app-image
     user: "10107:10107"
     command: ["auth"]
+    env_file: [/etc/polycarpic/staging-host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_auth
+      APP_ENV: staging
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_auth
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_auth
       AUTH_SECRET_FILE: /run/secrets/auth_secret
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       AUTH_PUBLIC_PORT: "3000"
@@ -85,8 +99,15 @@ services:
     <<: *hardened
     image: *app-image
     user: "10102:10102"
+    env_file: [/etc/polycarpic/staging-host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_worker
+      APP_ENV: staging
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_worker
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_worker
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
     secrets:
       - {source: db_password_worker__worker, target: db_password_worker}
@@ -106,8 +127,15 @@ services:
     user: "10103:10103"
     restart: "no"
     profiles: [migrate]
+    env_file: [/etc/polycarpic/staging-host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_migrator
+      APP_ENV: staging
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_migrator
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_migrator
     secrets:
       - {source: db_password_migrator__migrate, target: db_password_migrator}
     networks: [default]
@@ -126,8 +154,15 @@ services:
     profiles: [operator]
     logging: {driver: "none"}
     entrypoint: ["/app/bin/polycarpic", "cli"]
+    env_file: [/etc/polycarpic/staging-host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_operator
+      APP_ENV: staging
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_operator
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_operator
     secrets:
       - {source: db_password_operator__operator, target: db_password_operator}
     networks: [default]

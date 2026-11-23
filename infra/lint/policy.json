@@ -2,7 +2,10 @@
   "renderEnv": {
     "POLY_DOMAIN": "lint.test",
     "POLY_STAGING_ALLOW": "192.0.2.0/24",
-    "POLY_TLS": "ops@lint.test"
+    "POLY_TLS": "ops@lint.test",
+    "POLY_APP_IMAGE": "ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "POLY_TOOLS_IMAGE": "ghcr.io/richmosko/polycarpic-tools@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "POLY_CADDY_IMAGE": "ghcr.io/richmosko/polycarpic-caddy@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   },
   "allowedVars": [
     "POLY_POSTGRES_IMAGE",
