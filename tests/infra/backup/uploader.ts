@@ -108,5 +108,14 @@ export { INSTANCE };
 /** Attach to the fake-b2 the globalSetup started (POLY99_FAKE names its container and native URL). */
 export function attachFake(): Fake {
   const { name, nativeUrl } = JSON.parse(readFileSync(process.env.POLY99_FAKE!, 'utf8')) as { name: string; nativeUrl: string };
-  return makeFake(name, nativeUrl);
+  const f = makeFake(name, nativeUrl);
+  // The host must reach the fake's native half through the published loopback port (restore.sh and drill.sh do). Fail setup with the facts, not later with an empty body.
+  let ok = false;
+  for (let i = 0; i < 10 && !ok; i++) { ok = sh('curl', ['-s', '-m', '5', '-o', '/dev/null', '-w', '%{http_code}', `${nativeUrl}/_fake/log`]).out === '200'; if (!ok) sh('sleep', ['1']); }
+  if (!ok) {
+    const port = sh('docker', ['port', name]).out.trim();
+    const nets = sh('docker', ['inspect', '-f', '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}', name]).out.trim();
+    throw new Error(`fake-b2 is not reachable from the host at ${nativeUrl} (docker port: ${port || 'none'}; networks: ${nets || 'none'}). Something detached or re-attached the shared fake (on Linux that moves the published port).`);
+  }
+  return f;
 }

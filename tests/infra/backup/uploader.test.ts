@@ -271,24 +271,26 @@ describe('T4, T3: no route where there must be none', () => {
       expect(probe()).toBe(0);
     } finally { sh('docker', ['rm', '-f', name]); }
   });
-  it('T3: the backup container (backup-net, internal) cannot connect to fake-b2; RED ON THE FAULT: it can once attached to a routable network', () => {
+  it('T3: the backup container (backup-net, internal) cannot connect to fake-b2; RED ON THE FAULT: it can reach a listener once attached to a routable network (a throwaway listener, never the shared fake: attaching and detaching the fake moves its published port off the host on Linux)', () => {
     const name = `${PROJECT}-bk-net`;
     const net = `${PROJECT}-routable`;
-    sh('docker', ['rm', '-f', name]);
+    const target = `${PROJECT}-t3-target`;
+    sh('docker', ['rm', '-f', name, target]);
     const ip = sh('docker', ['inspect', '-f', '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}', fake.name]).out.trim();
     const st = s.compose('run', '-d', '--no-deps', '--name', name, '--entrypoint', 'sleep', 'backup', '600');
     expect(st.code, st.err).toBe(0);
     try {
-      const probe = () => sh('docker', ['exec', name, 'bash', '-c', `timeout 5 bash -c ": </dev/tcp/${ip}/443"`]).code;
+      const reach = (host: string, port: number) => sh('docker', ['exec', name, 'bash', '-c', `timeout 5 bash -c ": </dev/tcp/${host}/${port}"`]).code;
       expect(ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
-      expect(probe()).not.toBe(0);
-      sh('docker', ['network', 'create', net]);
-      sh('docker', ['network', 'connect', net, fake.name]);
-      sh('docker', ['network', 'connect', net, name]);
-      const ip2 = sh('docker', ['inspect', '-f', `{{(index .NetworkSettings.Networks "${net}").IPAddress}}`, fake.name]).out.trim();
-      expect(sh('docker', ['exec', name, 'bash', '-c', `timeout 5 bash -c ": </dev/tcp/${ip2}/443"`]).code).toBe(0);
-    } finally { sh('docker', ['rm', '-f', name]); sh('docker', ['network', 'disconnect', '-f', net, fake.name]); sh('docker', ['network', 'rm', net]); }
-    expect(TOOLS).toBeTruthy();
+      expect(reach(ip, 443)).not.toBe(0); // no route to fake-b2
+      expect(sh('docker', ['network', 'create', net]).code).toBe(0);
+      expect(sh('docker', ['run', '-d', '--name', target, '--network', net, '--entrypoint', 'python3', TOOLS, '-m', 'http.server', '8000']).code).toBe(0);
+      const ip2 = sh('docker', ['inspect', '-f', `{{(index .NetworkSettings.Networks "${net}").IPAddress}}`, target]).out.trim();
+      for (let i = 0; i < 20 && sh('docker', ['exec', target, 'curl', '-s', '-o', '/dev/null', 'http://127.0.0.1:8000/']).code !== 0; i++) sh('sleep', ['0.5']);
+      expect(reach(ip2, 8000)).not.toBe(0); // not attached yet: unreachable
+      expect(sh('docker', ['network', 'connect', net, name]).code).toBe(0);
+      expect(reach(ip2, 8000)).toBe(0); // the fault: a routable network gives it a route
+    } finally { sh('docker', ['rm', '-f', name, target]); sh('docker', ['network', 'rm', net]); }
   });
   it('T3: the rendered backup service mounts no backup_store_credential and holds no B2 endpoint or bucket', () => {
     const b = s.cfg.services.backup;
