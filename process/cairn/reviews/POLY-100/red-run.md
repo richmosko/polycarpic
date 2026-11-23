@@ -200,3 +200,13 @@ once devops-100's fix makes the test green (a test that never went green has no 
 | F14 | `test_deploy_guard.py` (8 new cases; fixtures now render every profile) | `logging`, `ulimits`, `mem_limit`, `tmpfs` values pass the guard |
 | F15 | `test_deploy_oneoff.py` | no `--name`, migrate timeout 600 s, a hang is `migrate-124`, no `oneoff-stuck` |
 | F9 | not written: the ruling gives no signature for `_edge_up(judged=…)`; asked of architect-100 |
+
+## F4 (form decided: corrected JSON, f08d4948), F9, F16, S33, S35 — written from the ruling, red on the build before the fixes
+
+| Tests | Red today because |
+|---|---|
+| `test_deploy_render.py` (isolation, remote include, saved render, second render on stdin, only the saved file with -f) and `RenderFiles` (the fixed point: the second render is fed exactly the saved bytes; the zero correction; S35 owner and mode 0600 under umask 0; no fixture secret value in any saved render, log or alert: green today only because nothing is saved yet) | renders unwrapped (a remote include is fetched twice); nothing saved; compose calls name the bundle's files |
+| `test_deploy_render_users.py` (S33): `backup`, `upload`, `cli` with a `current` and no render refuse and never name a bundle compose file | `upload` falls back to `releases/prod-current/infra/compose/prod.yml` |
+| `test_deploy_judged.py` (F9) | no `Judged` type; `_edge_up` takes a constant |
+| `test_deploy_flags.py`, `tests/infra/flags-real.test.ts` (F16/T14) | `compose run --no-build` (refused by every fake; the lint test reads the real `--help`) |
+| `test_deploy_hang.py` `S33` (the `interrupted` file) | no `interrupted` file |

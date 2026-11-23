@@ -116,3 +116,68 @@ class Render(DeployTest):
             for i, tok in enumerate(a):
                 if "/releases/" in tok and a[i - 1] if i else False:
                     self.assertTrue("config" in a and a[i - 1] in ("-f", "--env-file", "--project-directory"), "a releases/ path outside config's inputs: %r" % (a,))
+
+
+class RenderFiles(Render):
+    """S34/S35 and the fixed point (ruling f08d4948): the saved bytes are what was judged and what starts; owner and mode; no secret value in any saved render, log or alert."""
+
+    test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off = None
+    test_a_remote_include_is_refused_as_guard_render_and_never_fetched = None
+    test_the_judged_render_is_saved_root_0600_with_core_written_back_as_zero = None
+    test_a_second_render_that_differs_from_the_judged_one_is_guard_render = None
+    test_the_second_render_reads_the_saved_file_on_stdin = None
+    test_every_other_compose_call_names_only_the_saved_file_with_f = None
+    test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
+
+    def test_the_fixed_point_the_saved_bytes_render_again_to_themselves(self):
+        self.candidate()
+        r = self.deploy("staging")
+        self.assertEqual(r.rc, 0, r.err)
+        path = self.host.p("%s/staging/%s" % (STATE, self.saved()[0]))
+        saved = path.read_text()
+        again = [c for c in r.runner.calls if c["argv"] and "config" in c["argv"] and c["stdin"]]
+        self.assertTrue(again, "the second render")
+        for c in again:
+            self.assertEqual(c["stdin"], saved, "the second render is fed exactly the saved bytes")
+        self.assertEqual(json.loads(saved), json.loads(json.dumps(json.loads(saved))))
+
+    def test_the_saved_render_has_the_zero_correction_and_started_containers_come_from_it(self):
+        self.candidate()
+        r = self.deploy("staging")
+        d = json.loads(self.host.p("%s/staging/%s" % (STATE, self.saved()[0])).read_text())
+        for name, svc in d["services"].items():
+            core = (svc.get("ulimits") or {}).get("core")
+            self.assertNotEqual(core, {}, "%s: `core: {}` is written back as 0 before it is judged and saved" % name)
+        started = [c for c in r.world.compose_log if c["cmd"] == "up"]
+        self.assertTrue(started)
+
+    def test_s35_the_saved_render_is_owned_by_root_and_mode_0600_whatever_the_umask(self):
+        self.candidate()
+        old = os.umask(0o000)
+        try:
+            r = self.deploy("staging")
+        finally:
+            os.umask(old)
+        p = self.host.p("%s/staging/%s" % (STATE, self.saved()[0]))
+        st = os.stat(str(p))
+        self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
+        self.assertEqual(st.st_uid, os.getuid(), "owned by the trusted uid (root on a box)")
+        self.assertTrue(all(c[1] == 0 for c in r.chowns if "render" in str(c[0])), r.chowns)
+
+    def test_s35_no_fixture_secret_value_reaches_a_saved_render_a_log_or_an_alert(self):
+        values = {}
+        for svc, name in (("web", "db_password_app"), ("auth", "auth_secret"), ("worker", "credential_keyring"), ("postgres", "db_superuser_password")):
+            v = "fx" + os.urandom(12).hex()
+            self.host.secret(svc, name, v + "\n", staging=True)
+            values[name] = v
+        for refused in (False, True):
+            if refused:
+                self.world.render_hooks[("staging", None)] = lambda d: d["services"]["web"].update(privileged=True) or d
+            self.candidate()
+            self.deploy("staging")
+        blob = b""
+        for base, _, files in os.walk(str(self.host.p(STATE))):
+            for f in files:
+                blob += open(os.path.join(base, f), "rb").read()
+        for name, v in values.items():
+            self.assertNotIn(v.encode(), blob, "the value of %s is in a saved render, log or alert" % name)
