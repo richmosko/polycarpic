@@ -8,6 +8,8 @@ blocked_by: []
 assignee: seceng
 paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, process/cairn/issues/POLY-100b.md, docs/SECURITY/**, .gitleaksignore]
 stage: plan
+estimate.cost_usd: "25.00"
+estimate.gate_cycles: 4
 labels: []
 priority: null
 pr: null

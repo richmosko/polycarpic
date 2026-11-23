@@ -8,6 +8,8 @@ blocked_by: []
 assignee: architect
 paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, process/cairn/issues/POLY-100e.md, docs/ARCH/**]
 stage: review
+estimate.cost_usd: "10.00"
+estimate.gate_cycles: 2
 labels: []
 priority: null
 pr: null

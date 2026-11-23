@@ -8,6 +8,8 @@ blocked_by: []
 assignee: qa-engineer
 paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, process/cairn/issues/POLY-100c.md, tests/**, package.json, pnpm-lock.yaml]
 stage: execute
+estimate.cost_usd: "45.00"
+estimate.gate_cycles: 4
 labels: []
 priority: null
 pr: null
