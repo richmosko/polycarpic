@@ -550,3 +550,18 @@ the patches failing open; the exception is the cause.
 *A wrong-but-running Caddy config in a signed release.* No option stops it on the server: CI, review and the signature
 are the gate, then a person and `rollback`. Strict improves one thing: no Caddy ever runs without that gate. A12 and A13
 are wanted under every option.
+
+## `7ad32ae1` (S16, S17, A11, `first-attempt`)
+
+S16, S17, A11, `ps -a` and T-render's fail-not-skip: **met** (R9, R10, T9). If the Principal chooses strict, R9's parts go.
+`--existing-data`'s render: **accept**; it runs only the backup service, on the running Postgres image.
+
+**`first-attempt`: accept with S19.** The file proves the directory was empty once, not that it is empty of data now. On a
+rebuilt box: first attempt, `roles-missing`, the operator restores real data, then a rerun skips the backup and migrates
+it. The restored copy still exists off the box, so this risks time and anything written since, not everything.
+
+**S19.** A rerun skips step 3 only if the file exists, there is no `current`, **and** the project's database holds no table
+outside the system schemas, read over the local socket just before step 5. A table, or a failed or unparsable read, makes
+step 3 required. The file is ignored and removed whenever `current` exists. *T12:* rerun after `roles-missing` with an
+empty database succeeds; with one table, step 3 runs; with the read failing, step 3 runs; a leftover file beside `current`
+has no effect. Red on a mutant that trusts the file alone.
