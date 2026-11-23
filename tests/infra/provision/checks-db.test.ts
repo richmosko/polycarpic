@@ -132,29 +132,29 @@ describe('provision-check database checks D1–D6, with a running Postgres', () 
 
 describe('summary lines (R4)', () => {
   it('a WARN with no FAIL or WAIT: "PASSED WITH 1 WARNINGS: H13", exit 0, never ALL CHECKS PASSED', () => {
-    const r = ALL('rm /etc/polycarpic/secrets/uploader/heartbeat_url');
+    const r = ALL('rm /etc/polycarpic/secrets/host/heartbeat_url');
     expect(r.out).toMatch(/rc=0/);
     expect(r.out).toMatch(/^PASSED WITH 1 WARNINGS: H13$/m);
     expect(r.out).not.toMatch(/ALL CHECKS PASSED/);
   });
   it('--prod turns the WARN into a FAIL: "1 CHECKS FAILED", exit 1, the FAIL carries the fix', () => {
-    const r = ALL('rm /etc/polycarpic/secrets/uploader/heartbeat_url', { args: '--prod' });
+    const r = ALL('rm /etc/polycarpic/secrets/host/heartbeat_url', { args: '--prod' });
     expect(r.out).toMatch(/rc=1/);
     expect(r.out).toMatch(/^1 CHECKS FAILED$/m);
     failLine(r, 'H13', ['heartbeat']);
   });
   it('a prod cluster on disk (pg-prod/PG_VERSION) makes the check behave as --prod without the flag', () => {
-    const r = ALL('rm /etc/polycarpic/secrets/uploader/heartbeat_url; echo 17 > /srv/polycarpic/pg-prod/PG_VERSION');
+    const r = ALL('rm /etc/polycarpic/secrets/host/heartbeat_url; echo 17 > /srv/polycarpic/pg-prod/PG_VERSION');
     expect(r.out).toMatch(/rc=1/);
     expect(find(r.out, 'FAIL', 'H13')).toBeDefined();
   });
   it('a staging-only box (no prod cluster) reports the warning and passes', () => {
-    const r = ALL('rm /etc/polycarpic/secrets/uploader/heartbeat_url; rm -f /srv/polycarpic/pg-prod/PG_VERSION');
+    const r = ALL('rm /etc/polycarpic/secrets/host/heartbeat_url; rm -f /srv/polycarpic/pg-prod/PG_VERSION');
     expect(find(r.out, 'WARN', 'H13')).toBeDefined();
     expect(r.out).toMatch(/rc=0/);
   });
   it('FAIL beats WARN and WAIT: the failing summary counts only FAILs', () => {
-    const r = ALL('rm /etc/polycarpic/secrets/uploader/heartbeat_url; echo no > /var/fake-state/ntp');
+    const r = ALL('rm /etc/polycarpic/secrets/host/heartbeat_url; echo no > /var/fake-state/ntp');
     expect(r.out).toMatch(/rc=1/);
     expect(r.out).toMatch(/^1 CHECKS FAILED$/m);
   });

@@ -15,6 +15,8 @@ import tempfile
 ID = re.compile(r"(git-[0-9a-f]{12}|sha256-[0-9a-f]{12})")
 EXECUTABLES = {"infra/ops/polycarpic-ops", "infra/ops/install_box.py", "infra/provision.sh", "infra/provision-check.sh",
                "infra/postgres/gate-check.sh"}
+# scripts the containers run from the bundle (mounted read-only; their uids are not root): executable, but a bundle need not carry them
+RUNNABLE = {"infra/backup/backup.sh", "infra/backup/upload.sh", "infra/postgres/archive-wal.sh"}
 LINK = "/usr/local/sbin/polycarpic-ops"
 
 
@@ -68,7 +70,7 @@ def install(stream, bundle_id, root="/", out=sys.stdout):
             for n in files:
                 p = os.path.join(base, n)
                 rel = os.path.relpath(p, staging)
-                os.chmod(p, 0o755 if rel in EXECUTABLES else 0o644)
+                os.chmod(p, 0o755 if rel in EXECUTABLES or rel in RUNNABLE else 0o644)
                 os.lchown(p, 0, 0)
         for need in EXECUTABLES:
             if not os.path.isfile(os.path.join(staging, need)):

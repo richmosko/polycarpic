@@ -85,6 +85,39 @@ class Provision(ProvisionBase):
             self.assertFalse(self.host.p("/etc/polycarpic/ops.conf").exists(), bad)
             self.assertEqual(r.runner.calls, [], bad)
 
+    # ---- POLY-99 R10: --b2-endpoint (forwarded to provision.sh, which writes ops.conf), K2
+    EP = "https://s3.eu-central-003.backblazeb2.com"
+
+    def test_b2_endpoint_is_forwarded_to_provision_sh_in_the_order_given(self):
+        r = self.prov(*self.BASE, "--b2-endpoint", self.EP, "--mail-from", "Name <a@b.example>")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(r.runner.argvs(), [["/bin/bash", self.script("provision.sh"), "--stage", "host", "--target", "hetzner", "--domain", "polycarpic.com", "--b2-endpoint", self.EP, "--mail-from", "Name <a@b.example>"]])
+
+    def test_a_b2_endpoint_that_breaks_the_pattern_exits_2_with_the_message_and_runs_nothing(self):
+        for bad in ("http://s3.eu-central-003.backblazeb2.com", "https://s3.eu-central-003.backblazeb2.com/", "https://s3.eu-central-003.backblazeb2.com/x",
+                    "https://s3.eu-central-003.backblazeb2.com:443", "https://s3.eu-central-003.backblazeb2.com.evil.example", "https://evil.example",
+                    "https://s3.EU-central-003.backblazeb2.com", "https://api.backblazeb2.com", "-https://s3.x.backblazeb2.com", "", "https://s3.a_b.backblazeb2.com"):
+            r = self.prov(*self.BASE, "--b2-endpoint", bad)
+            self.assertEqual((r.rc, r.err, r.runner.calls), (2, "provision: bad --b2-endpoint\n", []), repr(bad))
+
+    def test_writing_the_bucket_keeps_an_endpoint_line_provision_sh_wrote_and_ops_conf_ends_with_exactly_the_two_ruled_lines(self):
+        conf = self.host.p("/etc/polycarpic/ops.conf")
+
+        def child(argv, stdin):  # provision.sh writes the endpoint line (R10); the Python wrapper then writes the bucket line
+            conf.parent.mkdir(parents=True, exist_ok=True)
+            have = conf.read_text() if conf.exists() else ""
+            if "B2_S3_ENDPOINT=" not in have:  # provision.sh adds the line once and keeps the others
+                conf.write_text(have + "B2_S3_ENDPOINT=%s\n" % self.EP)
+            return (0, "", "")
+        runner = Runner(None)
+        runner.on(("provision.sh",), fn=lambda a, s: child(a, s))
+        r = self.host.go(*self.BASE, "--b2-bucket", "polycarpic-hetzner-backups", "--b2-endpoint", self.EP, runner=runner)
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(sorted(conf.read_text().splitlines()), sorted(["B2_BUCKET=polycarpic-hetzner-backups", "B2_S3_ENDPOINT=%s" % self.EP]))
+        self.assertEqual(oct(os.stat(str(conf)).st_mode & 0o777), "0o644")
+        again = self.host.go(*self.BASE, "--b2-bucket", "polycarpic-hetzner-backups", "--b2-endpoint", self.EP, runner=runner)
+        self.assertNotIn("change:", again.out)
+
     def test_stage_database_forwards_project_and_refuses_anything_else(self):
         for p in ("prod", "staging"):
             r = self.prov("provision", "--stage", "database", "--project", p)

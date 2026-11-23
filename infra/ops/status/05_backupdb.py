@@ -11,7 +11,7 @@ PROJECTS = ("prod",)
 JOBS = "/var/lib/polycarpic/state/jobs.log"
 CONN = re.compile(r"(replication )?connection authorized: user=poly_backup\b")
 JOB = re.compile(r"([0-9T:Z-]+) ([0-9T:Z-]+) ([a-z0-9-]+) (ok|failed)")
-CAPS = {"provision-check-d3": 600}
+CAPS = {"provision-check-d3": 600, "backup-premigration": 3600}
 DEFAULT_CAP = 6 * 3600
 PAD = 60
 MAX_COVER = 8 * 3600  # B2: the windows may cover at most 8 of the last 24 hours
@@ -31,6 +31,8 @@ def run(ctx):
     pg = compose.running(compose.ps(ctx, "polycarpic-prod"), "postgres")
     if pg is None:
         return [Line("WAIT", "backupdb", "prod", "prod postgres is not running")]
+    if not ts.root_written(ctx, ctx.p(JOBS)):
+        return [Line("RED", "backupdb", "prod", "jobs.log is not root-written")]
     now = ctx.epoch()
     windows = []
     for n, raw in enumerate((ts.read_text(ctx.p(JOBS)) or "").split("\n"), 1):

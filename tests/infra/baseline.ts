@@ -19,7 +19,7 @@ export type FxSet = {
 
 const hard = (uid: number, extra: Y = {}): Y => ({
   user: `${uid}:${uid}`, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
-  restart: 'unless-stopped', healthcheck: { test: ['CMD', 'true'], interval: '30s' }, tmpfs: ['/tmp'], ...extra,
+  restart: 'unless-stopped', healthcheck: { test: ['CMD', 'true'], interval: '30s' }, tmpfs: ['/tmp'], ulimits: { core: 0 }, ...extra, // POLY-99 C2: core 0 in x-hardened
 });
 /** Per-service secret directories (ruling A1): /etc/polycarpic/{secrets,staging-secrets}/<service>/<name>.
  *  One top-level secret per (service, name): key `<name>__<service>`, mounted at target `<name>`. */
@@ -41,7 +41,7 @@ const MATRIX_PROD: Record<string, string[]> = {
   migrate: ['db_password_migrator'],
   operator: ['db_password_operator'],
   backup: ['db_password_backup'],
-  uploader: ['backup_store_credential', 'heartbeat_url'],
+  uploader: ['backup_store_credential'], // POLY-99 H-1: heartbeat_url is host-only (secrets/host/), root pings; no service mounts it
 };
 
 function project(kind: 'prod' | 'staging'): Y {
@@ -73,8 +73,16 @@ function project(kind: 'prod' | 'staging'): Y {
     operator: hard(prod ? 10006 : 10106, { image: APP, networks: ['default'], restart: 'no', profiles: ['operator'], logging: { driver: 'none' }, entrypoint: ['/app/bin/polycarpic', 'cli'], mem_limit: '256m' }),
   };
   if (prod) {
-    services.backup = hard(10004, { image: '${POLY_POSTGRES_IMAGE:?}', networks: ['backup-net'] });
-    services.uploader = hard(10005, { image: TOOLS, networks: ['upload-net'] });
+    // POLY-99 R10: backup.sh mounted read-only, /tmp a 1 MiB tmpfs (the passfile only); the uploader reads the whole spool read-only and
+    // holds the script, ops.conf and host.env read-only, with a 1 MiB /tmp for the rclone config.
+    services.backup = hard(10004, {
+      image: '${POLY_POSTGRES_IMAGE:?}', networks: ['backup-net'], tmpfs: ['/tmp:size=1m'],
+      volumes: ['/srv/polycarpic/spool/dump:/spool/dump', '/srv/polycarpic/spool/premigration:/spool/premigration', '/etc/polycarpic/age-recipients.txt:/etc/backup/age-recipients.txt:ro', '../backup/backup.sh:/usr/local/bin/backup.sh:ro'],
+    });
+    services.uploader = hard(10005, {
+      image: TOOLS, networks: ['upload-net'], tmpfs: ['/tmp:size=1m'],
+      volumes: ['/srv/polycarpic/spool:/spool:ro', '../backup/upload.sh:/usr/local/bin/upload.sh:ro', '/etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro', '/etc/polycarpic/host.env:/etc/uploader/host.env:ro'],
+    });
   }
   const proj: Y = {
     name: `polycarpic-${kind}`,

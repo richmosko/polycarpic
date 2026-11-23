@@ -13,7 +13,10 @@ OWNER = {"db_superuser_password": "provision", "auth_secret": "provision", "cred
 
 def settable(project="prod"):
     refused = REFUSED_PROVISION | {"credential_keyring", "staging_basic_auth"}
-    return sorted(set(n for _, n, _ in mounts(project) if n not in refused))
+    names = set(n for _, n, _ in mounts(project) if n not in refused)
+    if project == "prod":
+        names |= {"heartbeat_url"}  # POLY-99 H-1: host-only, written by set-secret under secrets/host/, mounted by no service
+    return sorted(names)
 
 
 class SetSecret(OpsTest):
@@ -130,10 +133,31 @@ class SetSecret(OpsTest):
         self.assertEqual(r.rc, 0)
         self.assertEqual(r.out.splitlines()[-1], "set-secret: plaid_secret written for web; run: sudo polycarpic-ops restart web")
 
-    def test_names_only_one_shot_services_mount_say_the_next_uploader_run_reads_it(self):
+    def test_heartbeat_url_is_host_only_written_under_secrets_host_root_root_0400_and_says_who_reads_it(self):
+        """POLY-99 H-1 (ruling R10 correction): no service mounts it; root reads it."""
         r = self.put("heartbeat_url", "https://hc-ping.example/u")
-        self.assertEqual(r.out.splitlines()[-1], "set-secret: heartbeat_url written for uploader; the next uploader run reads it")
-        self.assertEqual(self.on_disk("uploader", "heartbeat_url").read_text(), "https://hc-ping.example/u\n")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(r.out.splitlines()[-1], "set-secret: heartbeat_url written; root reads it on the next backup or upload run")
+        p = self.on_disk("host", "heartbeat_url")
+        self.assertEqual(p.read_text(), "https://hc-ping.example/u\n")
+        self.assertEqual(stat.S_IMODE(os.stat(str(p)).st_mode), 0o400)
+        self.assertTrue(r.chowns and all(c[1:] == (0, 0) for c in r.chowns), r.chowns)  # root:root, not root:10005
+        self.assertFalse(self.on_disk("uploader", "heartbeat_url").exists())
+
+    def test_HOST_ONLY_is_pinned_exactly_and_no_host_only_name_is_compose_mounted(self):
+        """Any addition to HOST_ONLY comes to seceng (ruling H-1)."""
+        from base import ctx_class
+        ctx_class()
+        import importlib
+        rules = importlib.import_module("lib.secrets")
+        self.assertEqual(rules.HOST_ONLY, {"heartbeat_url": "host"})
+        mounted = set(n for p in ("prod", "staging") for _, n, _ in mounts(p))
+        self.assertEqual(mounted & set(rules.HOST_ONLY), set())
+
+    def test_a_host_only_name_outside_HOST_ONLY_is_refused_exit_2(self):
+        r = self.put("not_a_secret_anyone_reads", "x")
+        self.assertEqual(r.rc, 2)
+        self.assertFalse(self.host.p("/etc/polycarpic/secrets/host/not_a_secret_anyone_reads").exists())
 
     def test_backup_store_credential_takes_two_prompts_and_is_two_lines(self):
         kid, key = "0049" + self.fix(), "K004" + self.fix()

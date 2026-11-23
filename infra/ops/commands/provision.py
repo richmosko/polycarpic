@@ -5,6 +5,7 @@ import re
 HELP = "provision the host (--stage host) or re-apply the database roles (--stage database --project prod|staging)"
 DOMAIN = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+")
 BUCKET = re.compile(r"[a-z0-9-]{6,50}")
+ENDPOINT = re.compile(r"https://s3\.[a-z0-9-]+\.backblazeb2\.com")
 OPS_CONF = "/etc/polycarpic/ops.conf"
 
 
@@ -14,6 +15,7 @@ def add_arguments(parser):
     parser.add_argument("--domain")
     parser.add_argument("--mail-from")
     parser.add_argument("--b2-bucket")
+    parser.add_argument("--b2-endpoint")
     parser.add_argument("--project")
     plain = parser.parse_args
 
@@ -22,6 +24,8 @@ def add_arguments(parser):
         # a value starting with '-' would be read as an option: refuse it with the named message (B3)
         if any(a == "--mail-from" and b.startswith("-") for a, b in zip(argv, argv[1:])):
             parser.error("provision: bad --mail-from")
+        if any(a == "--b2-endpoint" and b.startswith("-") for a, b in zip(argv, argv[1:])):
+            parser.error("provision: bad --b2-endpoint")
         return plain(argv, namespace)
 
     parser.parse_args = checked
@@ -43,13 +47,15 @@ def run(args, ctx):
         return _bad(ctx, "bad --mail-from")
     if args.b2_bucket is not None and not BUCKET.fullmatch(args.b2_bucket):
         return _bad(ctx, "bad --b2-bucket")
+    if args.b2_endpoint is not None and not ENDPOINT.fullmatch(args.b2_endpoint):
+        return _bad(ctx, "bad --b2-endpoint")
     if args.project is not None and args.project not in ("prod", "staging"):
         return _bad(ctx, "--project must be prod or staging")
     if args.stage == "database" and args.project is None:
         return _bad(ctx, "--stage database needs --project prod|staging")
 
     argv = ["/bin/bash", ctx.bundle("infra/provision.sh")]
-    for flag, value in (("--stage", args.stage), ("--target", args.target), ("--domain", args.domain), ("--mail-from", args.mail_from),
+    for flag, value in (("--stage", args.stage), ("--target", args.target), ("--domain", args.domain), ("--b2-endpoint", args.b2_endpoint), ("--mail-from", args.mail_from),
                         ("--project", args.project)):
         if value is not None:
             argv += [flag, value]
@@ -60,15 +66,18 @@ def run(args, ctx):
 
 
 def _write_conf(ctx, bucket):
-    """ops.conf: root:root 0644, one line B2_BUCKET=<name>; a line printed only when it changes."""
+    """ops.conf: root:root 0644, B2_BUCKET=<name> then the endpoint line provision.sh wrote; a line printed only when it changes."""
     real = ctx.p(OPS_CONF)
-    want = "B2_BUCKET=%s\n" % bucket
+    other = []
     try:
         with open(real, encoding="utf-8") as fh:
-            if fh.read() == want:
-                return
+            current = fh.read()
+        other = [l for l in current.split("\n") if l and not l.startswith("B2_BUCKET=")]  # provision.sh's B2_S3_ENDPOINT line stays
     except OSError:
-        pass
+        current = None
+    want = "".join(l + "\n" for l in ["B2_BUCKET=%s" % bucket] + other)
+    if current == want:
+        return
     os.makedirs(os.path.dirname(real), mode=0o755, exist_ok=True)
     tmp = real + ".new"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)

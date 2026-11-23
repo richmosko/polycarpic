@@ -3,6 +3,10 @@ import re
 
 NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
 TWO_LINES = "backup_store_credential"
+# Secrets root reads that no compose service mounts: name -> service directory (provision-check.sh carries the same pair as HOST_ONLY).
+HOST_ONLY = {"heartbeat_url": "host"}
+HOST_DIR = "host"  # root:root 0700, its files root:root 0400; no service mounts anything under it
+SECRET_ROOT = "/etc/polycarpic/secrets/"
 
 
 def refused_by(name):

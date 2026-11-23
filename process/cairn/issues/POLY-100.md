@@ -4,7 +4,7 @@ title: Pull-based deploy + timers
 status: in-progress
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83]
+blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
 assignee: devops-engineer
 paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, infra/deploy/**, infra/ops/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/caddy/**, infra/README.md, infra/lint/**, infra/ci/**, packages/db/**, packages/config/**, apps/worker/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore, Dockerfile]
 labels: [ops, deploy, security]
@@ -82,3 +82,4 @@ From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.m
 ### @team-lead — 2026-11-22
 
 Feature started. Branch: `feature/poly-100-pull-based-deploy`.
+From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8; ruling R6 is the contract): the deploy calls `polycarpic-ops backup premigration` and migrates only on exit 0 (1 failed, 3 not ready, 4 lock not got in 30 min), writing the `premigration-set …` line to deploy.log. Also this issue's: write /opt/polycarpic/images.env; enable both timers; publish and attest the tools image; install the ops bundle from the verified image; the deploy lock alongside backup.lock; `github_read_token` joins HOST_ONLY only through seceng's pinned-set review (secrets/host/, root:root 0400).

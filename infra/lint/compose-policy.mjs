@@ -15,6 +15,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const KINDS = ['edge', 'prod', 'staging'];
 const violations = [];
 const v = (id, file, msg) => violations.push(`[${id}] ${file}: ${msg}`);
+const HOST_SECRETS = /(^|\/)secrets\/host(\/|$)/;
 
 function args() {
   const a = process.argv.slice(2);
@@ -176,6 +177,30 @@ for (const [kind, cfg] of Object.entries(rendered)) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
       if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);
     }
+    // POLY-99 C2: no core file holds plaintext (the root disk is not LUKS): ulimits core 0 on every prod and staging service
+    if (kind !== 'edge') {
+      const core = s.ulimits?.core;
+      const coreOk = core !== undefined && (typeof core === 'object' ? Number(core.soft ?? 0) === 0 && Number(core.hard ?? 0) === 0 : Number(core) === 0);
+      if (!coreOk) v('core-dump', rel, `${at}: ulimits core must be 0`);
+    }
+    // POLY-99 C1: backup and uploader have a /tmp tmpfs of at most 1 MiB (it holds a passfile or a rclone config, never a dump)
+    if (kind === 'prod' && (sn === 'backup' || sn === 'uploader')) {
+      const entry = list(s.tmpfs).find((x) => String(x).split(':')[0] === '/tmp');
+      const m = /(?:^|[:,])size=(\d+)([kmg]?)$/i.exec(String(entry ?? '').split(':').slice(1).join(':'));
+      const size = m ? Number(m[1]) * ({ '': 1, k: 1024, m: 1048576, g: 1073741824 }[m[2].toLowerCase()]) : 0;
+      if (!entry || !(size > 0 && size <= 1048576)) v('tmp-size', rel, `${at}: /tmp must be a tmpfs of at most 1 MiB`);
+    }
+    // POLY-99 C10: root's record files live under /var/lib/polycarpic/state; no service mounts it or a parent of it
+    for (const vol of s.volumes ?? []) {
+      const src = String(vol.source ?? '').replace(/\/+$/, '');
+      if (vol.type === 'bind' && (src === '/var' || src === '/var/lib' || src === '/var/lib/polycarpic' || src.startsWith('/var/lib/polycarpic/state'))) v('state-mount', rel, `${at}: mounts ${src}: root's records are mounted by no service`);
+    }
+    // POLY-99 C3: the uploader reads the spool and changes nothing
+    if (kind === 'prod' && sn === 'uploader') {
+      const spoolMounts = (s.volumes ?? []).filter((x) => x.type === 'bind' && String(x.source ?? '').startsWith('/srv/polycarpic/spool'));
+      if (!spoolMounts.length) v('uploader-spool-ro', rel, `${at}: the spool must be mounted (read-only)`);
+      for (const x of spoolMounts) if (!x.read_only) v('uploader-spool-ro', rel, `${at}: ${x.source} must be mounted read-only`);
+    }
     if (s.ports?.length && sn !== 'caddy') v('ports-caddy-only', rel, `${at}: ports: only caddy publishes a port`);
     // mounts
     for (const vol of s.volumes ?? []) {
@@ -184,6 +209,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
       if (vol.type !== 'bind' && vol.type !== 'tmpfs') v('volume-type', rel, `${at}: volume ${src || vol.target} has type ${vol.type}; only bind and tmpfs`);
       if (vol.type === 'bind' && /docker\.sock|containerd\.sock/.test(base)) v('docker-sock', rel, `${at}: mounts ${src}`);
       if (vol.type === 'bind' && (src === '/' || src === '/var/run' || src === '/run' || src.startsWith('/var/run/') || src.startsWith('/run/'))) v('mount-forbidden', rel, `${at}: mounts ${src}`);
+      if (HOST_SECRETS.test(src)) v('host-secrets', rel, `${at}: mounts ${src}: secrets/host/ holds what root reads and no service mounts`);
       if (vol.type === 'bind') {
         const norm = src.startsWith(ROOT + sep) ? relative(resolve(composeDir), src) : src;
         const hit = (policy.binds[`${kind}.${sn}`] ?? []).find((b) => b.source === norm && b.target === vol.target);
@@ -241,6 +267,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
   for (const [key, sec] of Object.entries(cfg.secrets ?? {})) {
     if (sec.environment || sec.content) v('secret-source', rel, `secret ${key}: only file: sources`);
     const f = sec.file ?? '';
+    if (HOST_SECRETS.test(f)) v('host-secrets', rel, `secret ${key}: file ${f} is under secrets/host/, which no service mounts`);
     const pre = policy.secretPrefix[kind];
     if (!f.startsWith(pre) || f.includes('..')) v('secret-path', rel, `secret ${key}: file ${f} must be under ${pre}`);
     if (!Object.values(svcs).some((x) => (x.secrets ?? []).some((q) => (typeof q === 'string' ? q : q.source) === key))) v('secret-path', rel, `secret ${key} is mounted by no service`);

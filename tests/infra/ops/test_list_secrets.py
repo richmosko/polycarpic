@@ -18,7 +18,10 @@ class ListSecrets(OpsTest):
         staging = project == "staging"
         lines = [row("SERVICE", "NAME", "STATE", "MODE", "OWNER", "BYTES")]
         counts = dict(set=0, missing=0, wrong=0)
-        for svc, name, _ in mounts(project):
+        rows = list(mounts(project))
+        if project == "prod":
+            rows = sorted(rows + [("host", "heartbeat_url", "")])  # POLY-99 H-1: host-only, root:root 0400, no service mounts it
+        for svc, name, _ in rows:
             f = self.host.secret_path(svc, name, staging)
             if not f.exists() and not f.is_symlink():
                 lines.append(row(svc, name, "missing"))
@@ -30,9 +33,9 @@ class ListSecrets(OpsTest):
                 lines.append(row(svc, name, "WRONG", "%04o" % (st.st_mode & 0o7777), owner, st.st_size))
                 counts["wrong"] += 1
             else:
-                lines.append(row(svc, name, "set", "0440", owner, st.st_size))
+                lines.append(row(svc, name, "set", "0400" if svc == "host" else "0440", owner, st.st_size))
                 counts["set"] += 1
-        tail = "%d files: %d set, %d missing" % (len(mounts(project)), counts["set"], counts["missing"])
+        tail = "%d files: %d set, %d missing" % (len(rows), counts["set"], counts["missing"])
         if counts["wrong"]:
             tail += "; %d wrong: run provision-check" % counts["wrong"]
         return lines + [tail]
@@ -49,6 +52,16 @@ class ListSecrets(OpsTest):
         self.assertEqual((r.rc, r.err), (0, ""))
         self.assertEqual(r.out.splitlines(), self.expected())
         self.assertTrue(all(len(l) <= 80 for l in r.out.splitlines()))
+
+    def test_the_host_only_heartbeat_url_is_listed_0400_set_and_0440_is_wrong(self):
+        self.host.secret("host", "heartbeat_url", "https://hc-ping.example/u\n", mode=0o400)
+        r = self.host.go("list-secrets")
+        self.assertIn("set      0400", [l for l in r.out.splitlines() if l.startswith("host ")][0])
+        os.unlink(str(self.host.secret_path("host", "heartbeat_url")))
+        self.host.secret("host", "heartbeat_url", "https://hc-ping.example/u\n", mode=0o440)
+        r = self.host.go("list-secrets")
+        self.assertEqual(r.rc, 1)
+        self.assertIn("WRONG    0440", [l for l in r.out.splitlines() if l.startswith("host ")][0])
 
     def test_staging_reads_the_staging_tree_and_compose_file(self):
         self.plant_some(staging=True)

@@ -139,6 +139,10 @@ class Runner:
         r = self._rec("inherit", argv, None, timeout, env)
         if r["raises"]:
             raise r["raises"]
+        if r["fn"]:  # POLY-99: a child that prints may also have effects (provision.sh writes ops.conf); fn returns (code, out, err)
+            code, out, err = r["fn"](argv, None)
+            self.term.write(out)
+            return code
         self.term.write(r["term"])
         return r["code"]
 
@@ -182,6 +186,7 @@ class Host(object):
             self.mkdir("/etc/polycarpic/" + top, 0o755)
             for svc in sorted(set(s for s, _, _ in mounts(project))):
                 self.mkdir("/etc/polycarpic/%s/%s" % (top, svc), 0o750)
+        self.mkdir("/etc/polycarpic/secrets/host", 0o700)  # POLY-99 H-1: host-only secrets (heartbeat_url), root:root, no service mounts it
 
     def p(self, path):
         return self.root / path.lstrip("/")
@@ -268,10 +273,14 @@ class Host(object):
                 raise AssertionError("statvfs not supplied")
             return statvfs(path)
 
+        r.stdout_bytes = io.BytesIO()
+        extra = {}
+        if "stdout_bytes" in Ctx.__init__.__code__.co_varnames:  # POLY-99 pin 15: fetch-premigration writes bytes through ctx.stdout_bytes
+            extra["stdout_bytes"] = r.stdout_bytes
         ctx = Ctx(root=str(self.root), run=r.runner, run_inherit=r.runner.inherit, getpass=getpass_impl or fake_getpass, isatty=lambda: tty,
                   confirm=fake_confirm, now=lambda: clock[0], sleep=fake_sleep, chown=lambda *a: r.chowns.append(a), geteuid=lambda: euid,
                   tls_probe=fake_tls, statvfs=fake_statvfs, stdout=r.stdout, stderr=r.stderr,
-                  trusted_uid=os.getuid() if trusted is None else trusted)
+                  trusted_uid=os.getuid() if trusted is None else trusted, **extra)
         r.ctx = ctx
         mod = dispatcher or load_dispatcher()
         try:
