@@ -487,9 +487,18 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | Job | May add | Holds |
 |---|---|---|
 | image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
-| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
-| db | ≤ 10 s | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
+| provision | ≤ 40 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
+| db | ≤ 10 s after the restructure below; if qa then measures more, ≤ 15 s stands with no case dropped. Today: +12 to +20 s (qa, same day; main 13.1–13.4 s) | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 15 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
+
+**T-pre restructure** (qa; every fault stays, apply and `--plan` each). All faults share one database and one sibling, created once with the
+fault objects; each fault stays its own `it` and undoes itself. Sharing is sound only with these, which the present cases lack:
+- **Each refusal names its own fault:** the match is `refused (backup-acl)` **and** a per-fault pattern (the object or class, the privilege, the attribute, the
+  setting, or the role pair). Otherwise a fault that an earlier undo left behind makes a later case green for the wrong reason.
+- **The tracking table and `ta` are checked after each mode,** in one query, so a run that wrongly applies fails in its own case.
+- **A final case on the same database:** `--plan` exits 3 and apply exits 0. It proves that every undo worked and nothing else refused. It must run
+  last, and fail if any fault case was skipped.
+Red on: a mutant undo that does nothing (the next case's pattern or the final case fails); a runner mutant that applies before it refuses.
 
 **Builder split.** R12 is backend-lead's, as POLY-100f (filed): about 40 lines in `packages/db/src/migrate.ts` plus T-pre
 and T-lock, disjoint from every infra path; backend-lead owns the refusal codes the deploy reads. devops-engineer builds R1–R11.
