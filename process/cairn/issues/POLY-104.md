@@ -53,3 +53,7 @@ From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): measure
 ### @team-lead — 2026-11-23
 
 From the POLY-100 ruling (`process/cairn/reviews/POLY-100/ruling.md` R9, §L5; seceng S11, S15 in `ruling-review.md`): do not create the `app.` DNS record until `first-deploy prod` has run. That deploy stops Caddy, empties its data directories and recreates it, and prints the instruction as its last line. If the record exists earlier, every staging deploy skips the edge and alerts, and `first-deploy prod` refuses with `edge-prod-name-early` (exit 4). The reason: a staging-era Caddy that can resolve the prod name can obtain prod's certificate. INFRA's first-deploy runbook carries the same order.
+
+### @team-lead — 2026-11-23
+
+Correction to my comment above (2026-11-23): the rule "create the `app.` DNS record only after `first-deploy prod`" is withdrawn. It belonged to the staging-only edge exception, which the Principal replaced the same day with the strict rule: staging never deploys Caddy on any host (`process/DECISIONS.md` 2026-11-23; POLY-100 ruling R9, §L5 at d634da53). There is no DNS-order rule and no `edge-prod-name-early` refusal. What POLY-104 needs instead: `provision.sh` creates the two edge networks, and Caddy is brought up from a signed release before staging is served; which signed release (a signed `edge-<n>` tag, or prod first) is the Principal's open choice, ruling §L6. Either way the tag-signing key and `RELEASE_SIGNERS` come before the first staging deploy.
