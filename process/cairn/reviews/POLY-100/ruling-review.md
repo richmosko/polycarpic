@@ -692,3 +692,7 @@ The env_file rule becomes **S27**:
   cannot loosen without that test changing.
 - *Tests, guard and lint alike:* `mail.env` on web; missing from worker; the two swapped on auth; prod's `mail.env` in staging and the
   reverse; a third file; `required: false`; `mail.env` with a second key (provision-check). Positives for both projects.
+- *The lint today (read; its render keeps `env_file`, measured on Compose v5.7.0):* it accepts a service with **no** list, because it
+  judges only a non-empty one; it compares a single entry; and it reads a normalized render, where a relative or `..` path may
+  already be resolved. It must compare the whole list, empty included, and take the paths from the raw YAML, as the guard
+  takes them from the raw render.
