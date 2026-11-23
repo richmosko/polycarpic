@@ -50,17 +50,68 @@ async function assertRoles(client: pg.Client): Promise<void> {
   if (got.join() !== want.join()) {
     throw new MigrateRefusal('roles-missing', `poly_migrator memberships are not exactly [${MIGRATOR_MEMBERSHIPS.join(', ')}] with INHERIT FALSE, SET TRUE, no ADMIN: got [${got.join(', ')}]`);
   }
-  // The reverse direction (SecEng M-2): poly_owner and the seven have no member but poly_migrator, and poly_backup
-  // belongs to nothing but pg_read_all_data. roles.sql only adds grants, so drift on a live box is caught here.
+  // First, so a grant of poly_owner TO poly_backup is named backup-acl, not as a stray member of poly_owner.
+  await assertBackupRole(client);
+  // The reverse direction (SecEng M-2): poly_owner and the seven have no member but poly_migrator. roles.sql only adds
+  // grants, so drift on a live box is caught here.
   const stray = await client.query(
     `SELECT u.rolname AS member, r.rolname AS role FROM pg_auth_members m
        JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles u ON u.oid = m.member
-      WHERE (r.rolname = ANY($1) AND u.rolname <> 'poly_migrator')
-         OR (u.rolname = 'poly_backup' AND r.rolname <> 'pg_read_all_data')`,
+      WHERE r.rolname = ANY($1) AND u.rolname <> 'poly_migrator'`,
     [MIGRATOR_MEMBERSHIPS],
   );
   if (stray.rowCount) {
     throw new MigrateRefusal('roles-missing', `unexpected role memberships: ${stray.rows.map((r) => `${r.member} in ${r.role}`).join(', ')}`);
+  }
+}
+
+const bad = (what: string): never => {
+  throw new MigrateRefusal('backup-acl', `poly_backup is not exactly roles.sql's read-only role: ${what}`);
+};
+
+/** R12 (POLY-100): poly_backup bypasses RLS, so anything beyond roles.sql's state refuses the run. Catalog reads only. */
+async function assertBackupRole(client: pg.Client): Promise<void> {
+  // (b) attributes and settings.
+  const a = (await client.query(
+    `SELECT oid, rolsuper, rolcreatedb, rolcreaterole, rolcanlogin, rolreplication, rolbypassrls, rolconnlimit FROM pg_roles WHERE rolname = 'poly_backup'`,
+  )).rows[0] as Record<string, unknown>;
+  if (a.rolsuper || a.rolcreatedb || a.rolcreaterole || !a.rolcanlogin || !a.rolreplication || !a.rolbypassrls || a.rolconnlimit !== 3) {
+    bad('attributes differ (want LOGIN REPLICATION BYPASSRLS, no SUPERUSER/CREATEDB/CREATEROLE, CONNECTION LIMIT 3)');
+  }
+  const set = await client.query(`SELECT setdatabase, unnest(setconfig) AS cfg FROM pg_db_role_setting WHERE setrole = $1`, [a.oid]);
+  if (set.rows.length !== 1 || Number(set.rows[0].setdatabase) !== 0 || set.rows[0].cfg !== 'default_transaction_read_only=on') {
+    bad(`role settings are not exactly {default_transaction_read_only=on}: got [${set.rows.map((r) => `${r.setdatabase}:${r.cfg}`).join(', ')}]`);
+  }
+  // (a) every dependency of another object on the role in the shared catalogs and this database (dbid 0 or current), except
+  // pg_database ACL rows: those are shared, one per database, and are judged by the datacl read below. Sibling databases'
+  // objects cannot be inspected from here; pg_hba admits poly_backup to the application database only (ruling R12).
+  const dep = await client.query(
+    `SELECT d.dbid, d.classid::regclass::text AS cls, d.objid, d.objsubid, d.deptype FROM pg_shdepend d
+      WHERE d.refclassid = 'pg_authid'::regclass AND d.refobjid = $1
+        AND d.dbid IN (0, (SELECT oid FROM pg_database WHERE datname = current_database()))
+        AND NOT (d.classid = 'pg_database'::regclass AND d.deptype = 'a')`,
+    [a.oid],
+  );
+  if (dep.rowCount) {
+    bad(`it owns or holds privileges on objects: ${dep.rows.map((r) => `${r.cls}:${r.objid}${r.objsubid ? `.${r.objsubid}` : ''} (${r.deptype}, db ${r.dbid})`).join(', ')}`);
+  }
+  // Every database's ACL entry for the role is exactly CONNECT, without grant option (also catches TEMPORARY/CREATE, which share the row).
+  const acl = await client.query(
+    `SELECT db.datname, db.datname = current_database() AS here, x.privilege_type, x.is_grantable FROM pg_database db, aclexplode(db.datacl) x
+      WHERE x.grantee = $1`, [a.oid],
+  );
+  const wrong = acl.rows.filter((r) => r.privilege_type !== 'CONNECT' || r.is_grantable);
+  if (wrong.length) bad(`its privileges on databases are not exactly CONNECT: ${wrong.map((r) => `${r.datname}: ${r.privilege_type}${r.is_grantable ? ' WITH GRANT OPTION' : ''}`).join(', ')}`);
+  if (!acl.rows.some((r) => r.here)) bad('it has no CONNECT on the current database');
+  // (c) memberships, which pg_shdepend does not record (S5).
+  const mem = await client.query(
+    `SELECT u.rolname AS member, r.rolname AS role, m.admin_option FROM pg_auth_members m
+       JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles u ON u.oid = m.member
+      WHERE u.rolname = 'poly_backup' OR r.rolname = 'poly_backup'`,
+  );
+  const only = mem.rows.length === 1 && mem.rows[0].member === 'poly_backup' && mem.rows[0].role === 'pg_read_all_data' && !mem.rows[0].admin_option;
+  if (!only) {
+    bad(`unexpected role memberships: [${mem.rows.map((r) => `${r.member} in ${r.role}${r.admin_option ? ' with admin' : ''}`).join(', ')}], want only poly_backup in pg_read_all_data`);
   }
 }
 

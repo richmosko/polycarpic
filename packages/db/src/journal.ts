@@ -20,13 +20,13 @@ export interface AppliedRow {
 
 /** exit: 1 other failure, 2 journal/tracking divergence (nothing applied), 4 lock timeout. */
 export class MigrateRefusal extends Error {
-  check: 'journal-order' | 'not-a-prefix' | 'roles-missing' | 'wrong-role' | 'not-converged' | 'lock-timeout';
+  check: 'journal-order' | 'not-a-prefix' | 'roles-missing' | 'backup-acl' | 'wrong-role' | 'not-converged' | 'lock-timeout';
   exit: 1 | 2 | 4;
   constructor(check: MigrateRefusal['check'], message: string) {
     super(message);
     this.name = 'MigrateRefusal';
     this.check = check;
-    this.exit = check === 'journal-order' || check === 'not-a-prefix' || check === 'roles-missing' ? 2 : check === 'lock-timeout' ? 4 : 1;
+    this.exit = check === 'journal-order' || check === 'not-a-prefix' || check === 'roles-missing' || check === 'backup-acl' ? 2 : check === 'lock-timeout' ? 4 : 1;
   }
 }
 
