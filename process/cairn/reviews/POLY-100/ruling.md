@@ -75,7 +75,7 @@ run with `-c credential.helper=`, `GIT_TERMINAL_PROMPT=0` and a bare URL, so git
 In this order; each check is a named refusal. Every refusal is logged and raises the R10 alert. A **Q** row also
 quarantines the digest. A network or API failure is never Q (seceng D13): the run logs `transient`, raises no alert,
 exits 0 and retries at the next poll. A lasting outage shows as `08_deploy`'s `last-poll` WARN (R10). `transient` covers
-only the GitHub reads (R2, V4's fetch) and `pull`; a non-zero `gh attestation verify` is always `attestation` with an
+only the GitHub reads (R2, V4's fetch) and a non-zero `docker pull` (a pulled image whose `RepoDigests` lacks the digest is the `pull` refusal, with an alert); a non-zero `gh attestation verify` is always `attestation` with an
 alert, because gh's exit cannot tell an outage from a refusal. Releases live in `/opt/polycarpic/releases/`, with the
 `<project>-current` symlinks beside the bundles.
 
