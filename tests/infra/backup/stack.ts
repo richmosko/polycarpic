@@ -115,7 +115,10 @@ export function up(opts: UpOpts = {}): Stack {
   for (const s of SERVICES) {
     const vols: any[] = [];
     for (const v of cfg.services[s].volumes ?? []) {
-      if (v.type !== 'bind' || !/^\/(srv|etc)\/polycarpic/.test(v.source)) continue;
+      if (v.type !== 'bind' || !/^\/(srv|etc)\/polycarpic/.test(v.source)) {
+        if (s === 'uploader') vols.push(v.type === 'bind' ? { type: 'bind', source: v.source, target: v.target, read_only: !!v.read_only } : v); // its list is replaced whole (!override)
+        continue;
+      }
       const ro = !!v.read_only;
       const m = /^\/srv\/polycarpic\/spool(?:\/(wal|dump|premigration))?$/.exec(v.source);
       if (m) {
@@ -151,7 +154,11 @@ export function up(opts: UpOpts = {}): Stack {
     }
   }
   const ovFile = join(dir, 'override.yml');
-  writeFileSync(ovFile, stringify(ov));
+  // The uploader's base mount is the whole spool at /spool (one target); three volume mounts at /spool/<dir> would sit beside it and Docker
+  // Desktop refuses the host path. `!override` makes the list replace the base list instead of merging by target.
+  let ovText = stringify(ov);
+  if (ov.services.uploader) ovText = ovText.replace(/(\n {2}uploader:\n {4}volumes:)/, '$1 !override');
+  writeFileSync(ovFile, ovText);
   rootRun(['chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv', ...chowns].join(' && '));
 
   const tools = (script: string, o: { rw?: boolean; input?: string } = {}) =>
@@ -255,7 +262,7 @@ export const pgContainer = () => `${PROJECT}-postgres-1`;
 export const BACKUP_SH = join(ROOT, 'infra', 'backup', 'backup.sh');
 /** a mutant copy of a script under test: `from` must occur, or the mutant would silently equal the original */
 export function mutate(text: string, from: string | RegExp, to: string): string {
-  const out = text.replace(from, to);
+  const out = typeof from === 'string' ? text.split(from).join(to) : text.replace(from, to); // a string mutates EVERY occurrence (each rclone call)
   if (out === text) throw new Error(`mutant did not change the script: ${String(from)}`);
   return out;
 }

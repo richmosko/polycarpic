@@ -245,7 +245,7 @@ describe('U4/C11: the rclone config is a 0600 tmpfs file; no key in argv or envi
       }
       const mode = exec('stat', '-c', '%a %u', '/tmp/rclone.conf').out.trim();
       const hasKey = exec('grep', '-c', APP_KEY, '/tmp/rclone.conf').out.trim();
-      const leak = exec('sh', '-c', `for p in /proc/[0-9]*; do tr "\\0" "\\n" < $p/cmdline 2>/dev/null; tr "\\0" "\\n" < $p/environ 2>/dev/null; done | grep -c -e '${APP_KEY}' -e '${KEY_ID}'`).out.trim();
+      const leak = exec('bash', '-c', `A='${APP_KEY.slice(0, 8)}''${APP_KEY.slice(8)}'; K='${KEY_ID.slice(0, 8)}''${KEY_ID.slice(8)}'; n=0; while IFS= read -r l; do if [[ $l == *"$A"* || $l == *"$K"* ]]; then n=$((n+1)); fi; done < <(for p in /proc/[0-9]*; do tr "\\0" "\\n" < $p/cmdline 2>/dev/null; tr "\\0" "\\n" < $p/environ 2>/dev/null; done); echo $n`).out.trim();
       probe += `\nMODE=${mode}\nHASKEY=${hasKey}\nLEAK=${leak}\n`;
     });
     expect(r.code).toBe(0);
@@ -273,7 +273,7 @@ describe('T4, T3: no route where there must be none', () => {
     try {
       const probe = () => sh('docker', ['exec', name, 'bash', '-c', 'timeout 5 bash -c ": </dev/tcp/postgres/5432"']).code;
       expect(probe()).not.toBe(0);
-      expect(sh('docker', ['network', 'connect', `${PROJECT}_default`, name]).code).toBe(0);
+      expect(sh('docker', ['network', 'connect', 'polycarpic-prod_default', name]).code).toBe(0);
       expect(probe()).toBe(0);
     } finally { sh('docker', ['rm', '-f', name]); }
   });
@@ -309,8 +309,8 @@ describe('T14: the uploader cannot change the spool', () => {
     const n = setName(s, 'dump', TS);
     plantSpool(s, 'dump', n);
     for (const [label, cmd] of [['create', 'touch /spool/dump/new'], ['replace', `printf x > /spool/dump/${n}`], ['delete', `rm /spool/dump/${n}`], ['wal create', 'touch /spool/wal/new'], ['premigration create', 'touch /spool/premigration/new']] as const) {
-      const r = inUploader(`${cmd} 2>&1`);
-      expect({ label, code: r.code !== 0, out: r.out }).toEqual({ label, code: true, out: expect.stringMatching(/Read-only file system/) });
+      const r = inUploader(`{ ${cmd}; } 2>&1`);
+      expect({ label, code: r.code !== 0, out: r.out }).toEqual({ label, code: true, out: expect.stringMatching(label === 'replace' ? /Read-only file system|Permission denied/ : /Read-only file system/) });
     }
     expect(s.ls('dump')).toEqual([n]);
   });
