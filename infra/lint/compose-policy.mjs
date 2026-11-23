@@ -177,6 +177,30 @@ for (const [kind, cfg] of Object.entries(rendered)) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
       if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);
     }
+    // POLY-99 C2: no core file holds plaintext (the root disk is not LUKS): ulimits core 0 on every prod and staging service
+    if (kind !== 'edge') {
+      const core = s.ulimits?.core;
+      const coreOk = core !== undefined && (typeof core === 'object' ? Number(core.soft ?? 0) === 0 && Number(core.hard ?? 0) === 0 : Number(core) === 0);
+      if (!coreOk) v('core-dump', rel, `${at}: ulimits core must be 0`);
+    }
+    // POLY-99 C1: backup and uploader have a /tmp tmpfs of at most 1 MiB (it holds a passfile or a rclone config, never a dump)
+    if (kind === 'prod' && (sn === 'backup' || sn === 'uploader')) {
+      const entry = list(s.tmpfs).find((x) => String(x).split(':')[0] === '/tmp');
+      const m = /(?:^|[:,])size=(\d+)([kmg]?)$/i.exec(String(entry ?? '').split(':').slice(1).join(':'));
+      const size = m ? Number(m[1]) * ({ '': 1, k: 1024, m: 1048576, g: 1073741824 }[m[2].toLowerCase()]) : 0;
+      if (!entry || !(size > 0 && size <= 1048576)) v('tmp-size', rel, `${at}: /tmp must be a tmpfs of at most 1 MiB`);
+    }
+    // POLY-99 C10: root's record files live under /var/lib/polycarpic/state; no service mounts it or a parent of it
+    for (const vol of s.volumes ?? []) {
+      const src = String(vol.source ?? '').replace(/\/+$/, '');
+      if (vol.type === 'bind' && (src === '/var' || src === '/var/lib' || src === '/var/lib/polycarpic' || src.startsWith('/var/lib/polycarpic/state'))) v('state-mount', rel, `${at}: mounts ${src}: root's records are mounted by no service`);
+    }
+    // POLY-99 C3: the uploader reads the spool and changes nothing
+    if (kind === 'prod' && sn === 'uploader') {
+      const spoolMounts = (s.volumes ?? []).filter((x) => x.type === 'bind' && String(x.source ?? '').startsWith('/srv/polycarpic/spool'));
+      if (!spoolMounts.length) v('uploader-spool-ro', rel, `${at}: the spool must be mounted (read-only)`);
+      for (const x of spoolMounts) if (!x.read_only) v('uploader-spool-ro', rel, `${at}: ${x.source} must be mounted read-only`);
+    }
     if (s.ports?.length && sn !== 'caddy') v('ports-caddy-only', rel, `${at}: ports: only caddy publishes a port`);
     // mounts
     for (const vol of s.volumes ?? []) {

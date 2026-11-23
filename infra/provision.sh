@@ -12,11 +12,11 @@ MAPPER=polycarpic-data
 DOCKER_KEY_FPR=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 VOL_DEVICE_GLOB='/dev/disk/by-id/scsi-0HC_Volume_*'
 
-stage='' target='' domain='' mail_from='' project=''
+stage='' target='' domain='' mail_from='' project='' b2_endpoint='' b2_endpoint_set=0
 changes=0
 
 die() { echo "provision.sh: $*" >&2; exit "${2:-1}"; }
-usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] | --stage database --project prod|staging" >&2; exit 2; }
+usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-endpoint <url>] | --stage database --project prod|staging" >&2; exit 2; }
 change() { echo "change: $*"; changes=$((changes + 1)); }
 
 while [ $# -gt 0 ]; do
@@ -25,6 +25,7 @@ while [ $# -gt 0 ]; do
     --target) target=${2:-}; shift 2 ;;
     --domain) domain=${2:-}; shift 2 ;;
     --mail-from) mail_from=${2:-}; shift 2 ;;
+    --b2-endpoint) b2_endpoint=${2:-}; b2_endpoint_set=1; shift 2 ;;
     --project) project=${2:-}; shift 2 ;;
     *) usage ;;
   esac
@@ -83,6 +84,9 @@ ensure_line() { # file fixed-string line
 validate_host_args() {
   [ "$target" = hetzner ] || die "--target hetzner is required (the home box is POLY-120)" 2
   [[ $domain =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$ ]] || die "--domain must be a domain name, e.g. example.com" 2
+  if [ "$b2_endpoint_set" = 1 ]; then
+    [[ $b2_endpoint =~ ^https://s3\.[a-z0-9-]+\.backblazeb2\.com$ ]] || die "--b2-endpoint must be https://s3.<region>.backblazeb2.com" 2
+  fi
   if [ -n "$mail_from" ]; then
     check_mail_from "$mail_from" || die "--mail-from must be an address under mail.$domain (the domain Resend verified; DMARC aligns there)" 2
   fi
@@ -215,16 +219,21 @@ data_volume() {
   ensure_line /etc/fstab "/dev/mapper/$MAPPER $DATA ext4 defaults,nofail 0 2"
 }
 
-# acl_dir <path> <uid:gid>: 0700 for the owner; uid 10005 reads and removes through access and default ACLs (F12, M1).
+# acl_dir <path> <uid:gid>: 0700 for the owner; uid 10005 lists and reads through access and default ACLs (r-x), and only root
+# deletes (POLY-99 C3). Each directory has an .inflight/ with the same owner: files are born there with a default `u:10005:r--`
+# and no access entry for 10005, so the uploader cannot enter it.
 # Never chmod a spool file after creating it: a chmod rewrites the ACL mask and takes away the uploader's read.
 acl_dir() {
   local path=$1 owner=$2 before after
   ensure_dir "$path" 0700 "$owner"
-  before=$(getfacl -cp "$path")
-  setfacl -m u:10005:rwx "$path"
-  setfacl -d -m u::rwx,g::---,o::---,u:10005:rwx "$path"
-  after=$(getfacl -cp "$path")
-  [ "$before" = "$after" ] || change "ACL of $path set (10005 rwx, default entries)"
+  ensure_dir "$path/.inflight" 0700 "$owner"
+  before=$(getfacl -cp "$path"; getfacl -cp "$path/.inflight")
+  setfacl -m u:10005:r-x "$path"
+  setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x "$path"
+  setfacl -x u:10005 "$path/.inflight"
+  setfacl -d -m u::rwx,g::---,o::---,u:10005:r-- "$path/.inflight"
+  after=$(getfacl -cp "$path"; getfacl -cp "$path/.inflight")
+  [ "$before" = "$after" ] || change "ACL of $path set (10005 r-x, .inflight default r--)"
 }
 
 data_dirs() {
@@ -243,13 +252,46 @@ data_dirs() {
 state_files() {
   ensure_dir /var/lib/polycarpic 0755 0:0
   ensure_dir "$STATE" 0755 0:0
-  local f owner
-  for f in last-upload:10005 last-dump:10004 jobs.log:10004; do
-    owner=${f##*:}; f=${f%%:*}
+  local f
+  # Root writes every record the status and the restore read; no container mounts any of them (POLY-99 R9).
+  for f in last-upload jobs.log spool.sha256; do
     if [ ! -e "$STATE/$f" ]; then : > "$STATE/$f"; change "created $STATE/$f"; fi
-    [ "$(stat -c %u:%g "$STATE/$f")" = "$owner:$owner" ] || chown "$owner:$owner" "$STATE/$f"
+    [ "$(stat -c %u:%g "$STATE/$f")" = "0:0" ] || { chown 0:0 "$STATE/$f"; change "owner of $STATE/$f set to root"; }
     [ "$(stat -c %a "$STATE/$f")" = 644 ] || chmod 0644 "$STATE/$f"
   done
+  if [ -f "$STATE/last-dump" ] && [ ! -s "$STATE/last-dump" ]; then rm -f "$STATE/last-dump"; change "removed the unused $STATE/last-dump"; fi
+}
+
+# ops.conf: root:root 0644. The endpoint line is ours; polycarpic-ops writes the bucket line and keeps this one.
+ops_endpoint() {
+  local conf=$ETC/ops.conf other want current=''
+  [ -f "$conf" ] && current=$(cat "$conf")
+  other=$(printf '%s\n' "$current" | grep -v '^B2_S3_ENDPOINT=' | grep -v '^$' || true)
+  want=$(printf '%s\n%s\n' "$other" "B2_S3_ENDPOINT=$b2_endpoint" | grep -v '^$')
+  if [ ! -f "$conf" ] || [ "$current" != "$want" ]; then
+    printf '%s\n' "$want" > "$conf.new"
+    chmod 0644 "$conf.new"
+    chown 0:0 "$conf.new"
+    mv "$conf.new" "$conf"
+    change "ops.conf B2_S3_ENDPOINT set"
+  fi
+  [ "$(stat -c %a "$conf")" = 644 ] || chmod 0644 "$conf"
+}
+
+# The backup and uploader units are installed, not enabled: the first deploy enables the timers once images.env exists.
+install_units() {
+  local here src u reload=0
+  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  src=$here/backup/systemd
+  for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
+    [ -f "$src/$u" ] || die "$src/$u not found"
+    if ! cmp -s "$src/$u" "/etc/systemd/system/$u"; then
+      install -m 0644 -o 0 -g 0 "$src/$u" "/etc/systemd/system/$u"
+      change "installed /etc/systemd/system/$u"
+      reload=1
+    fi
+  done
+  if [ "$reload" = 1 ]; then systemctl daemon-reload; fi
 }
 
 secrets_for() { # root services generated
@@ -342,6 +384,8 @@ stage_host() {
   state_files
   secrets_for "$ETC/secrets" "$PROD_SERVICES" "$PROD_GENERATED"
   host_secrets
+  if [ "$b2_endpoint_set" = 1 ]; then ops_endpoint; fi
+  install_units
   secrets_for "$ETC/staging-secrets" "$STAGING_SERVICES" "$STAGING_GENERATED"
   host_env "$ETC/host.env" polycarpic-prod "https://app.$domain" "$mf"
   host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain" "$mf"

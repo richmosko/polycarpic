@@ -175,8 +175,8 @@ secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
   case "$f" in
     "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;;
-    "$ETC/ops.conf") # POLY-98 R3: world-readable by design, so it may hold only bucket-name lines
-      if [ ! -s "$f" ] || grep -qvE '^B2_BUCKET=[a-z0-9-]{6,50}$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name>;"; fi ;;
+    "$ETC/ops.conf") # world-readable by design, so it may hold only the bucket name and the endpoint URL
+      if [ ! -s "$f" ] || grep -qvE '^(B2_BUCKET=[a-z0-9-]{6,50}|B2_S3_ENDPOINT=https://s3\.[a-z0-9-]+\.backblazeb2\.com)$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name> or B2_S3_ENDPOINT=<url>;"; fi ;;
     *) h6="$h6 $f is world-readable;" ;;
   esac
 done < <(find "$ETC" -type f -perm -o=r 2> /dev/null)
@@ -208,8 +208,11 @@ report H6 "secrets layout and modes" "$h6" "inspect the paths named; restore the
 
 # ------------------------------------------------------------------ H7 data dirs, spool, ACLs
 h7=''
-expect_acl=$(printf '%s\n' 'default:group::---' 'default:mask::rwx' 'default:other::---' 'default:user::rwx' 'default:user:10005:rwx' \
-  'group::---' 'mask::rwx' 'other::---' 'user::rwx' 'user:10005:rwx' | LC_ALL=C sort)
+# POLY-99 C3: 10005 lists and reads (r-x) and never writes or deletes; .inflight/ gives it only a default r-- and no access entry.
+expect_acl=$(printf '%s\n' 'default:group::---' 'default:mask::r-x' 'default:other::---' 'default:user::rwx' 'default:user:10005:r-x' \
+  'group::---' 'mask::r-x' 'other::---' 'user::rwx' 'user:10005:r-x' | LC_ALL=C sort)
+expect_inflight_acl=$(printf '%s\n' 'default:group::---' 'default:mask::r--' 'default:other::---' 'default:user::rwx' 'default:user:10005:r--' \
+  'group::---' 'other::---' 'user::rwx' | LC_ALL=C sort)
 for d in pg-prod pg-staging; do
   got=$(stat -c '%a %u:%g' "$DATA/$d" 2> /dev/null || echo missing)
   [ "$got" = "700 999:999" ] || h7="$h7 $d is $got (want 700 999:999);"
@@ -224,6 +227,15 @@ for pair in spool/wal:999:999 spool/dump:10004:10004 spool/premigration:10004:10
     missing=$(LC_ALL=C comm -13 <(echo "$acl") <(echo "$expect_acl") | tr '\n' ' ')
     extra=$(LC_ALL=C comm -23 <(echo "$acl") <(echo "$expect_acl") | tr '\n' ' ')
     h7="$h7 $d ACL differs (missing: ${missing:-none}; unexpected: ${extra:-none});"
+  fi
+  if [ ! -d "$DATA/$d/.inflight" ]; then h7="$h7 $d/.inflight is missing;"; continue; fi
+  got=$(stat -c '%u:%g' "$DATA/$d/.inflight")
+  [ "$got" = "$own" ] || h7="$h7 $d/.inflight is owned by $got (want $own);"
+  acl=$(getfacl -cp "$DATA/$d/.inflight" 2> /dev/null | grep -v '^$' | sed 's/[[:space:]]*#effective.*//' | LC_ALL=C sort)
+  if [ "$acl" != "$expect_inflight_acl" ]; then
+    missing=$(LC_ALL=C comm -13 <(echo "$acl") <(echo "$expect_inflight_acl") | tr '\n' ' ')
+    extra=$(LC_ALL=C comm -23 <(echo "$acl") <(echo "$expect_inflight_acl") | tr '\n' ' ')
+    h7="$h7 $d/.inflight ACL differs (missing: ${missing:-none}; unexpected: ${extra:-none});"
   fi
 done
 while IFS= read -r f; do
@@ -240,9 +252,24 @@ report H7 "data dirs, spool and ACLs" "$h7" "never chmod a spool file; to repair
 
 # ------------------------------------------------------------------ H8 spool contents
 h8=''
-while IFS= read -r f; do h8="$h8 stray file $f;"; done < <(find "$DATA/spool" -type f ! -name '*.age' ! -name '*.sha256' ! -path '*/.inflight/*' 2> /dev/null)
-while IFS= read -r f; do h8="$h8 inflight file older than 10 minutes: $f;"; done < <(find "$DATA/spool/wal/.inflight" -type f -mmin +10 2> /dev/null)
+# a .sha256 (the uploaded marker) is admitted in premigration/ only
+while IFS= read -r f; do h8="$h8 stray file $f;"; done < <(find "$DATA/spool" -type f ! -name '*.age' ! -path '*/.inflight/*' ! -path "$DATA/spool/premigration/*.sha256" 2> /dev/null)
+for d in wal dump premigration; do
+  while IFS= read -r f; do h8="$h8 inflight file older than 10 minutes: $f;"; done < <(find "$DATA/spool/$d/.inflight" -type f -mmin +10 2> /dev/null)
+done
 report H8 "spool contents" "$h8" "a stale or stray spool file means an interrupted writer: inspect it, move it out, and run the backup again (INFRA §6.1)"
+
+# ------------------------------------------------------------------ H16 backup units
+# The four unit files equal the bundle's copies. Whether the timers are enabled is the first deploy's line, not this check's.
+h16=''
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
+  inst=/etc/systemd/system/$u
+  if [ ! -f "$inst" ]; then h16="$h16 $u is not installed;"; continue; fi
+  cmp -s "$here/backup/systemd/$u" "$inst" || h16="$h16 $u differs from the bundle copy;"
+  [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h16="$h16 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
+done
+report H16 "backup units" "$h16" "rerun: sudo bash provision.sh --stage host ... (installs the unit files from the bundle)"
 
 # ------------------------------------------------------------------ H9 service gids
 h9=''

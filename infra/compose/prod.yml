@@ -8,6 +8,7 @@ x-hardened: &hardened
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
   restart: unless-stopped
+  ulimits: {core: 0}
 
 x-app-image: &app-image ${POLY_APP_IMAGE:-ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000}
 

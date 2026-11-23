@@ -663,7 +663,11 @@ jobs:
           bash infra/ci/image.sh scan polycarpic-postgres:ci
           bash infra/ci/image.sh scan polycarpic-caddy:ci
 
-      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage)
+      - name: Install age and the PostgreSQL client (the restore and drill tests decrypt and pg_restore on the runner)
+        if: needs.changes.outputs.image == 'true'
+        run: sudo apt-get update -y > /dev/null && sudo apt-get install -y --no-install-recommends age postgresql-client > /dev/null
+
+      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage, backup)
         if: needs.changes.outputs.image == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
 
@@ -736,7 +740,7 @@ jobs:
         run: docker build -t poly97-box:test tests/infra/provision
 
       - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
-        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh
 
       - name: Operator tool tests (Python stdlib, injected transports, no network)
         run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator

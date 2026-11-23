@@ -63,11 +63,13 @@ export const TABLE = {
   // box helpers (Dockerfile, fakes, box.ts, pg.ts) stay here too, because tests/infra/image/provision-db.test.ts runs them.
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/|hetzner\/|operator\/|ops\/)/, /^bin\//,
     /^infra\/ci\/(image|install-trivy)\.sh$/, /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
+    /^packages\/db\/sql\/roles\.sql$/, // POLY-99: drill.sh and the backup scratch stack apply it
   ],
   // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run, shellcheck and the operator-tool unit tests. Reads the compose
   // files (secret table), the Postgres pin and prod config (D checks), roles.sql, and the workflow that defines the job.
   provision: [/^infra\/hetzner\//, /^infra\/provision(-check)?\.sh$/, /^infra\/operator\//, /^infra\/ops\//, /^tests\/infra\/(provision|operator|ops)\//, /^tests\/infra\/vitest\.provision\.config\.ts$/,
-    /^infra\/compose\//, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^\.github\/workflows\/ci\.yml$/],
+    /^infra\/compose\//, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^\.github\/workflows\/ci\.yml$/,
+    /^infra\/backup\//, /^infra\/(restore|drill)\.sh$/], // POLY-99: the shellcheck step and the unit files the provision dry run installs
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):
   // the db harness helpers and image build, apps/migrate, and the Postgres pin. Runs only the `unit` job's e2e step.
