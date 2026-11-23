@@ -22,6 +22,13 @@ Unit file `tests/infra/ops/test_deploy.py`; it joins the existing provision-job 
    stderr's last line on a refusal is `deploy: refused <name>`. Exit 1 on a refusal; exit 4 on a precondition (`not-first-deployed`, `existing-data`, `edge-prod-name-early`).
 8. `current` for a seeded project is `<digest> <tag or -> <commit> <tree sha256> <UTC>`.
 
+9. **Prod order and refusals** (`test_deploy_candidate.py`): the tag is fetched and verified first, then C = its commit feeds V1. So: `tag-signature`
+   (bad key, lightweight, PGP block), `tag-commit` (a signed tag whose target is not a commit), `tag-name` (object's `tag` field, ref and Release differ;
+   checked before `not-newer`), `attestation` (a signed tag on a commit the image was not attested at), `not-newer`, `label`: all exit 1, last stderr line
+   `deploy: refused <name>`, alert `<UTC> <name>`. Q rows (`tag-*`, `label`) put `<digest> <UTC> <name>` in `quarantine`; `attestation`, `not-newer` do not.
+   A gh outage logs event `transient`, no alert-free exit code is pinned. A candidate equal to `current` exits 0 touching nothing; a quarantined one exits 0 and logs `quarantined`.
+   Staging's ancestry check needs both `current`'s commit and C in `tags.git` (fetch them both).
+
 ## Groups (builder turns them green in order)
 
 - G0 slice 0 (this commit, green against a throwaway stub): V1 refusal.

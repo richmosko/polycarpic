@@ -95,6 +95,30 @@ class World(object):
         self.commit_a = self.commit("a")
         self.commit_b = self.commit("b")
 
+    def keygen(self, name):
+        """-> (private key path, `ssh-ed25519 <base64>`)."""
+        priv = self.tmp / ("key-" + name)
+        REAL_RUN(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", str(priv)])
+        return str(priv), " ".join((self.tmp / ("key-%s.pub" % name)).read_text().split()[:2])
+
+    def tag(self, name, commit, kind="signed", key=None, ref=None):
+        """kind: signed (ssh), light, gpg (an object carrying a PGP block), tree (ssh-signed tag of a tree). -> the tag object (or commit) sha."""
+        if kind == "light":
+            self.git("tag", name, commit)
+            return commit
+        if kind == "gpg":
+            body = "object %s\ntype commit\ntag %s\ntagger t <t@example.invalid> 1 +0000\n\nm\n-----BEGIN PGP SIGNATURE-----\n\nAAAA\n-----END PGP SIGNATURE-----\n" % (commit, name)
+            sha = self.git("hash-object", "-t", "tag", "-w", "--literally", "--stdin", stdin=body)
+            self.git("update-ref", "refs/tags/" + name, sha)
+            return sha
+        target = self.git("rev-parse", commit + "^{tree}") if kind == "tree" else commit
+        self.git("-c", "gpg.format=ssh", "-c", "user.signingkey=" + key, "tag", "-s", "-m", "m", name, target)
+        sha = self.git("rev-parse", "refs/tags/" + name)
+        if ref:
+            self.git("update-ref", "refs/tags/" + ref, sha)
+            self.git("tag", "-d", name)
+        return sha
+
     def commit(self, msg):
         self.git("commit", "-q", "--allow-empty", "-m", msg)
         return self.git("rev-parse", "HEAD")
@@ -124,7 +148,7 @@ class World(object):
     def _real(self, argv, stdin):
         env = self._last_env(argv)
         argv = [a.replace("https://github.com/" + SLUG, str(self.origin)) if a.startswith("https://github.com/" + SLUG) else a for a in argv]
-        real_env = dict(self._genv())
+        real_env = {"PATH": SYSTEM_PATH, "HOME": str(self.tmp)}  # the tool's own GIT_* only: a fixture global config in HOME must not rescue it
         real_env.update({k: v for k, v in (env or {}).items() if k.startswith("GIT_") or k == "SSH_AUTH_SOCK"})
         p = REAL_RUN(argv, env=real_env, input=stdin, capture_output=True, text=True, check=False)
         return p.returncode, p.stdout, p.stderr
@@ -253,6 +277,25 @@ class DeployTest(OpsTest):
         r = self.host.go("deploy", *argv, runner=runner, ctx_extra=extra, **kw)
         r.world = w
         return r
+
+    def signers(self, *pubs):
+        """allowed_signers on the box, plain form (R11): one principal per key."""
+        self.host.write("/etc/polycarpic/allowed_signers", "".join('rel%d namespaces="git" %s\n' % (i, p) for i, p in enumerate(pubs)))
+
+    def release(self, version, key, commit=None, kind="signed", attested=True, **tagkw):
+        """A published prod release: tag in the origin, Release JSON, the image in the registry (label = its commit), attested at the commit."""
+        w = self.world
+        commit = commit or w.commit_b
+        w.tag(version, commit, kind=kind, key=key, **tagkw)
+        dig = digest("img-" + version)
+        w.image("polycarpic", dig, commit)
+        if attested:
+            w.attested.add((dig, commit))
+        w.releases.insert(0, {"tag_name": version, "draft": False, "prerelease": False, "body": "digest: " + dig, "published_at": utc()})
+        return dig
+
+    def nothing_ran(self, r):
+        self.assertEqual([a for a in r.world.docker_log if a[1] in ("create", "compose", "run", "cp")], [])
 
     def argv_text(self, r, binary):
         return [" ".join(c["argv"]) for c in r.runner.calls if c["argv"][0] == binary]
