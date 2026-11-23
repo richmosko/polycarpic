@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { fixtures, sha256 } from './artifacts.ts';
+import { fixtures, plantVersion, sha256 } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
 import { INSTANCE, PROJECT, type Stack, attach, sh } from './stack.ts';
 import { type Fake, attachFake, runUploader, verifiedLines } from './uploader.ts';
@@ -44,6 +44,8 @@ const lastRun = () => lap.dockerCalls().filter((l) => /^run /.test(l)).pop() ?? 
 /** C6: every hardening flag, a digest-pinned image, no bind mount, no environment, no published port, no identity */
 function assertScratchFlags(l: string) {
   for (const f of ['--network none', '--cap-drop ALL', '--security-opt no-new-privileges', '--user 999:999', '--pids-limit 512', '--memory 2g', 'polycarpic.restore=scratch']) expect(l, f).toContain(f);
+  expect(l).toMatch(/(^| )--rm( |$)/); // F4: Docker removes the container and its layer when the time ends
+  expect(l).toMatch(/--entrypoint sleep \S+ 28800\b/);
   expect(l).toMatch(/postgres:[\w.]+@sha256:[0-9a-f]{64}/);
   expect(l).not.toMatch(/(^| )(-v|--volume|--mount|-p|--publish|-e|--env|--env-file)( |=)/);
   expect(l).not.toContain(lap.identity);
@@ -101,6 +103,26 @@ describe('criterion 3: backup -> spool -> uploader -> fake-b2 -> restore -> scra
       expect(connections()).toBeGreaterThan(before);
     } finally { sh('docker', ['rm', '-f', decoy]); }
   }, 400_000);
+});
+
+describe('F2 for a WAL key under --base: a name with two versions can be passed with --accept-version', () => {
+  it('a segment whose first version lies (the sibling does not match) and whose second is the real one: the refusal lists `sibling no` / `sibling yes`; `--accept-version <real>` goes on to the scratch with a WARN; `<bad>` exits 4', () => {
+    const st = fake.store();
+    const walKey = Object.keys(st).filter((k) => /\/wal\/wal-\d+-\d+-[0-9A-F]{24}\.age$/.test(k)).sort().pop()!; // the newest segment: --base certainly uses it
+    const real = st[walKey]![0]!;
+    const bad = plantVersion(fake, walKey, Buffer.from('not the segment'), real.uploadTimestamp + 5_000);
+    const list = lap.run('restore.sh', B('--base'));
+    expect(list.code).toBe(3);
+    const text = list.out + list.err;
+    expect(text).toMatch(new RegExp(`version ${bad.fileId} \\S+ \\S+ sibling no`));
+    expect(text).toMatch(new RegExp(`version ${real.fileId} \\S+ \\S+ sibling yes`));
+    lap.resetLogs();
+    expect(lap.run('restore.sh', B('--base').concat(['--accept-version', bad.fileId])).code).toBe(4);
+    expect(lap.dockerCalls().filter((l) => /^run /.test(l))).toEqual([]);
+    const ok = lap.run('restore.sh', B('--base').concat(['--accept-version', real.fileId]), { env: { POLY99_SCRATCH_FAIL: '1' } });
+    expect(ok.err).toContain(`WARN accepting version ${real.fileId} of`);
+    expect(lap.dockerCalls().filter((l) => /^run /.test(l))).toHaveLength(1); // it passed the selection and the sibling check and reached the scratch start
+  }, 300_000);
 });
 
 describe('criterion 5 / T18: a premigration set -> restore --premigration --from-box -> scratch', () => {

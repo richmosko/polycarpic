@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Files, fixtures, msToTs, plantObject, plantVersion, sha256, tsToMs } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
-import { INSTANCE, type Stack, attach, sh } from './stack.ts';
+import { INSTANCE, PROJECT, type Stack, attach, sh } from './stack.ts';
 import { type Fake, attachFake } from './uploader.ts';
 
 let s: Stack, fake: Fake, lap: Laptop;
@@ -128,6 +128,58 @@ describe('restore.sh usage and hygiene (R7): exit 2, the message, and nothing de
     expect(r.code).toBe(5);
     expect(fake.log().slice(before).every((l) => /b2_authorize_account/.test(l))).toBe(true);
     noScratch();
+  });
+});
+
+describe('F4: the scratch has a bounded life and a way to end it (seceng build review, repository public)', () => {
+  const LABEL = 'polycarpic.restore=scratch';
+  const mk = (n: string, label: boolean) => sh('docker', ['run', '-d', '--name', n, ...(label ? ['--label', LABEL] : []), '--entrypoint', 'sleep', 'poly99-tools:test', '600']);
+  const gone = (n: string) => sh('docker', ['inspect', n]).code !== 0;
+  it('the scratch is `docker run -d --rm --entrypoint sleep <image> 28800` by default; `--hours 2` gives 7200; `--hours 0` and `--hours 25` exit 2 and start nothing', () => {
+    plantA();
+    lap.run('restore.sh', REST_BUCKET(), { env: NOSCRATCH });
+    expect(scratchRuns()).toHaveLength(1);
+    expect(scratchRuns()[0]).toMatch(/(^| )--rm( |$)/);
+    expect(scratchRuns()[0]).toMatch(/--entrypoint sleep \S+ 28800\b/);
+    lap.resetLogs();
+    lap.run('restore.sh', REST_BUCKET(['--hours', '2']), { env: NOSCRATCH });
+    expect(scratchRuns()[0]).toMatch(/--entrypoint sleep \S+ 7200\b/);
+    lap.resetLogs();
+    for (const h of ['0', '25', 'x', '-1']) {
+      const r = lap.run('restore.sh', REST_BUCKET(['--hours', h]));
+      expect({ h, code: r.code }).toEqual({ h, code: 2 });
+    }
+    noScratch();
+  });
+  it('`restore.sh --cleanup` removes every container labelled polycarpic.restore=scratch (rm -f -v), prints how many, and leaves an unlabelled container alone', () => {
+    const names = [`${PROJECT}-fa`, `${PROJECT}-fb`, `${PROJECT}-fu`];
+    for (const n of names) sh('docker', ['rm', '-f', n]);
+    try {
+      expect(mk(names[0]!, true).code).toBe(0);
+      expect(mk(names[1]!, true).code).toBe(0);
+      expect(mk(names[2]!, false).code).toBe(0);
+      const id = (n: string) => sh('docker', ['inspect', '-f', '{{.Id}}', n]).out.trim().slice(0, 12);
+      const ids = names.map(id);
+      const r = lap.run('restore.sh', ['--cleanup']);
+      expect({ code: r.code, out: r.out + r.err }).toEqual({ code: 0, out: expect.stringMatching(/\b2\b/) });
+      const rm = lap.dockerCalls().filter((l) => /^rm -f -v /.test(l)).join(' ');
+      expect(rm).toContain(ids[0]!);
+      expect(rm).toContain(ids[1]!);
+      expect(rm).not.toContain(ids[2]!);
+      expect([gone(names[0]!), gone(names[1]!), gone(names[2]!)]).toEqual([true, true, false]);
+    } finally { for (const n of names) sh('docker', ['rm', '-f', n]); }
+  });
+  it('a run with a labelled scratch present prints `WARN 1 scratch container(s) from earlier…`, so a forgotten one is seen; with none there is no such WARN', () => {
+    plantA();
+    const none = lap.run('restore.sh', REST_BUCKET(), { env: NOSCRATCH });
+    expect(none.err).not.toMatch(/WARN.*scratch/i);
+    const n = `${PROJECT}-forgotten`;
+    sh('docker', ['rm', '-f', n]);
+    try {
+      expect(mk(n, true).code).toBe(0);
+      const r = lap.run('restore.sh', REST_BUCKET(), { env: NOSCRATCH });
+      expect(r.err).toMatch(/WARN 1 scratch container/i);
+    } finally { sh('docker', ['rm', '-f', n]); }
   });
 });
 
@@ -271,7 +323,7 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     expect(existsSync(path)).toBe(true);
     expect(readdirSync(path).every((f) => /^[A-Za-z0-9_-]+(\.\w+)?$/.test(f))).toBe(true);
   });
-  it('T10: two versions of the dump and a hide marker -> exit 3 listing every version (fileId, upload time); no download, no scratch', () => {
+  it('T10: two versions of the dump and a hide marker -> exit 3 listing every version (fileId, upload time, sibling yes|no); no scratch', () => {
     plantA();
     const dump = name(A, 'dump');
     const v2 = plantObject(fake, s.major, 'dump', dump, B[name(B, 'dump')]!, tsToMs(tsA) + 120_000, { sibling: false });
@@ -281,7 +333,6 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     const listed = ids(r.out + r.err);
     expect(listed.length).toBeGreaterThanOrEqual(3);
     expect(listed).toContain(v2.fileId);
-    expect(fake.log().some((l) => /b2_download_file_by_id/.test(l))).toBe(false);
     noScratch();
   });
   it('T10 RED ON THE FAULT: a mutant without the two-version refusal (the line marked `# T10`) downloads the newest, poisoned version and goes on to the scratch', () => {
@@ -304,27 +355,52 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     expect(canaryIn(c)).toBe(s.canary);
     sh('docker', ['rm', '-f', '-v', c]);
   }, 300_000);
-  it('C9: version 1 hidden and unsiblinged, version 2 siblinged -> the refusal lists both and names the hide marker; no scratch', () => {
+  it('C9/F2: version 1 hidden and unsiblinged, version 2 siblinged -> the refusal lists `sibling no` for v1 and `sibling yes` for v2 and names the hide marker; `--accept-version <v2>` passes it (WARN accepting, the ORIGINAL canary restored); `<v1>` exits 4 at the sibling check; an unknown fileId exits 2; none of the refusals starts a scratch', () => {
     for (const [n, b] of Object.entries(A)) if (n !== name(A, 'dump')) plantObject(fake, s.major, 'dump', n, b, tsToMs(tsA) + 60_000);
     const dump = name(A, 'dump');
-    const v1 = plantObject(fake, s.major, 'dump', dump, A[dump]!, tsToMs(tsA) + 60_000, { sibling: false });
+    const v1 = plantObject(fake, s.major, 'dump', dump, Buffer.from('age-encryption.org/v1\nthe first attempt, cut short'), tsToMs(tsA) + 60_000, { sibling: false });
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/${dump}`, Buffer.from(''), tsToMs(tsA) + 70_000, 'hide');
     const v2 = plantObject(fake, s.major, 'dump', dump, A[dump]!, tsToMs(tsA) + 120_000);
     const r = lap.run('restore.sh', REST_BUCKET());
     expect(r.code).toBe(3);
-    const got = ids(r.out + r.err);
-    expect(got).toContain(v1.fileId);
-    expect(got).toContain(v2.fileId);
-    expect(r.out + r.err).toMatch(/hide marker/i);
+    const text = r.out + r.err;
+    expect(text).toMatch(new RegExp(`version ${v1.fileId} \\S+ \\S+ sibling no`));
+    expect(text).toMatch(new RegExp(`version ${v2.fileId} \\S+ \\S+ sibling yes`));
+    expect(text).toMatch(/hide marker/i);
+    noScratch();
+    const bad = lap.run('restore.sh', REST_BUCKET(['--accept-version', v1.fileId]));
+    expect(bad.code).toBe(4);
+    noScratch();
+    const ok = lap.run('restore.sh', REST_BUCKET(['--accept-version', v2.fileId]));
+    expect({ code: ok.code, err: ok.err.slice(-400) }).toEqual({ code: 0, err: expect.any(String) });
+    expect(ok.err).toContain(`WARN accepting version ${v2.fileId} of`);
+    const c = scratchName(ok.out);
+    expect(canaryIn(c)).toBe(s.canary);
+    sh('docker', ['rm', '-f', '-v', c]);
+  }, 300_000);
+
+  it('F2: a fileId that belongs to none of the chosen keys (`--accept-version`) exits 2 before any restore starts; a malformed one too', () => {
+    plantA();
+    for (const id of ['4_znotafileid', 'x/../y', '']) {
+      const r = lap.run('restore.sh', REST_BUCKET(['--accept-version', id]));
+      expect({ id, code: r.code }).toEqual({ id, code: 2 });
+    }
     noScratch();
   });
-  it('C5: an object key that is not <instance>/<M>/<dir>/<R2 name> (`..` segments) is refused (exit 5); nothing is written outside the temp directory; no scratch', () => {
+  it('F1/C5: a junk key and a `..` key planted under the instance prefix are skipped and counted, never used: `restore --dump` still reaches the scratch with `WARN 2 stray objects in the bucket`, nothing is written outside the temp directory; without them there is no such WARN (positive twin)', () => {
     plantA();
+    const clean = lap.run('restore.sh', REST_BUCKET(), { env: NOSCRATCH });
+    expect(clean.err).not.toMatch(/stray object/);
+    expect(scratchRuns()).toHaveLength(1);
+    lap.resetLogs();
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/junk`, Buffer.from('junk'), tsToMs(tsA) + 60_000);
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/../../x`, Buffer.from('payload'), tsToMs(tsA) + 60_000);
-    const r = lap.run('restore.sh', REST_BUCKET(['--keep']));
-    expect(r.code).toBe(5);
+    const r = lap.run('restore.sh', REST_BUCKET(['--keep']), { env: NOSCRATCH });
+    expect(r.err).toContain('WARN 2 stray objects in the bucket');
+    expect(r.code).not.toBe(5); // the old behaviour refused the whole listing
+    expect(scratchRuns()).toHaveLength(1); // it went on to the scratch start
     expect(existsSync(join(lap.dir, 'x'))).toBe(false);
-    noScratch();
+    expect(r.err + r.out).not.toContain('junk'); // a stray name is counted, never printed
   });
 
   describe("C7' set choice and the replay check", () => {

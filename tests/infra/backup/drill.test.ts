@@ -72,9 +72,16 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     expect(existsSync(report)).toBe(true);
     const md = readFileSync(report, 'utf8');
     expect(md).toMatch(/\d{4}-\d\d-\d\d/); // the date
-    for (const n of Object.keys(SET)) expect(md).toContain(n); // object names
-    expect(md).toMatch(/4_zfake_\d+/); // fileIds
-    for (const id of ['DR1', 'DR10', 'DR11']) expect(md).toContain(id);
+    // F3 (the repository is public): the filed form holds each object's kind and <TS>, its upload time and its sibling sha256, and every check line; it holds no
+    // fileId, no bucket name, no system id and no object key
+    expect(md).not.toMatch(/4_zfake_/);
+    expect(md).not.toContain('poly-test-bucket');
+    expect(md).not.toContain(s.sys);
+    expect(md).not.toContain(`${INSTANCE}/`);
+    expect(md).not.toMatch(/\b[a-z0-9_-]+\/\d{2}\/(dump|wal|premigration)\//);
+    for (const n of Object.keys(SET)) { expect(md).toContain(tsOf(n)); expect(md).toMatch(new RegExp(`\\b${n.split('-')[0]}\\b`)); expect(md).not.toContain(n); }
+    for (const id of ['DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'DR7', 'DR8', 'DR9', 'DR10', 'DR11']) expect(md).toContain(id);
+    expect(lap.dockerCalls().filter((l) => /^run /.test(l)).every((l) => /(^| )--rm( |$)/.test(l))).toBe(true); // an interrupted drill cannot leave a scratch behind
     expect(lap.scratches()).toEqual([]); // scratch containers are removed on exit
     const st = fake.store();
     expect(Object.keys(st).filter((n) => n.startsWith(`${INSTANCE}/drill/probe-`)).length).toBeGreaterThanOrEqual(1); // DR10 ran against a probe
@@ -95,11 +102,15 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     const dumpName = Object.keys(SET).find((n) => n.startsWith('dump-'))!.replace(TS0(), fresh);
     plantObject(fake, s.major, 'dump', dumpName, B[Object.keys(B).find((n) => n.startsWith('dump-'))!]!, Date.now(), { sibling: false }); // DR1: a newer second version
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/${dumpName}`, Buffer.from(''), Date.now() + 1_000, 'hide'); // and a hide marker after it
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/junk`, Buffer.from('junk'), Date.now()); // F1: stray objects under the instance prefix
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/../../x`, Buffer.from('x'), Date.now());
     fake.mode('permissive');
     const r = lap.run('drill.sh', DRILL());
     const c = checks(r.out);
     for (const id of ['DR1', 'DR2', 'DR3', 'DR10', 'DR11']) expect({ id, kind: c[id]?.kind, out: r.out.slice(-1500) }).toMatchObject({ id, kind: 'FAIL' });
     expect(r.out).toMatch(/hide/i);
+    expect(r.out).toMatch(/\b2 stray objects?\b/); // F1: DR1 makes the stray objects loud, with a count and no names
+    expect(r.out).not.toContain('junk');
     expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: (?=.*\bDR1\b)(?=.*\bDR2\b)(?=.*\bDR3\b)(?=.*\bDR10\b)(?=.*\bDR11\b)/) });
     expect(lap.scratches()).toEqual([]);
   }, 900_000);
