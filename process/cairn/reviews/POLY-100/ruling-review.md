@@ -671,3 +671,24 @@ different: stop, never replace" is right. Open: S21's tag compare, S26; S22, S23
 **Both met** in the ruling; the old name is gone from the file. **A15 (advisory):** a failing `test` or `merge-base` prints nothing, so a
 person can read silence as success. End each step-1 chain with `&& echo REVIEW-OK` (prod's second line: `TAG-OK`) and say
 step 2 needs it. Open: T-net's overlap cases; S22, S23, S25 (§L6). The fixed names in tests and INFRA are checked at build review.
+
+## `b2d0642c`, `166e2438`, `2899fe83`
+
+`b2d0642c` (T-net overlap) and `166e2438` (A15): **accept.** `2899fe83` (mail.env): **accept.** It narrows who gets `MAIL_FROM`.
+The env_file rule becomes **S27**:
+
+| Service | Prod, exactly this list, in this order | Staging |
+|---|---|---|
+| auth, worker | `/etc/polycarpic/host.env`, `/etc/polycarpic/mail.env` | `/etc/polycarpic/staging-host.env`, `/etc/polycarpic/staging-mail.env` |
+| web, migrate, operator | `/etc/polycarpic/host.env` | `/etc/polycarpic/staging-host.env` |
+| every other service, edge's caddy included | none | none |
+
+- *Match:* whole-list equality, same length and order, each path the exact string. Refused: a subset, a superset, a swap, a
+  duplicate, a prefix, `..`, a relative path, a variable, the other project's file, `required: false`, any key but `path` and `required`.
+- *Why order:* Compose lets a later file override an earlier one (documentation). So each mail file also holds exactly one
+  key, `MAIL_FROM`, and `host.env` does not hold it: provision-check asserts both, for both projects.
+- *One list:* lint and guard both read `env_files` in `infra/deploy/compose-allow.json`, the lint from the tree and the guard from
+  the installed copy. No second list in `policy.json` or in code. A pin test holds the table above literally, so the shared list
+  cannot loosen without that test changing.
+- *Tests, guard and lint alike:* `mail.env` on web; missing from worker; the two swapped on auth; prod's `mail.env` in staging and the
+  reverse; a third file; `required: false`; `mail.env` with a second key (provision-check). Positives for both projects.
