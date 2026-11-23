@@ -48,7 +48,8 @@ def dockerfile_manifest():
 def code_manifest():
     """The old source of a bundle (the code's own list). Used only while the Dockerfile has no /release manifest, so the other tests keep their own reasons to be red or green;
     `test_f1_the_harness_builds_bundles_from_the_dockerfile_list` is the one that is red until it has."""
-    files = [p for p in MANIFEST] + ["infra/postgres/" + f.name for f in sorted((REPO / "infra" / "postgres").iterdir()) if f.is_file() and f.suffix in (".conf", ".sh")]
+    # R4's manifest under infra/postgres: the .conf files and archive-wal.sh (gate-check.sh is host code, shipped by install.sh)
+    files = [p for p in MANIFEST] + ["infra/postgres/" + f.name for f in sorted((REPO / "infra" / "postgres").iterdir()) if f.is_file() and (f.suffix == ".conf" or f.name == "archive-wal.sh")]
     return sorted(files)
 
 

@@ -17,7 +17,7 @@ def last(r):
     return r.err.splitlines()[-1] if r.err.strip() else ""
 
 
-class F2(DeployTest):
+class Hang(DeployTest):
     new_commit = fl.Flow.new_commit
     staging_candidate = fl.Flow.staging_candidate
     hex_dir = fl.Flow.hex_dir
@@ -46,6 +46,9 @@ class F2(DeployTest):
         self.assertIsNotNone(self.state("staging", "alert"), what)
         self.assertEqual(len([c for c in self.world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"]) % 2, 0, "the candidate's `up` and the rollback's")
 
+
+
+class F2(Hang):
     def test_each_health_read_hanging_is_not_healthy_and_rolls_back(self):
         for cmd in ("exec", "ps"):
             self.world.hang = {cmd}
@@ -77,7 +80,7 @@ class F2(DeployTest):
         self.first()
         x2 = self.staging_candidate()
         self.world.raise_cmd = {"run": RuntimeError("boom")}
-        self.world.hang_from = -1  # active from the start of the run: before any `up` of the candidate
+        self.world.hang_from = len(self.world.up_marks) - 1  # active until this run's first `up`: the first `run` (check-config) is made before it
         # the candidate's first `up` has not happened when the first `run` (check-config) is made
         r = self.deploy("staging")
         self.assertEqual((r.rc, last(r)), (1, "deploy: refused internal"), r.err)
@@ -128,6 +131,16 @@ class F2(DeployTest):
         self.assertIn("interrupted", (self.state("staging", "deploy.log") or "") + r.err)
 
 
+    def test_a_health_read_that_still_hangs_during_the_rollback_is_rollback_unhealthy(self):
+        self.world.hang = {"exec"}
+        self.world.hang_through = True
+        x1, x2 = self.bad_second_deploy()
+        r = self.deploy("staging")
+        self.assertEqual((r.rc, last(r)), (1, "deploy: rollback-unhealthy"), r.err)
+        self.assertIn(x2, self.state("staging", "quarantine") or "")
+        self.assertIsNotNone(self.state("staging", "alert"))
+
+
 class NonUtf8(unittest.TestCase):
     """The real child runner: a child printing bytes that are not UTF-8 is a failed child's output, decoded with replacement, never an exception."""
 
@@ -148,7 +161,7 @@ class NonUtf8(unittest.TestCase):
         self.assertEqual(code, 127)
 
 
-class S33(unittest.TestCase if False else DeployTest):
+class S33(Hang):
     """S33 (ruling 121609fe): the `interrupted` file's read rule and what clears it."""
     new_commit = fl.Flow.new_commit
     staging_candidate = fl.Flow.staging_candidate
@@ -157,7 +170,6 @@ class S33(unittest.TestCase if False else DeployTest):
     ups = fl.Flow.ups
     since = fl.Flow.since
     mark = 0
-    setUp = F2.setUp
 
     def test_an_unreadable_interrupted_file_is_state(self):
         self.first()

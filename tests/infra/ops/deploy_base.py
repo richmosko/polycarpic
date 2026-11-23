@@ -154,7 +154,7 @@ class World(object):
         self.bad_caddy = set()
         self.bad_flags = []
         self.run_hang, self.run_names, self.stuck_oneoff = set(), [], set()
-        self.hang, self.raise_cmd, self.hang_from = set(), {}, 10 ** 9
+        self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
         self.config_wrapped = []
         self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
         self.unmounted = set()
@@ -351,7 +351,7 @@ class World(object):
             return 0, "", ""
         if sub == "compose":
             return self._compose(argv, stdin)
-        if sub == "inspect" and "inspect" in self.hang and len(self.up_marks) > self.hang_from:
+        if sub == "inspect" and "inspect" in self.hang and self.hang_from < len(self.up_marks) <= self.hang_from + (10 ** 9 if self.hang_through else 1):
             raise TimeoutError("inspect")
         if sub == "inspect" and argv[2] in self.stuck_oneoff:
             return 0, json.dumps([{"Id": "x", "Config": {"Image": "x"}, "State": {"Status": "running"}}]), ""
@@ -416,7 +416,7 @@ class World(object):
                 subcmd = argv[i]
                 break
         self.compose_log.append(dict(argv=list(argv), project=project, cmd=subcmd, rest=argv[i + 1:]))
-        if len(self.up_marks) > self.hang_from:  # F2: after the run's first `up`, these commands hang (TimeoutError, as ctx.run raises) or raise
+        if self.hang_from < len(self.up_marks) <= self.hang_from + (10 ** 9 if self.hang_through else 1):  # F2: from the run's first `up` until the next one (the rollback's), these hang (TimeoutError, as ctx.run raises) or raise
             if subcmd in self.hang:
                 raise TimeoutError(subcmd)
             if subcmd in self.raise_cmd:
@@ -492,7 +492,7 @@ class World(object):
         for k, a in enumerate(rest):
             if skip:
                 skip = False
-            elif a in ("--pull", "--timeout", "-t"):
+            elif a in ("--pull", "--timeout", "-t", "--name"):
                 skip = True
             elif not a.startswith("-"):
                 out.append(k)
