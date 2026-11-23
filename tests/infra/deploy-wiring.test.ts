@@ -1,0 +1,92 @@
+// POLY-100 R11 statics: the CI build, the image refs, the units. Reads files; no Docker, no network (lint job).
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
+
+const ROOT = join(dirname(new URL(import.meta.url).pathname), '..', '..');
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+const wf = parse(read('.github/workflows/build.yml'));
+const stepsOf = (job: string): any[] => wf.jobs[job].steps;
+const text = (s: any) => JSON.stringify(s);
+
+describe('build.yml: siblings job (R11)', () => {
+  const sib = stepsOf('siblings');
+  const builds = sib.filter((s) => String(s.uses ?? '').startsWith('docker/build-push-action'));
+  it('builds exactly postgres, tools and caddy from their own Dockerfiles, each with GIT_COMMIT', () => {
+    expect(builds.map((s) => s.with.file).sort()).toEqual(['infra/backup/tools.Dockerfile', 'infra/caddy/Dockerfile', 'infra/postgres/Dockerfile']);
+    for (const b of builds) expect(text(b.with['build-args'])).toContain('GIT_COMMIT=${{ github.sha }}');
+  });
+  it('each sibling is provenance-attested (one attest step per build)', () => {
+    const attests = sib.filter((s) => String(s.uses ?? '').startsWith('actions/attest-build-provenance'));
+    expect(attests).toHaveLength(3);
+  });
+  it('each sibling is Trivy-scanned', () => {
+    const names = sib.map((s) => String(s.name ?? ''));
+    for (const n of ['postgres', 'tools', 'caddy']) expect(names.some((x) => x.startsWith('Trivy scan of ' + n))).toBe(true);
+    // the scan comes before the attestation of the same image
+    expect(names.findIndex((x) => x.startsWith('Trivy scan of caddy'))).toBeLessThan(names.findIndex((x, i) => i > 0 && /attest/i.test(x) && /caddy/i.test(x)) === -1 ? 1e9 : names.findIndex((x, i) => /attest/i.test(x) && /caddy/i.test(x)));
+  });
+});
+
+describe('build.yml: app job (R11)', () => {
+  it('needs the siblings job and runs the compose-policy lint and the images.env writer before the app build', () => {
+    expect(wf.jobs.build.needs).toEqual('siblings');
+    const names = stepsOf('build').map((s) => String(s.run ?? '') + String(s.uses ?? ''));
+    const iEnv = names.findIndex((n) => n.includes('infra/ci/images-env.sh'));
+    const iLint = names.findIndex((n) => n.includes('compose-policy.mjs'));
+    const iBuild = names.findIndex((n) => n.startsWith('docker/build-push-action'));
+    expect(iEnv).toBeGreaterThanOrEqual(0);
+    expect(iLint).toBeGreaterThan(iEnv);
+    expect(iBuild).toBeGreaterThan(iLint);
+  });
+  it('the lint step has all four image variables: the three from the written images.env, the app one exported', () => {
+    const step = stepsOf('build').find((s) => String(s.run ?? '').includes('compose-policy.mjs'));
+    expect(String(step.run)).toContain('infra/release/images.env');
+    expect(String(step.run)).toContain('POLY_APP_IMAGE=');
+    expect(read('infra/ci/images-env.sh')).toMatch(/POLY_POSTGRES_IMAGE[\s\S]*POLY_TOOLS_IMAGE[\s\S]*POLY_CADDY_IMAGE/);
+  });
+});
+
+describe('compose files: no default digest anywhere (F10)', () => {
+  for (const f of ['prod', 'staging', 'edge']) {
+    it(`${f}.yml: every POLY_*_IMAGE is \${…:?} and no image carries a literal digest`, () => {
+      const t = read(`infra/compose/${f}.yml`);
+      for (const m of t.matchAll(/\$\{(POLY_[A-Z]+_IMAGE)([^}]*)\}/g)) expect(m[2], m[0]).toBe(':?');
+      expect(t.split('\n').filter((l) => /^\s*image:/.test(l) && /@sha256:/.test(l))).toEqual([]);
+    });
+  }
+});
+
+describe('deploy units (R1)', () => {
+  const service = read('infra/deploy/systemd/polycarpic-deploy@.service');
+  const timer = read('infra/deploy/systemd/polycarpic-deploy@.timer');
+  it('the service is a oneshot that runs the installed ops tool for its instance, with a 90 minute cap', () => {
+    expect(service).toMatch(/^Type=oneshot$/m);
+    expect(service).toMatch(/^ExecStart=\/usr\/local\/sbin\/polycarpic-ops deploy %i$/m);
+    expect(service).toMatch(/^TimeoutStartSec=90min$/m);
+  });
+  it('the timer polls every five minutes with up to a minute of jitter', () => {
+    expect(timer).toMatch(/^OnCalendar=\*:0\/5$/m);
+    expect(timer).toMatch(/^RandomizedDelaySec=60$/m);
+  });
+  it('provision installs the units but does not enable them (first-deploy does)', () => {
+    const p = read('infra/provision.sh');
+    expect(p).toContain('polycarpic-deploy@.service');
+    expect(p).toContain('polycarpic-deploy@.timer');
+    expect(p).not.toMatch(/systemctl enable[^\n]*polycarpic-deploy@/);
+  });
+  it('provision-check compares the deploy units to the ops bundle', () => {
+    expect(read('infra/provision-check.sh')).toContain('polycarpic-deploy@');
+  });
+});
+
+describe('installed policy and signers (R5, R11)', () => {
+  it('compose-allow.json ships with the ops bundle, not the release manifest', () => {
+    expect(read('infra/ops/install.sh')).toContain('compose-allow.json');
+  });
+  it('provision-check reports compose-allow.json, allowed_signers and edge.env', () => {
+    const c = read('infra/provision-check.sh');
+    for (const n of ['compose-allow.json', 'allowed_signers', 'edge.env']) expect(c).toContain(n);
+  });
+});
