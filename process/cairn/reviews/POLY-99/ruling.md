@@ -419,10 +419,64 @@ with the canary row inserted **after** the base present after recovery.
 `drill.sh`, `archive-wal.sh`; the image and provision jobs green on CI; the INFRA and SECURITY edits (§E) in the same
 PR quoting built output; the builder's unmeasured list in the build-green commit.
 
-**Guards.** The new container suite ≤ 240 s locally and the ops unit tests ≤ 20 s `(unmeasured)`. Over either, an
-addendum moves cases. The suites join existing jobs: `tests/infra/backup/**` in `image` (add it to
-`vitest.image.config.ts`'s include); the ops tests in `provision`. No new job. The suite-time delta is reported at
-build green.
+**Guards.** *(Correction. The 240 s guard was set without a measurement. This text replaces it, and replaces the
+480 s figure in the POLY-99 comment @ `e585d393`.)*
+
+*Measured:* the red run @ `96726662`, per file (qa-99):
+
+| file | backup | uploader | restore | slice0 | drill | fake-b2 | roundtrip |
+|---|---|---|---|---|---|---|---|
+| wall time | 82 s | 67 s | 66 s | 13 s | 7 s | 5 s | 4 s |
+
+That is 244 s in the files and 358 s wall, and restore, drill and roundtrip ran setup only. Green as written, the suite
+would take 15–20 min `(unmeasured, qa's estimate)`. The cost is not stack setup (about 10 s up and 4 s down per file).
+It is the per-case container work: roughly one scratch restore of 15–25 s in each of restore's 46 cases, two per
+drill run, and a backup of 3–4 s per backup case.
+
+*The design:*
+- **(a) One stack, one real set.** A vitest `globalSetup` does these once per suite:
+  - builds the two images;
+  - brings the stack up;
+  - takes one nightly set and one premigration set;
+  - uploads them to fake-b2;
+  - writes them read-only to a shared fixture directory.
+
+  Every file reuses the stack and those sets. A file that changes stack state (spool, fake mode) restores it in its
+  own `afterEach`. Only `backup.test.ts` takes its own backups.
+- **(b) A refusal exits before any scratch.** Each refusal case asserts its code before `docker run` of a scratch;
+  the fake docker log shows no scratch started. The cases are R7's usage, validation, selection, integrity, C5, C7,
+  C8 and C12. They cost under 1 s each.
+- **(c) Real scratch restores: at most 9 in the whole suite.**
+  - roundtrip: `--base`, `--dump` and `--premigration`, 3. T11's decoy rides on the `--dump` one, and C6's flags
+    are asserted on all three.
+  - T10's `--before`: 1.
+  - T17's mutant: 1.
+  - drill: one happy run and one run carrying every planted fault at once (hash, permissive fake, two versions,
+    replay). The second run asserts each FAIL id from its one output. Together 4.
+- **(d) One container run per table.** R2's good and bad names are all planted together. One uploader run then
+  asserts shipped or stray per name. The same goes for backup's precondition table where the cases share a fixture.
+
+*Targets:*
+- Locally, the whole `tests/infra/backup` directory green: **≤ 420 s** on this Mac, one suite at a time.
+- The ops unit tests: ≤ 20 s.
+- qa reports per-file times at the build-green gate. Over the target, cases are consolidated further, never dropped
+  or loosened, and the lead hears it at once.
+
+*CI:*
+- The suite joins the existing `image` job as one more step, and no new job is added.
+- That step runs only when a new `backup` output of `infra/ci/changes.mjs` is true. It is true for `infra/backup/`,
+  `infra/restore.sh`, `infra/drill.sh`, `infra/postgres/archive-wal.sh`, `infra/compose/prod.yml`,
+  `infra/ops/commands/backup.py`, `infra/ops/commands/upload.py` and `tests/infra/backup/`.
+- **Before:**
+  - `image` takes 306 s.
+- **After:**
+  - on a PR that touches none of those paths, `image` is unchanged at 306 s;
+  - on one that does, it takes about 306 s plus the suite, target ≤ 306 + 420 s `(unmeasured on CI;` the builder
+    reports the CI figure at build green`)`.
+- Why not a separate job: CI's wall clock would shrink only on backup PRs, against the house rule. Gated this way,
+  most PRs pay nothing.
+- The suite's fixed subnets mean it cannot run alongside another container suite on one daemon. The job's steps are
+  sequential, so that holds.
 
 ## E — Doc passages (owners)
 
