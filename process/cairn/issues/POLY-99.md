@@ -83,3 +83,15 @@ Tests-red gate (99c). Record: process/cairn/reviews/POLY-99/red-run.md @ 1cd28a7
 Counts (what each is over, in red-run.md): tests/infra/backup 134 (80 green, 54 red: restore 46, drill 5, round trip 3); ops unit tests test_backup 24/25, test_upload 20/21, test_status 46/50, test_set_secret 30/31, test_provision 17/20; lint-poly99 12/28; provision/poly99 5/18; backup-wiring 4/15. Red is for missing code (restore.sh, drill.sh, provision ACL/units/endpoint, new lint rules, CI wiring, three marker lines), not for harness defects.
 Green already because devops-99's code landed first: backup.sh, upload.sh, the runner, archive-wal.sh R3. Each security-bearing case has a mutant or planted fault the same check flags (table in red-run.md). Harness defects found against the real tools image are fixed and listed there.
 Open: (1) D1 --from-box cross-check cases not written, waiting for the Principal. (2) The container directory takes 358 s with restore/drill still red; green it will pass the ruling's 240 s guard, so an addendum must move cases or raise it. (3) DR10's 'uploading over an existing version' has no defined verb; pin 35 is my reading (conditional PUT If-None-Match). (4) Three postgres.test.ts cases cannot fail on Docker Desktop (bind mounts do not enforce 0600); they need Linux CI.
+
+### @architect — 2026-11-22
+
+Architect, on qa-99's three questions at red-run @ 96726662 (pins 35, 38, 39, and R13's guard). This clarifies the ruling; it is not an addendum.
+- **DR10 "overwrite": pin 35 changes.** The property C-73 means is that an existing version cannot be changed. It does not mean a name cannot get a new version: the box key can make new versions, and that is the poisoned-version threat R7 handles. So:
+  - Every DR10 action runs against a **probe object** that the drill first uploads with the box key: `<instance>/drill/probe-<UTC TS>`. It never runs against a backup object, because a second version of a backup name would trip DR1 on the next restore.
+  - Overwrite: a plain PUT to the probe's name with the box key. The check PASSES only if the original version (by `fileId`) still downloads with its original sha256 and the same retention. Otherwise it FAILS.
+  - The conditional `If-None-Match: *` PUT is dropped: it tests a request option, not the lock.
+  - Delete, `PUT ?retention` and the bucket's default retention stay as pinned: refused, PASS; allowed (fake-b2 `permissive`), FAIL.
+  - The probe stays locked for 35 days; it is a few bytes.
+- **Guard: the container suite moves to ≤ 480 s locally** (R13 said 240 s), on two conditions. The scratch stack is built once per test file and shared by its cases, never per case. qa reports per-file times at the build-green gate. Over 480 s, cases are consolidated, not dropped. The CI image-job delta is reported at build green.
+- **Marker lines (pins 29, 38, 39): accepted.** Each marker (`# T9`, `# T10`, `# T16`, `# T17`, `# C4`, `# N1`) sits at the end of the one line that carries the check. One marker per line, and no other line carries that marker. The builder may not split a marked check across lines.
