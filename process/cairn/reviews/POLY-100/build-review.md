@@ -128,3 +128,52 @@ Required of qa: the mutants named above, before green.
 - **`release.yml`, S22:** met. **Advisory A16:** `release-lookup.sh` still omits `--source-digest`; the box is the authority.
 - **Docs.** SECURITY is mine and **not yet written**: C-83 (checks, tested-by, edge tags), T-64 (tag-name downgrade), the host-only and token rows, the `staging_basic_auth` row, the
   guard as a control, C-82's Dockerfile-sibling scans, R-4. I write it once F1-F6 settle what is true. INFRA: I checked only the token and staging-auth rows.
+
+---
+
+# Re-review @ `2825b6f7`
+
+**Verdict: FAIL.** F1-F16 are fixed as ruled but for F2 and F15. Three new findings block (G1-G3); G4 goes with them. CI run 45288873465 is green on every job at this sha (checked with `gh run view`).
+
+**Read in full:** `deployer.py`, `edge.py`, `sauth.py`, `release.py`, `compose_guard.py`, `stack.py`, `compose.py`, the deploy commands, every other product change since `28811f74`, `render-isolation.test.ts`, the new
+parts of `red-run.md` and `gate.md`, devops-100's create evidence. **Ran, no containers:** my first nine probes again (all now as ruled) and six new ones on the harness (Q1-Q6; Q3 and Q4 corrected once, my first versions did
+not exercise the fault). **Not run:** any suite or mutant. **Not read line by line:** most test files. The mutant column is `red-run.md`'s word.
+
+## Blocking
+
+| # | Finding | Shown | Required |
+|---|---|---|---|
+| **G1** | **The render user cannot reach the files it must render, so every real deploy is refused and quarantined.** The dispatcher sets umask 077; `os.makedirs(mode=0o755)` then makes `/opt/polycarpic/releases` and `state/deploy` 0700. Provision creates neither. Uid 10020 cannot enter them: `guard-render`, which is a Q row, so good digests are banned. | Q5: after a first deploy both are 0700 (the release directory under it is 0755). That uid 10020 then fails is how the kernel reads 0700; not run. The unit fakes ignore modes and the Linux test uses its own 0755 directory | Create both with an explicit chmod 0755, checked each run; provision-check asserts it. **One Linux case on the real path:** the tool's own extraction under umask 077, then both renders and the stdin step as 10020, for the three real files |
+| **G2** | **A bookkeeping error stops the rollback (F2).** After `up`, `quarantine`, `log` and `put` run before the restore; and a `Refusal` raised after `up` is passed to `refuse`, which never rolls back. A full disk is a likely cause: the pull just filled it. | Q1: `quarantine` unreadable → `refused state`, bad release still running. Q2: state not writable → exception, still running, **no alert**. Q3: saved render changed after `up` → `refused unjudged`, still running | After the candidate's first `up`, every exit that is not healthy restores **first**, whatever was raised; each record is then tried on its own, and none can stop the next. Same in `edge.py` and `rollback.py`, where the quarantine write also comes first |
+| **G3** | **The new release's Postgres can start on live data before the backup (S12).** `_roll_out` picks the candidate's render when the first `ps` says Postgres runs; `_start_postgres` asks again, and a failed second answer reads as "not running". | Q4: second `ps` fails: `up postgres` from the candidate's render with no backup taken | With a `current`, the candidate's render is never passed to `_start_postgres`. One `ps` decides; a failed `ps` stops the run |
+
+## With them
+
+| # | Finding |
+|---|---|
+| G4 | F15: any failing `docker inspect` counts as "gone". Q6: daemon unreachable after a hung migrate → `migrate-timeout`, locks released while the container may run. Only "No such object" is gone; anything else is `oneoff-stuck`. |
+| G5 | `judge` saves before the fixed-point check, so a failed re-judge of `current` replaces the render that backup, upload and cli use; they check that it exists, not its hash. Save after the check; keep the sha beside it and compare. |
+| G6 | `refuse` quarantines before it alerts, and `mark_transient` can raise from inside its handler: either ends with no alert. Alert first. `_handle_interrupted` ignores a restore that failed. |
+| G7 | The 120 s: `child` is computed once per poll, and a poll has up to six children, so a slow poll can overrun by minutes. Recompute per child. |
+| G8 | H23 accepts any process whose command line holds "docker compose". |
+
+## F1-F16, S31-S35, A17, A18
+
+| Item | Code | Test and mutant |
+|---|---|---|
+| F1 | met: `/release/infra` assembled; probe of the old path still refuses | built-image test green in CI; tightened after one mutant passed it |
+| F2 / S32 | **not met: G2.** Hang, non-UTF-8, `in-progress`, `interrupted` as ruled | first-interruption mutant red; no case for an error in the bookkeeping |
+| F3 | met; my two probes now keep staging's directory | original bug red; two single mutants equivalent, said so |
+| F4, S31, S33, S35, A18 | built as ruled; **G1 stops it on a real box**, G5 | isolation, hash re-read, 0644, fixed point, fallback: red. Linux 3 of 3 in CI, on its own directory |
+| F5, F6 | met; probes now `state` | red |
+| F7, F8, F9, F10, F11, F12, F13, F14 | met | each shown red |
+| F15 | **G4** | red for the case it has |
+| F16 | met, docker, gh and git included | red on the old argv |
+| A17 | met | red both ways |
+| First-review mutants (T8, T9, T15, T17, T18, T-take, T-caddy, T-probe, T-help) | - | all recorded red |
+
+**F4's create evidence:** all 15 services, source and corrected JSON both exit 0 with a container, every listed field equal, aliases, groups, masked paths and propagation now included. It proves that what is judged
+creates what the source would. It was rendered as 65534, not 10020: the bytes do not depend on the number, but **what the number can read does**, which is G1. So F4 is proven for equality, and not proven on the real path.
+
+**Workflows:** unchanged but for a safer count in `release-scan`; B1-B3, S22, S25 stand. **Staging exception:** still none. **`owner_of`:** the fake now answers the two paths only (qa's word).
+**SECURITY 1.19.0:** C-82, C-83, C-70, T-64, R-4, the token and `staging_basic_auth` rows, in this commit. They state the design; G1-G3 must be fixed for them to be true.
