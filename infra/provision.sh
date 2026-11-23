@@ -12,11 +12,11 @@ MAPPER=polycarpic-data
 DOCKER_KEY_FPR=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 VOL_DEVICE_GLOB='/dev/disk/by-id/scsi-0HC_Volume_*'
 
-stage='' target='' domain='' mail_from='' project='' b2_endpoint='' b2_endpoint_set=0
+stage='' target='' domain='' mail_from='' project='' b2_endpoint='' b2_endpoint_set=0 bind_addr='' staging_allow='' acme_email=''
 changes=0
 
 die() { echo "provision.sh: $*" >&2; exit "${2:-1}"; }
-usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-endpoint <url>] | --stage database --project prod|staging" >&2; exit 2; }
+usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-endpoint <url>] [--bind-addr <ip> --staging-allow <cidr,...> --acme-email <addr>] | --stage database --project prod|staging" >&2; exit 2; }
 change() { echo "change: $*"; changes=$((changes + 1)); }
 
 while [ $# -gt 0 ]; do
@@ -26,6 +26,9 @@ while [ $# -gt 0 ]; do
     --domain) domain=${2:-}; shift 2 ;;
     --mail-from) mail_from=${2:-}; shift 2 ;;
     --b2-endpoint) b2_endpoint=${2:-}; b2_endpoint_set=1; shift 2 ;;
+    --bind-addr) bind_addr=${2:-}; shift 2 ;;
+    --staging-allow) staging_allow=${2:-}; shift 2 ;;
+    --acme-email) acme_email=${2:-}; shift 2 ;;
     --project) project=${2:-}; shift 2 ;;
     *) usage ;;
   esac
@@ -291,6 +294,16 @@ install_units() {
       reload=1
     fi
   done
+  # the deploy units (POLY-100): installed, not enabled; first-deploy enables the project's timer
+  src=$here/deploy/systemd
+  for u in polycarpic-deploy@.service polycarpic-deploy@.timer; do
+    [ -f "$src/$u" ] || die "$src/$u not found"
+    if ! cmp -s "$src/$u" "/etc/systemd/system/$u"; then
+      install -m 0644 -o 0 -g 0 "$src/$u" "/etc/systemd/system/$u"
+      change "installed /etc/systemd/system/$u"
+      reload=1
+    fi
+  done
   if [ "$reload" = 1 ]; then systemctl daemon-reload; fi
 }
 
@@ -334,6 +347,18 @@ host_env() { # file instance origin
 PUBLIC_ORIGIN=$origin
 MAIL_FROM=\"$from\"
 POLY_INSTANCE=$instance"
+}
+
+# edge.env (POLY-100 R9): what the shared Caddy needs, read by the deploy's compose calls. Written only when all three flags are given.
+edge_env() {
+  local allow=${staging_allow//,/ }
+  [[ "$bind_addr" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "--bind-addr must be an IPv4 address" 2
+  [[ "$acme_email" =~ ^[^[:space:]@\"\'\\]+@[^[:space:]@\"\'\\]+$ ]] || die "--acme-email must be an address" 2
+  [[ "$allow" =~ ^[0-9a-fA-F:./\ ]+$ ]] || die "--staging-allow must be a comma-separated list of addresses or CIDRs" 2
+  put_file "$ETC/edge.env" 0644 "POLY_DOMAIN=$domain
+POLY_BIND_ADDR=$bind_addr
+POLY_STAGING_ALLOW=\"$allow\"
+POLY_TLS=$acme_email"
 }
 
 effective_mail_from() {
@@ -389,6 +414,7 @@ stage_host() {
   secrets_for "$ETC/staging-secrets" "$STAGING_SERVICES" "$STAGING_GENERATED"
   host_env "$ETC/host.env" polycarpic-prod "https://app.$domain" "$mf"
   host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain" "$mf"
+  if [ -n "$bind_addr$staging_allow$acme_email" ]; then edge_env; fi
   check_accounts
   if [ "$changes" = 0 ]; then echo "host stage: no changes"; else echo "host stage: $changes changes"; fi
 }

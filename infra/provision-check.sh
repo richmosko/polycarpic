@@ -271,6 +271,45 @@ for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.s
 done
 report H16 "backup units" "$h16" "rerun: sudo bash provision.sh --stage host ... (installs the unit files from the bundle)"
 
+# ------------------------------------------------------------------ H17 deploy units and policy (POLY-100 R11)
+h17=''
+for u in polycarpic-deploy@.service polycarpic-deploy@.timer; do
+  inst=/etc/systemd/system/$u
+  if [ ! -f "$inst" ]; then h17="$h17 $u is not installed;"; continue; fi
+  cmp -s "$here/deploy/systemd/$u" "$inst" || h17="$h17 $u differs from the bundle copy;"
+  [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h17="$h17 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
+done
+allow=$here/deploy/compose-allow.json
+if [ ! -f "$allow" ]; then h17="$h17 $allow is missing;"; elif [ "$(stat -c %u "$allow")" != 0 ]; then h17="$h17 $allow is not root-owned;"; fi
+report H17 "deploy units and guard policy" "$h17" "rerun: sudo bash provision.sh --stage host ... (installs the units); the policy ships with polycarpic-ops install.sh"
+
+# ------------------------------------------------------------------ H18 allowed_signers (WAIT before prod)
+signers=$ETC/allowed_signers
+if [ ! -f "$signers" ]; then
+  wait_ H18 "allowed_signers" "waits for: polycarpic-ops allowed-signers install < signers file (before the first prod deploy)"
+elif [ "$(stat -c '%a %u:%g' "$signers")" != "644 0:0" ] || ! [ -s "$signers" ] || grep -qvE '^[A-Za-z0-9][A-Za-z0-9_.@+-]* namespaces="git" ssh-ed25519 [A-Za-z0-9+/]+=*$' "$signers"; then
+  fail H18 "allowed_signers" "$signers is not root:root 0644 with only plain 'namespaces=\"git\" ssh-ed25519' lines" "reinstall it: polycarpic-ops allowed-signers install < signers file"
+else
+  pass H18 "allowed_signers"
+fi
+
+# ------------------------------------------------------------------ H19 edge.env
+if [ -f "$ETC/edge.env" ] && [ "$(stat -c '%a %u:%g' "$ETC/edge.env")" = "644 0:0" ] \
+  && grep -q '^POLY_DOMAIN=' "$ETC/edge.env" && grep -q '^POLY_BIND_ADDR=' "$ETC/edge.env" && grep -q '^POLY_STAGING_ALLOW=' "$ETC/edge.env" && grep -q '^POLY_TLS=' "$ETC/edge.env"; then
+  pass H19 "edge.env"
+else
+  fail H19 "edge.env" "$ETC/edge.env is missing, not root:root 0644, or lacks one of POLY_DOMAIN, POLY_BIND_ADDR, POLY_STAGING_ALLOW, POLY_TLS" "rerun: sudo bash provision.sh --stage host ... --bind-addr <ip> --staging-allow <cidr,...> --acme-email <addr>"
+fi
+
+# ------------------------------------------------------------------ H20 deploy timers
+h20=''
+for proj in prod staging; do
+  if [ -f "/var/lib/polycarpic/state/deploy/$proj/current" ]; then
+    systemctl is-enabled --quiet "polycarpic-deploy@$proj.timer" 2> /dev/null || h20="$h20 polycarpic-deploy@$proj.timer is not enabled;"
+  fi
+done
+report H20 "deploy timers" "$h20" "sudo systemctl enable --now polycarpic-deploy@<project>.timer (first-deploy does this)"
+
 # ------------------------------------------------------------------ H9 service gids
 h9=''
 while IFS=: read -r user _ _ gid _; do
