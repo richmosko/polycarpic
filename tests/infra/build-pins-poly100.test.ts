@@ -75,7 +75,7 @@ export function violations(wf: any): string[] {
   if (!/=~ \^POLY_\(POSTGRES\|TOOLS\|CADDY\)_IMAGE=ghcr\\\.io\/richmosko\/polycarpic-\(postgres\|tools\|caddy\)@\(sha256:\[0-9a-f\]\{64\}\)\$ \]\]/.test(run)) v.push('release-scan: no fixed-grammar check on images.env lines');
   if (!/if \[\[ "\$line" =~[\s\S]*?then[\s\S]*?image\.sh scan "ghcr\.io\/richmosko\/polycarpic-\$\{BASH_REMATCH\[2\]\}@\$\{BASH_REMATCH\[3\]\}" \|\| status=1[\s\S]*?else[\s\S]*?status=1/.test(run)) v.push('release-scan: a sibling is scanned outside the checked branch, or an unchecked line does not fail');
   if (/\|\| exit\b|\|\| return\b/.test(run) || /^\s*set -e(?!u)/m.test(run)) v.push('release-scan: stops at the first failure');
-  if (!/exit "\$status"/.test(run) || !/wc -w\)" = 3/.test(run)) v.push('release-scan: the exit status or the three-siblings count is missing');
+  if (!/exit "\$status"/.test(run) || !/wc -w\)" = 3|\$\{#seen_names\[@\]\}" = 3/.test(run)) v.push('release-scan: the exit status or the three-siblings count is missing');
   return v;
 }
 

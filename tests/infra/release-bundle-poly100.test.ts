@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 // POLY-100 F1 (ruling.md R13, build review 3bbc6626): the image ships R4's exact manifest at /release/infra, root-owned and read-only, not the whole repository. Static half (lint job): the
 // Dockerfile assembles /release/infra from the same list release.py's filter accepts. The built-image half is tests/infra/image/release-bundle.test.ts.
 import { readFileSync } from 'node:fs';
@@ -24,13 +25,13 @@ export function dockerfileManifest(): string[] {
 describe('F1: the Dockerfile ships the manifest, not the repository', () => {
   it('has a /release/infra assembly in its build stage and the runtime stage copies it from there', () => {
     expect(docker, 'no /release/infra anywhere').toMatch(/\/release\/infra/);
-    expect(docker).toMatch(/COPY[^\n]*--from=build[^\n]*\/release\/infra/);
+    expect(docker).toMatch(/COPY[^\n]*--from=build[^\n]* \/release /); // the whole assembled /release tree, so the box's `docker cp cid:/release/infra` finds exactly it
   });
 
   it('the runtime copy is root-owned and read-only', () => {
-    const line = docker.split('\n').find((l) => /COPY[^\n]*--from=build[^\n]*\/release\/infra/.test(l)) ?? '';
+    const line = docker.split('\n').find((l) => /COPY[^\n]*--from=build[^\n]* \/release /.test(l)) ?? '';
     expect(line).toMatch(/--chown=root:root/);
-    expect(line).toMatch(/--chmod=(?:[ugo]=rX|0?[0-7][0-5][0-5]|a-w)/);
+    expect(docker, 'modes are set where /release is assembled: files 0644, scripts 0755, none group- or world-writable').toMatch(/find \/release -type f -exec chmod 0644/);
     expect(docker.split('\n').filter((l) => /^\s*COPY\b.*--chown=node:node.*\/app\b/.test(l)).join('\n')).not.toMatch(/\/app\/infra\b/);
   });
 
@@ -49,7 +50,9 @@ describe('F1: the Dockerfile ships the manifest, not the repository', () => {
   });
 
   it('runs the image check on a change to the installed filter (the image job triggers on release.py)', () => {
-    const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
-    expect(ci).toMatch(/infra\/ops\/lib\/release\.py/);
+    // the image job's trigger is infra/ci/changes.mjs's `image` filter (ci.yml only reads its output): run the classifier on the changed path
+    const r = spawnSync('node', [join(ROOT, 'infra', 'ci', 'changes.mjs')], { input: 'infra/ops/lib/release.py\0', encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/^image=true$/m);
   });
 });
