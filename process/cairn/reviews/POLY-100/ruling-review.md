@@ -303,3 +303,19 @@ D1 and D2 as above. **D3, the safety check's rules come only from the operator (
   `main` can widen them, and staging runs every `main` change automatically on the same server as prod.
 - *Cost of (a).* A release that legitimately needs a new mount or service is refused, loudly, until you run the install
   step.
+
+### Read against `900d23f6` (the architect's in-place update, which landed while the re-review above was written)
+
+| Condition | At `900d23f6` |
+|---|---|
+| S5 memberships | **closed**: R12 (c), T-pre |
+| S6 child env, git credentials | **closed**: R2, T15 |
+| S8 `HOST_ONLY` + `github_pat_` shape | **closed**: R11, T18. The join is approved as written there |
+| S9 signers | **closed**: R11, T17 |
+| S13 rollback through the guard | **closed**: R5 (V7 before rollback's `up`), R8 |
+| S10 key and value allowlist, env sources | **partly met.** `priv` now refuses any `network_mode`. Still open: `pid`/`ipc` with `container:` or `service:` (the rule says `host` only); `uts`, `cgroup`, `cgroup_parent`, `volumes_from`, `sysctls` (no per-service key set); named volumes with `driver_opts` (no type rule); top-level `configs` `file` sources (SM4); `env_file` sources, which the render erases (SM3); pinned `user`, `read_only`, `cap_drop: [ALL]`; step (1) still a line regex. T8 needs S10's eight cases |
+| S11 staging-era Caddy keys | **open**: `--force-recreate` replaces the container, not Caddy's data directory, so a key issued to staging-era code survives |
+| S12 `current`'s images until step 8 | **open**: R6 step 2 still starts the **candidate's** Postgres, before step 3's backup |
+
+**Gate:** the plan gate clears when S10, S11 and S12 are in the ruling with their tests. Each is a ruling edit, not a
+re-measure.
