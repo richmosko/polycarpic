@@ -28,6 +28,21 @@ beforeAll(() => {
 afterAll(() => { if (lap) lap.cleanup(); });
 beforeEach(() => { if (setupError) throw new Error(setupError); fake.reset(); lap.resetLogs(); lap.setFdesetup(0); lap.setBox({}); });
 
+
+/** pg_restore invocations (continuation lines joined) that ask for data only: `--data-only`, or a short-option cluster holding `-a` before an option that takes
+ * the rest of the cluster as its argument (`-Fc` is format c, not -a). Only pg_restore lines are read, so `ssh -a -x` cannot match. */
+const TAKES_ARG = new Set('dfFhjLnNpPStTUI'.split(''));
+export function dataOnlyRestores(text: string): string[] {
+  const lines = text.replace(/\\\n\s*/g, ' ').split('\n').filter((l) => /\bpg_restore\b/.test(l) && !/^\s*#/.test(l));
+  return lines.filter((l) => {
+    if (/--data-only\b/.test(l)) return true;
+    for (const tok of l.split(/\s+/)) {
+      if (!/^-[A-Za-z0-9]+$/.test(tok)) continue;
+      for (const ch of tok.slice(1)) { if (ch === 'a') return true; if (TAKES_ARG.has(ch)) break; }
+    }
+    return false;
+  });
+}
 const NOSCRATCH = { POLY99_SCRATCH_FAIL: '1' };
 /** the nightly set A as the uploader leaves it, uploaded a minute after its <TS> */
 const plantA = (o: { uploadedMs?: number } = {}) => { for (const [n, b] of Object.entries(A)) plantObject(fake, s.major, 'dump', n, b, o.uploadedMs ?? tsToMs(tsA) + 60_000); };
@@ -80,8 +95,15 @@ describe('restore.sh usage and hygiene (R7): exit 2, the message, and nothing de
     expect(t).toMatch(/umask 077/);
     expect(t).toMatch(/set -euo pipefail/);
     expect(t).not.toMatch(/\bPG(HOST|PORT|USER|PASSWORD|PASSFILE|SERVICE|DATABASE)\b/);
-    expect(readFileSync(join(lap.infra, 'backup', 'restore-lib.sh'), 'utf8')).not.toMatch(/--data-only/);
+    for (const f of ['restore.sh', 'backup/restore-lib.sh', 'drill.sh']) expect(dataOnlyRestores(readFileSync(join(lap.infra, f), 'utf8')), f).toEqual([]); // INFRA F4: the whole dump, never data-only
     expect(readFileSync(join(lap.infra, 'drill.sh'), 'utf8')).toMatch(/ulimit -c 0/);
+  });
+  it('RED ON THE FAULT: the data-only check flags `pg_restore -a`, `--data-only` and a cluster such as `-ac`, and leaves `-Fc`, `-d x`, `ssh -a -x` and comments alone', () => {
+    expect(dataOnlyRestores('pg_restore -a -d x f')).toHaveLength(1);
+    expect(dataOnlyRestores('docker exec c pg_restore --data-only -d x f')).toHaveLength(1);
+    expect(dataOnlyRestores('pg_restore -ac -d x f')).toHaveLength(1);
+    expect(dataOnlyRestores('pg_restore \\\n  -d x -a f')).toHaveLength(1);
+    expect(dataOnlyRestores('pg_restore -Fc -d x --exit-on-error f\nssh -a -x host\n# pg_restore -a')).toEqual([]);
   });
   it('C12: fdesetup reporting an unencrypted disk -> exit 2 `restore.sh: disk encryption is not active (fdesetup isactive)`, no age run, no scratch', () => {
     lap.setFdesetup(1);
