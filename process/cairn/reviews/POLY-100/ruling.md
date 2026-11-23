@@ -193,6 +193,13 @@ Health is polled every 5 s for up to 120 s after `up -d` returns. A release is h
 - `compose exec -T web node -e "<fetch http://127.0.0.1:3000/api/v1/health>"` reports HTTP **200**. The decision reads the
   status code only, never the body (seceng D15).
 
+**Through Caddy (A13), prod only, real-domain mode, not on the first deploy.** A new seam `ctx.https_status(host, addr, path)`
+asks for `https://app.<POLY_DOMAIN>/api/v1/health` at `POLY_BIND_ADDR` (`0.0.0.0` reads as `127.0.0.1`), with that name as SNI and full
+certificate verification, no redirect followed, 10 s timeout. It is asked once before step 8 as a baseline. Baseline 200: 200
+is required in this health poll and after a rollback. Any other baseline: the probe is not required, and the run logs
+`edge-probe-baseline` and writes it as the alert even when healthy. Without the baseline, an unrelated certificate or
+network fault would quarantine a good release for good, and a release that fixes Caddy could never deploy.
+
 The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A compromised container can still answer 200
 (A5); health is a liveness gate, not a security one.
 
@@ -212,10 +219,13 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 - **Manual:** `polycarpic-ops rollback <project>` makes no GitHub call. It quarantines `current` and ups `previous` from
   `releases/`, after the tree-hash re-check, R1's integrity check and the R5 guard, then runs R7. It restores edge on
   the same rule.
-- **What health sees of Caddy.** Its healthcheck is `caddy version`, so R7 catches a Caddy that does not start, not one
-  that starts and routes wrongly. Such a release needs the manual rollback.
+- **What health sees of Caddy.** Its healthcheck is `caddy version`, so that alone catches only a Caddy that does not
+  start. R7's probe (A13) adds one that misroutes the health path or serves no valid certificate. A Caddy that logs or
+  forwards wrongly while answering is stopped before the image exists, by the lint (R11, A12), review and the signature.
 
-- **What lifts a quarantine.** A `guard-<rule>` line holds only while its bundle id equals the installed one. After
+- **What lifts a quarantine.** A `guard-<rule>` line lifts only when its bundle id and the installed one are both
+  well-formed (`git-` or `sha256-` and 12 hex) and differ, and the digest has no other reason (S18). A missing or
+  unreadable id on either side keeps it. After
   `install.sh` installs another bundle the next poll takes the digest again and runs V1–V7 in full; the operator clears
   nothing. Every other reason holds for good: there is no clear command, and the fix is a new digest.
 
@@ -264,7 +274,7 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 | `current`, `previous` | one line `<digest> <tag or -> <commit> <tree sha256> <UTC>` |
 | (both pointers) | absent is absent; present but unparsable stops the run with `state` (exit 1, no Q), for both projects and for `first-deploy` and `rollback`, and a bad prod `current` counts as "prod exists" (S17) |
 | `quarantine` | lines `<digest> <UTC> <reason>`; a `guard-<rule>` line adds a fourth field, the installed ops bundle id (`readlink /opt/polycarpic/ops/current`) |
-| `deploy.log` | append `<UTC> <event> <fields>`. Events are a closed set: `candidate verified refused transient busy quarantined not-newer premigration-set migrated up healthy rolled-back rollback-unhealthy` |
+| `deploy.log` | append `<UTC> <event> <fields>`. Events are a closed set: `candidate verified refused transient busy quarantined not-newer premigration-set migrated up healthy rolled-back rollback-unhealthy edge-probe-baseline` |
 | `alert` | one line `<UTC> <refusal or event>`. Written on every stop or rollback; removed on the next healthy run |
 | `last-poll` | UTC of the last run that read GitHub successfully (seceng A-c) |
 
@@ -301,6 +311,11 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
   stay `contents: read`, `packages: read`. Cost: three Trivy scans in the weekly main-only run `(unmeasured)`, none on a
   PR. Workflow static, red on: a mutant scanning the app only; one that stops at the first failure; one that passes an
   unchecked line to the scan.
+- **Caddyfile lint by allowlist (A12),** rule `caddy-allow` in `compose-policy.mjs`, beside the existing rules: the
+  top-level block heads are exactly the seven in today's file, each once, and every non-comment, non-blank trimmed line equals
+  one in the fixed list for its block, with that list's count. Anything else is refused: another directive or global option, a
+  second `log`, a one-line block, a continuation, a quoted or heredoc form, another `import` or `{$…}`. A Caddyfile
+  change then always carries a lint change in the same PR. `infra/caddy/Dockerfile` copies that one file.
 - `POLY_APP_IMAGE`, `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE` become `${…:?}` with no default digest anywhere (F10). The lint
   step's env sets all four.
 - **Env wiring.** web, auth, worker, migrate and operator get:
@@ -396,7 +411,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-prod-edge` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
 | T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15). Resolver answering "resolves" then "no such name" on a staging-only host: no argv names edge; the reverse: edge skipped, `edge-prod-name` (S16). A truncated prod `current`, no prod containers: staging touches no edge and `first-deploy prod` wipes nothing (S17) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check; mutant resolving ownership twice; mutant reading a malformed `current` as absent; mutants where `EAI_AGAIN`, a missing `POLY_DOMAIN` or a failing `compose ps` reads as safe; mutant wiping under a running caddy when staging has no `current` |
 | T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
-| T10q | A `guard-<rule>` digest is skipped while the bundle id is unchanged; after the id changes it is judged again in full (deploys if it passes, is refused again if not). An `unhealthy` digest stays skipped after the same change | mutant lifting every reason; mutant never lifting; mutant lifting without V1 |
+| T10q | A `guard-<rule>` digest is skipped while the bundle id is unchanged; after the id changes it is judged again in full (deploys if it passes, is refused again if not). An `unhealthy` digest stays skipped after the same change, as does one with both reasons, or with a missing or malformed id stored or installed (S18) | mutant lifting every reason; mutant never lifting; mutant lifting without V1 |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
@@ -408,6 +423,8 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5); TEMPORARY to poly_backup on a **sibling** database, refused through the shared `pg_database` row. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read; mutant exempting every `pg_database` row |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
 | T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture. A missing compose plugin fails, never skips |
+| T-caddy | `caddy-allow` passes the real file and refuses: `forward_auth` in a site; a second global `log`; `php_fastcgi` on one line with its block; `import other`; an extra site block; a repeated allowed line | mutant naming bad directives instead of allowing; mutant ignoring counts |
+| T-probe | Baseline 200 then 502: rollback and quarantine; baseline 200 then a certificate failure: the same; baseline failing: healthy, `edge-probe-baseline` logged and alerted, no quarantine; first deploy and staging: no probe | mutant without the probe; mutant without the baseline; mutant skipping verification (real `https_status` against a local self-signed listener) |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped |
 
 Every refusal test asserts the exit code and the refusal name, and each guard has a positive case. Criterion 6 is
@@ -483,7 +500,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S17 (seceng `ruling-review.md` @ `faf490fa`): met by
+## S1–S18 (seceng `ruling-review.md` @ `0afb1c26`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -506,3 +523,5 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S15 `app.` record only after the prod wipe; `edge-prod-name-early` | R9 Order; T9; §L5. No `--caddy-never-staged` flag (reason in R9) |
 | S16 one edge-ownership decision per run | R9; T9 |
 | S17 malformed `current` is not absent | R10; T9 |
+| S18 unreadable bundle id keeps the quarantine | R8; T10q |
+| A12, A13 (adopted) | R11 `caddy-allow`, T-caddy; R7 through Caddy, T-probe |
