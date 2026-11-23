@@ -19,9 +19,9 @@ const DIGEST = 'sha256:' + 'e'.repeat(64);
 
 describe('release.yml structure', () => {
   it('.github/workflows/release.yml exists', () => { expect(text).not.toBe(''); });
-  it('triggers: push of v1.* tags and a dispatch with a `commit` input; top-level permissions {}', () => {
+  it('triggers: push of v1.* and edge-* tags (POLY-100 R9) and a dispatch with a `commit` input; top-level permissions {}', () => {
     expect(Object.keys(w.on).sort()).toEqual(['push', 'workflow_dispatch']);
-    expect((w.on.push as { tags: string[] }).tags).toEqual(['v1.*']);
+    expect((w.on.push as { tags: string[] }).tags).toEqual(['v1.*', 'edge-*']);
     expect((w.on.workflow_dispatch as { inputs: Record<string, unknown> }).inputs.commit).toBeDefined();
     expect(w.permissions).toEqual({});
   });
