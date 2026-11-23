@@ -463,6 +463,36 @@ remote git include and the two remote-off variables (a second layer; `unshare --
 
 **For INFRA:** the saved render bakes `host.env` and `mail.env` in, so an edit to them takes effect at the next deploy, not at a restart.
 
+## G — Re-review findings (seceng `build-review.md` @ `c02f16ee`; agreed `ruling-review.md` @ `06d9cb71`, S36, S37)
+
+All eight are in this loop. Where an earlier rule differs, this table rules.
+
+| # | Rule | Test | Red on |
+|---|---|---|---|
+| G1 | One helper makes every shared directory and sets its mode by `chmod`, never by `makedirs(mode=)` under the 077 umask: `/opt/polycarpic`, `releases`, each release tree (dirs 0755, files 0644/0755), `state/deploy` and each project's, the render home: root, exactly 0755, checked on every run and repaired only when opened without following a link and root-owned; a link, another owner or a non-directory is `render-path`, never repaired; the render home stays empty and unwritable by 10020 (S37); provision creates the first three and provision-check asserts them. Before any render, root checks each path the render names (bundle, `images.env`, env files): every parent `o+x`, the file `o+r`, root-owned. A miss is `render-path` (alert, **no Q**): a box fault must not ban a digest | Linux, in `render-isolation.test.ts`: under umask 077, through the dispatcher's own entry as root, the tool's own `extract` and `write_images_env`, then raw, plain and stdin renders as 10020, the three real files. Unit: each directory made 0700 beforehand is repaired; a symlink and a foreign owner at each level: `render-path`, untouched; a 0600 env file: `render-path`, digest not quarantined, next poll tries again | mutant `makedirs(mode=0o755)` alone; mutant Q on `render-path`; mutant checking the file only; mutant repairing through a link |
+| G2 | `run.up` is set before the candidate's first `up`, edge's included. From then on every exit that is not healthy, refusals included, goes through one `unwind`: **restore first**; then `quarantine`, `log`, `alert`, clearing `in-progress`, each in its own `try`, in that order, none able to stop the next; the alert is also written to stderr, and the exit is never 0. `in-progress` is cleared only after the quarantine line is on disk, so a failed write leaves the next run to treat it as interrupted. Same in `edge.py`; `rollback` restores before it quarantines. **A restore needs no write (S36):** it renders and judges in memory; when the corrected bytes equal the saved file's and its sha256 sidecar, `up` names the saved file and nothing is written. Only when they differ is it saved; if that save fails, the saved pair is used when its hash holds and its bytes, read back through the isolated stdin render, pass the guard now; else `rollback-unhealthy`. Manual rollbacks write pointers after the restore; a failed pointer write is reported, exit 1, with the old release up. `in-progress` unwritable before `up` → refusal, nothing started | seceng's Q1–Q3, and: full disk (`ENOSPC`) at each of `quarantine`, `log`, `alert`, `in-progress`; a `Refusal` after `up`; the same for edge and `rollback`; `ENOSPC` on **every** write from the candidate's `up` onward: the old release is up and healthy, for a project, prod with edge, edge, and the manual rollbacks (S36) | mutant quarantining first; mutant passing a post-`up` `Refusal` to `refuse`; mutant with one `try` around all records; mutant clearing `in-progress` early; mutant saving before every `up` |
+| G3 | With a `current`, `_start_postgres` is given `current`'s judged render and no other; the candidate's is passed only by `first-deploy` with no `current`. One `compose ps`, its answer carried; `None` (failed or unparsable) stops the run: `ps` (alert, no Q). Every other branch on a `ps` (edge ownership, `edge-deploy` step 2, stuck one-offs) carries its answer too, a failure being the refusing one | first `ps` up and second failing (seceng's Q4); first failing; down; with and without `current`: no argv starts the candidate's Postgres before step 5 | mutant asking twice; mutant reading a failed `ps` as "not running" |
+| G4 | Gone is exactly: `docker inspect` exits non-zero **and** stderr holds `No such object` or `No such container`. Anything else, a timeout included, is `oneoff-stuck`, and the locks are held while it is re-checked, 5 s apart, for 60 s | daemon unreachable after a hung migrate: `oneoff-stuck`; gone: `migrate-timeout`; each message form, compared with the real one in T-render's lint step | mutant on the exit code alone |
+| G5 | The render is judged and passes the fixed point in memory (stdin); only then is it saved, beside `render-<…>.sha256`; `backup`, `upload`, `cli`, `up` and `run` compare before use, a miss is `state` | failed re-judge of `current` leaves the old file and hash; changed file: each reader refuses | mutant saving first; mutant checking existence |
+| G6 | `refuse` alerts first, then logs, then quarantines, each on its own `try`. `mark_transient` never raises: a bad file is alerted `state`. `_handle_interrupted`: a failed restore is `rollback-unhealthy` and stops the run; the mark is cleared only after a good one | each write failing in turn: an alert is always there; a failed restore | mutant quarantining first; mutant ignoring the restore's answer |
+| G7 | Each health child gets min(30 s, what is left) computed just before it starts; with nothing left the poll ends as "not healthy" | six children each taking 29 s: rollback starts ≤ 120 s fake time | mutant computing once per poll |
+| G8 | H23 allows a process of uid 10020 only when its executable is `docker` or `docker-compose` (`/proc/<pid>/exe`) and its arguments hold `compose` and `config` | a script named with the words: refused; a real render: passes | mutant on the command line alone |
+
+**The one test that would have caught G1, F1 and F16 together (for the Principal, §L7; not ruled in until they decide)**
+
+**T-real:** one real `first-deploy staging` on the CI runner, as real root, with the real dispatcher, real umask, real `install_box.py` install, real Docker and Compose, and the job's own images.
+- **Faked: GitHub only.** A `gh` on `PATH` (run list, `digest.txt`, attestation answer). The registry is a local one answering as `ghcr.io` over TLS (an `/etc/hosts` line, a CA in `/etc/docker/certs.d/ghcr.io`), holding `polycarpic:ci`,
+  `polycarpic-postgres:ci`, `polycarpic-caddy:ci` and a tools image, so `docker pull <name>@sha256:…` is real. The staging first deploy needs no git.
+- **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users, networks, env files, fixture secrets. `provision.sh` itself stays with the box fixture.
+- **Steps:** `first-deploy staging` → exit 4 `roles-missing`; `provision --stage database`; again → healthy; containers on the digests; a second poll does nothing; then an image whose web never answers → rolled back, quarantined.
+- **Would have caught:** F1 (the real tar), F16 (`run`'s options), G1 (umask and uid 10020), and the `PLAID_ENV`, `MAIL_FROM` and edge-network faults. Not G2–G4, which need faults injected.
+- **Where:** the `image` job, as its last step (seceng: after the backup suite, which is torn down by then; read-only permissions; never in `build.yml`; the hosts line and the CA are removed even on failure, no later step pulls; the fake `gh` is written by the test and in no shipped path). Runs when Dockerfile, infra, apps or packages change.
+- **Cost, all estimates `(unmeasured)`:** about 250 lines of harness; 2.5 to 4 minutes of the `image` job (push and pull of four images, Postgres start, health windows, the 120 s rollback case; without that last case about 1.5 to 2).
+  Risk: it edits the runner's `/etc/hosts`; it can be flaky where Docker is slow.
+- **Not covered:** systemd timers, real GitHub, a prod deploy (premigration backup, edge). POLY-104 and the first prod deploy.
+
+**Recommendation:** in this loop, with the rollback case. Three faults of one kind passed 100 % of a green suite. seceng recommends it too.
+
 ## R13 — The tests
 
 **Seam.** Unit level is `tests/infra/ops/test_deploy.py` on the POLY-98 harness (`base.py`: temp root, every outside call
@@ -563,6 +593,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | L1 | Criterion 5 says "measured in the restore drill"; drill and timing are POLY-116's. Amend to "the runbook's inputs are proven (T13)", or say otherwise |
 | L2 | `self-update` has no issue; suggest the ops follow-up umbrella |
 | L4 | User steps, in order: the token and its one-call check; the SSH tag-signing key and `RELEASE_SIGNERS` (needed before staging is **served**); `allowed-signers install` on the box with the same key; after the first `build.yml` run, confirm the three new GHCR packages are public `(unmeasured)`; sign and push `edge-1` on a `main` commit built in the last 90 days and wait for its Release |
+| L7 | T-real (section G): in this loop, with or without its rollback case, or a named follow-up. The Principal's |
 | L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and `staging-auth`, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
 
 ## E — Doc passages (owners, at the verdict)
@@ -573,7 +604,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S35 (seceng `ruling-review.md`): met by
+## S1–S37 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -589,4 +620,4 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
 | S28 | R9 edge step 2; T-edge | S29 (a, b), S30 | R11 `staging-auth`; T-sauth |
-| A13 | R7; T-probe | S31–S35 | F4, F2, R4 R-b |
+| A13 | R7; T-probe | S31–S37 | F4, F2, R4 R-b, G1, G2 |
