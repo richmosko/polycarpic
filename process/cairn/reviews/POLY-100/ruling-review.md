@@ -488,3 +488,26 @@ containers: staging touches no edge; `first-deploy prod` wipes nothing. Red on a
 
 **A11 (advisory).** `first-deploy prod` resolves `app.` at the start; Caddy is wiped after migrate, perhaps minutes later.
 Resolve once more after Caddy is removed and before the recreate, and stop if the name appeared.
+
+## `d0cd9969` (what lifts a quarantine)
+
+**Accept, with S18.** The lapse follows an operator's root install and re-runs V1–V7, so it reaches nothing new. **S18:** a
+`guard-` line lifts only when both ids are well-formed (`git-` or `sha256-` and 12 hex) and differ. A missing or unreadable
+id, stored or installed, keeps the digest quarantined. A digest that also has any other reason stays. *T10q adds both.*
+
+## D2: a correction to my text for the Principal
+
+My D2 text above says a bad Caddy change "fails the health check and rolls back with the release". **That is wrong for a
+Caddy that starts.** Health runs `caddy version` and asks web directly, not through Caddy. Nothing on the box reads the
+Caddyfile: it is baked into the Caddy image, and the guard (V7) reads compose only.
+
+*What stops a signed release whose Caddyfile is wrong but starts:* the CI lint and container tests on the PR, the lint
+again at release, review, and the signature. After that, only a person noticing, and `rollback`. By reading, the lint has
+holes: it pins `reverse_proxy` targets but not other directives that forward traffic (`forward_auth`), and it requires the
+filtered log block without refusing a second one that writes elsewhere.
+
+*Recommendation: still (a).* Under (b) or (c) the same file reaches prod with every one of those checks except the
+signature. The two-line reason changes, not the choice. Two additions, each for the lead or the Principal:
+- **A12.** The lint allowlists Caddyfile directives and global options instead of naming bad ones. Closes the holes above.
+- **A13.** After a prod `up`, except the first, root asks `https://app.<domain>/api/v1/health` through Caddy (pinned to the
+  bind address) and requires 200. Catches a Caddy that misroutes that path or has no certificate; it cannot see logging.
