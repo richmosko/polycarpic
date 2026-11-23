@@ -916,3 +916,24 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Two Resend keys, one per service, with H6 strict and a `--service` flag on `set-secret`.
 **Approved by:** Mosko
+
+### 2026-11-23 — `restore.sh --premigration --from-box`: the bucket cross-check stays optional
+**Decision:** The laptop-side from-box restore is checked against root's recorded hash always, and against the bucket only when the read key is given; without it the restore prints `WARN` and continues (POLY-99 ruling R7, D1 option (a), as built). The always-required cross-check is moved to the box-side route back into prod (POLY-158), where it has no override.
+**Why:** Root's record, which neither the backup container nor the uploader can write, already stops every attacker below root. The bucket cross-check adds protection only against root on the box (or `polyops`), who already holds the live database and every secret and can tamper before the upload, which the cross-check does not catch. The restore lands in a throwaway scratch on the laptop with no network. The point where a forged file would become real data is the copy back into prod, so the strict check belongs there. The architect and seceng had recommended requiring it here with a loud override; the lead changed its recommendation after re-reading seceng's attacker table.
+**Alternatives considered:**
+- Refuse without the read key unless `--skip-bucket-check` is given (the architect's and seceng's recommendation).
+**Approved by:** Mosko
+
+### 2026-11-23 — Decrypted pre-migration data may be streamed into a temporary scratch cluster on the box
+**Decision:** For a bad-migration rollback, the laptop decrypts the pre-migration backup and streams it over ssh into a throwaway scratch cluster on the box (POLY-99 ruling D2 option (a); built in POLY-158). No plaintext file is written on the box. Conditions: the scratch is a separate cluster with no network; its files are in tmpfs while the data fits; "destroyed" means the container and its dedicated data directory are removed and the tool lists none left; `polycarpic-ops status` shows RED for one older than 24 hours; copy-back is data only as a non-superuser; the bucket cross-check is always required on this path.
+**Why:** The rule of 2026-11-08 (no plaintext dump on the box) exists so that someone who captures the server finds no readable backup history. A temporary cluster holds nearly what the live database already holds, on the same encrypted volume, for the hours of the repair; left in place it would become what the rule forbids, hence the destruction and status conditions. A forged backup's code would run in a sealed container beside the live data rather than on the laptop, and reaches it only by also escaping the container; a forgery gets that far only if the backup program was already compromised or the attacker holds root. Laptop-only would need a second audited copy-back tool and puts the 60-minute recovery target at risk. The architect and seceng both recommended this.
+**Alternatives considered:**
+- Laptop only: nothing decrypted reaches the box, and a separate audited tool copies corrected rows back.
+**Approved by:** Mosko
+
+### 2026-11-23 — A daily off-box list-only bucket check is filed now and gates the first real household data
+**Decision:** A scheduled GitHub job lists the backup bucket once a day with a key that holds `listFiles` only and pings the alert service (POLY-159). It is its own issue, not part of POLY-103, and must be in place before the first real household data. GitHub holding this key is an accepted exception to TB-12 under seceng's conditions: an environment secret used by one read-only workflow, no third-party action, and output of counts and pass or fail only.
+**Why:** A compromised uploader, the internet-facing container, can report `verified` while sending nothing; root then deletes the spool copy and the alerts stay green until the monthly drill, so up to a month of backups could be missing. The key reads no content and cannot write or delete; stolen, it reveals when backups run, their sizes and the cluster's system id. The architect and seceng both recommended this.
+**Alternatives considered:**
+- Defer to POLY-103's alerting design.
+**Approved by:** Mosko
