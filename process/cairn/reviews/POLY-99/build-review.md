@@ -395,6 +395,10 @@ On DR2: if qa confirms that the existing case prints `FAIL DR2` on the real buil
 mutant, that is the red proof. I then withdraw the single-fault case as a requirement. It remains a suggestion for the
 WAL copy of the comparison, which the existing case may not reach.
 
+**DR2, settled.** qa confirms that the existing case prints `FAIL DR2` on the build and `PASS DR2` on the `if false`
+mutant. That is the red proof, so the single-fault dump case is withdrawn. The WAL-segment case stays required (the
+architect @ `5fd52dd6`), and qa writes it with F6 and F7.
+
 ### DR8 when no scratch exists @ `a929a3fb` (`git diff a937f9a5..a929a3fb -- infra`: `drill.sh`, 2 lines)
 
 **Accepted.** On the branch where the two restores did not both come up, DR8 now prints FAIL instead of SKIP. The
