@@ -172,8 +172,16 @@ Q = quarantine. Steps 3–4 are prod only (staging has no backup service).
 
 The guard judges `current`'s render before step 2's `up`, on staging too. Every `compose` argv before step 5 names `current`'s directory and image refs (S12). `first-deploy` skips step 3: the
 project has never had a release, and before `provision --stage database` poly_backup does not exist. It refuses
-(`existing-data`, exit 4) when the project's Postgres data directory is non-empty, unless given `--existing-data`, which
-makes step 3 required (seceng A8: a lost state dir must not let real data migrate unbacked). The timer's `deploy` never skips it and refuses while the project has no `current` (`not-first-deployed`).
+(`existing-data`, exit 4) when the project's Postgres data directory is non-empty (seceng A8), with two ways through:
+- **Its own earlier attempt.** When the directory is empty and there is no `current`, `first-deploy` writes the root file
+  `state/deploy/<project>/first-attempt` before starting Postgres, and removes it when healthy. While it exists a rerun
+  proceeds and skips step 3. Without it the normal path is blocked: the first run starts Postgres, stops at
+  `roles-missing`, and the rerun finds a non-empty directory. A lost state directory has no such file.
+- **`--existing-data`,** which makes step 3 required on prod. No release exists then, so `backup.py` renders the ops
+  bundle's `prod.yml`, with `POLY_POSTGRES_IMAGE` from the running container and, for `POLY_APP_IMAGE` and
+  `POLY_TOOLS_IMAGE`, an all-zero digest that only satisfies `${…:?}` and cannot be pulled.
+
+The timer's `deploy` never skips step 3 and refuses while the project has no `current` (`not-first-deployed`).
 On the first deploy, `--plan` exit 2 naming `roles-missing` prints
 `run: sudo polycarpic-ops provision --stage database --project <p>` and exits 4.
 
@@ -232,8 +240,11 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
     fresh ACME account and fresh keys.
   - **These checks fail closed.** Only "no such name" (`EAI_NONAME`, `EAI_NODATA`) counts as not resolving; any other
     resolver error, a missing `POLY_DOMAIN` and a failing `compose ps` each count as "resolves" / "caddy exists" /
-    "prod exists". The wipe first removes every caddy container `compose ps` lists for `polycarpic-edge`, with or
-    without a staging `current`, and stops (`edge-wipe`) unless a second `ps` shows none.
+    "prod exists". The wipe first removes every caddy container `compose ps -a` lists for `polycarpic-edge`, with or
+    without a staging `current`, and stops (`edge-wipe`) unless a second `ps -a` shows none.
+    It then resolves `app.` once more and stops (`edge-prod-name-early`) before the recreate if the name appeared (A11).
+  - **One ownership decision per run (S16),** made before V7 and carried to step 8 and to rollback. A later check may only
+    take ownership away, never add it. `_edge_up` refuses a render this run has not judged.
   - **Order (S15).** Caddy retries a failed issuance in the background, so a running staging-era Caddy would obtain
     the certificate in the minutes between the record appearing and the wipe. The `app.` A/AAAA records are therefore
     created only **after** `first-deploy prod` has stopped, emptied and recreated caddy, and `first-deploy prod` prints
@@ -251,6 +262,7 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 | File | Content |
 |---|---|
 | `current`, `previous` | one line `<digest> <tag or -> <commit> <tree sha256> <UTC>` |
+| (both pointers) | absent is absent; present but unparsable stops the run with `state` (exit 1, no Q), for both projects and for `first-deploy` and `rollback`, and a bad prod `current` counts as "prod exists" (S17) |
 | `quarantine` | lines `<digest> <UTC> <reason>`; a `guard-<rule>` line adds a fourth field, the installed ops bundle id (`readlink /opt/polycarpic/ops/current`) |
 | `deploy.log` | append `<UTC> <event> <fields>`. Events are a closed set: `candidate verified refused transient busy quarantined not-newer premigration-set migrated up healthy rolled-back rollback-unhealthy` |
 | `alert` | one line `<UTC> <refusal or event>`. Written on every stop or rollback; removed on the next healthy run |
@@ -382,11 +394,11 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
 | T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
 | T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-prod-edge` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
-| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check; mutants where `EAI_AGAIN`, a missing `POLY_DOMAIN` or a failing `compose ps` reads as safe; mutant wiping under a running caddy when staging has no `current` |
+| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15). Resolver answering "resolves" then "no such name" on a staging-only host: no argv names edge; the reverse: edge skipped, `edge-prod-name` (S16). A truncated prod `current`, no prod containers: staging touches no edge and `first-deploy prod` wipes nothing (S17) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check; mutant resolving ownership twice; mutant reading a malformed `current` as absent; mutants where `EAI_AGAIN`, a missing `POLY_DOMAIN` or a failing `compose ps` reads as safe; mutant wiping under a running caddy when staging has no `current` |
 | T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
 | T10q | A `guard-<rule>` digest is skipped while the bundle id is unchanged; after the id changes it is judged again in full (deploys if it passes, is refused again if not). An `unhealthy` digest stays skipped after the same change | mutant lifting every reason; mutant never lifting; mutant lifting without V1 |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
-| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8) | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle |
+| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
 | T14 | `--pull never --no-build` on every compose up/run; only R4's `-f` files | mutant without `--pull never` |
 | T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
@@ -395,7 +407,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T18 | `HOST_ONLY` pin test fails on a third name; `set-secret github_read_token` refuses a `ghp_` value with exit 2; the sweep finds the token in no output or log (S8) | mutant pin with a third name; mutant without the shape check |
 | T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5); TEMPORARY to poly_backup on a **sibling** database, refused through the shared `pg_database` row. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read; mutant exempting every `pg_database` row |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
-| T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture |
+| T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture. A missing compose plugin fails, never skips |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped |
 
 Every refusal test asserts the exit code and the refusal name, and each guard has a positive case. Criterion 6 is
@@ -471,7 +483,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S15 (seceng `ruling-review.md` @ `ead8f7f9`): met by
+## S1–S17 (seceng `ruling-review.md` @ `faf490fa`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -492,4 +504,5 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S13 rollback through the guard | R5, R8; T8 |
 | S14 network judged by its resolved name | R5 `network`; T8 |
 | S15 `app.` record only after the prod wipe; `edge-prod-name-early` | R9 Order; T9; §L5. No `--caddy-never-staged` flag (reason in R9) |
-
+| S16 one edge-ownership decision per run | R9; T9 |
+| S17 malformed `current` is not absent | R10; T9 |
