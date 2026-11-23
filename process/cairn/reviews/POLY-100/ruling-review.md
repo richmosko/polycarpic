@@ -763,3 +763,27 @@ answers first, so outsiders cost nothing (by the Caddyfile's order, which S20 pi
 
 **Plan gate: open at `6747ce07`.** No condition of mine is open in the ruling. S11, S15 and A11 are withdrawn with strict. The build gates on
 every condition's test.
+
+## Draft: F1-F15 (architect-100, not yet in the ruling)
+
+**F1, F3: agree as drafted.** On F3's reuse path the existing directory also passes F8's owner check. **F4: agree with S31;** rendering from the judged file is better than
+my parse, because the second render no longer decides anything. **F2: agree with S32.** F5-F15: agree.
+
+**S31 (on F4).**
+- *(a) Render as nobody.* A local `include` may name a file a staging container can write (its Postgres data directory, say). The guard reads `env_file` from the
+  raw render and values from the plain one, so a file that changes between the two shows clean paths to the first and gives a root-only file's content to the second,
+  inside staging's environment. (b) does not help: that plain render **is** the judged one. So every `config` runs as uid and gid 65534 with no groups and no new
+  privileges (`setpriv`, inside the `unshare`), where no secret file is readable and the Docker socket is not reachable. What it needs is already world-readable
+  (release files, `images.env`, `edge.env`, the host and mail env files). Unmeasured that Compose renders so; the Linux test shows it.
+- *(b) Only local files of this release.* Same run, a second line: a service's `environment` in the plain render holds no key outside the raw render's own plus
+  those of its listed env files. Refusal `guard-env`.
+- *(c) The zero written back* is `ulimits.core` alone, and only where the policy pins it at zero (F14). Any other empty object where a number belongs is `guard-render`.
+- *Tests:* a root-only file as `env_file` through a local include fails the render; a canary in a 0400 root file never appears in a render; a file swapped between
+  the two renders is refused; red on mutants rendering as root and without (b).
+- *Consequence for INFRA:* the saved file bakes `host.env` and `mail.env` in, so an edit to them takes effect at the next deploy, not at a restart.
+
+**S32 (on F2's `in-progress`).** A power cut must not ban a good release for good. The first interruption of a digest rolls back with no quarantine and is tried again;
+a second for the same digest quarantines it (`interrupted`). The mark means the **candidate's** first `up`, not step 2's Postgres. It is removed once handled, so a first
+deploy with nothing to roll back to alerts once, not every poll. *Tests:* each of the three; red on a mutant that quarantines at once.
+
+A measure still owed before build: `unshare`, `setpriv` and an `up` from the saved file on Linux. The `up` needs the lead's go-ahead (a container run).
