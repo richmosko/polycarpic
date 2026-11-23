@@ -294,7 +294,7 @@ def tag_commit(ctx, tag):
     """V4: fetch the tag object into tags.git and verify its SSH signature against the installed signers. -> (commit, tag object's name)."""
     repo = tags_repo(ctx)
     ref = "refs/tags/" + tag
-    code, _, _ = git(ctx, ["--git-dir", repo, "fetch", "--no-tags", REPO_URL, "%s:%s" % (ref, ref)])
+    code, _, _ = git(ctx, ["--git-dir", repo, "fetch", "--no-tags", REPO_URL, "+%s:%s" % (ref, ref)])
     if code != 0:
         raise Transient("tag fetch failed")
     code, out, _ = git(ctx, ["--git-dir", repo, "cat-file", "-t", ref])

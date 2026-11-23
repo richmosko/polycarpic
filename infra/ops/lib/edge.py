@@ -74,6 +74,7 @@ def deploy(tag, ctx):
             ctx.err("deploy: internal error: %s" % err.__class__.__name__)
             if not run["up"]:
                 rel.alert(ctx, "edge", "internal")
+                ctx.err("deploy: refused internal")
                 return 1
             return _unhealthy(ctx, seen["digest"], run["cur"], guarded=True)
     except rel.Transient as err:
@@ -99,6 +100,7 @@ def _run(tag, ctx, work, seen, run):
     if why:
         raise why
     deployer.require_data_mount(ctx)
+    deployer.check_edge_env(ctx)  # F10, before any network call and so before V1
     cur = rel.load_pointer(ctx, "edge", "current")
     rel.load_pointer(ctx, "edge", "previous")
     run["cur"] = cur
@@ -119,7 +121,6 @@ def _run(tag, ctx, work, seen, run):
         raise Refusal("quarantined")
     commit = rel.tag_commit(ctx, tag)
     rel.log(ctx, "edge", "candidate", digest, commit)
-    deployer.check_edge_env(ctx)  # F10, before V1
     deployer.check_staging_auth(ctx)
     rdir, images, created = deployer._verify("edge", ctx, tok, work, digest, commit)
     deployer.clear_transient(ctx, "edge")

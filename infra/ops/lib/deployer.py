@@ -96,6 +96,7 @@ def _handle_interrupted(project, ctx, cur):
     digest = ip.strip()
     if not rel.DIGEST.fullmatch(digest):
         raise Refusal("state")
+    rel.log(ctx, project, "refused", "interrupted", digest)
     rel.alert(ctx, project, "interrupted")
     prev = rel.read(ctx, project, "interrupted")
     if prev is not None and prev.strip() == digest:
@@ -115,10 +116,12 @@ def _handle_interrupted(project, ctx, cur):
 def _internal(project, ctx, err, digest, run):
     """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it R8's automatic rollback."""
     rel.log(ctx, project, "refused", "internal", digest)
-    ctx.err("deploy: internal error: %s" % err.__class__.__name__)
     if not run["up"]:
+        ctx.err("deploy: internal error: %s" % err.__class__.__name__)
         rel.alert(ctx, project, "internal")
+        ctx.err("deploy: refused internal")
         return 1
+    ctx.err("deploy: internal error: %s" % err.__class__.__name__)
     try:
         return _rollback_auto(project, ctx, digest, run["cur"], run["owns"], run["probe"])
     except Exception:
@@ -159,6 +162,9 @@ def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
     cur = rel.load_pointer(ctx, project, "current")
     rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)
     run["cur"] = cur
+    since = rel.read(ctx, project, "transient-since")  # F12: a malformed mark stops the run with `state`
+    if since is not None and rel.ts.parse(since.strip()) is None:
+        raise Refusal("state")
     _handle_interrupted(project, ctx, cur)
     if cur:  # a leftover first-attempt file beside `current` has no effect and is removed (S19)
         _unlink(ctx, project, "first-attempt")
