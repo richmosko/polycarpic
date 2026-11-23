@@ -246,6 +246,19 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
   - The decrypted files sit in a `mktemp -d` directory, removed on exit unless `--keep`.
 - **Exit:** 0 restored; 1 restore failed; 2 usage; 3 selection refused; 4 integrity or replay; 5 the box or bucket
   refused, or a box line failed validation.
+- *(Correction, from seceng's build review F1 and F2, `build-review.md` @ `78b0b0a6`.)*
+  - **A stray bucket key is skipped, not fatal.** A record whose key or `fileId` fails C5 is left out, is never used
+    as a path or key, and is counted. `restore.sh` prints `WARN <n> stray objects in the bucket` and goes on.
+    `drill.sh` fails DR1, giving the count.
+  - **A two-version name is passable (C9).** `--before` cannot pass one, because every version up to the cutoff
+    still counts. So:
+    - the refusal lists `version <fileId> <upload time> <key> sibling yes|no`, with `hide marker` where one exists;
+    - a new repeatable `--accept-version <fileId>` takes that version for its name and prints `WARN accepting
+      version …`;
+    - a `fileId` belonging to no chosen name exits 2;
+    - the sibling check still applies, so accepting a bad version exits 4;
+    - this holds for WAL keys under `--base` too;
+    - the drill stays FAIL DR1.
 
 ## R8 — `infra/drill.sh` (the §6.7 assertions)
 
