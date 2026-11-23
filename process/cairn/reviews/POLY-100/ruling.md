@@ -101,7 +101,7 @@ the image was attested at is therefore refused by V1 as `attestation` (no Q, as 
 ## R4 — The release bundle is data (F5, F8, R-b; seceng D7, D8, hole 5)
 
 - Extraction: `docker create --name polycarpic-bundle-<12 hex> <ref>@<digest>` (never started), then
-  `docker cp <cid>:/app/infra -`, then `docker rm`.
+  `docker cp <cid>:/release/infra -` (F1), then `docker rm`.
   - The tar goes through a filter. It refuses: symlinks, hardlinks, devices, FIFOs, setuid/setgid bits, absolute or `..`
     paths, and any path outside the fixed manifest: `infra/compose/{prod,staging,edge}.yml`, `infra/caddy/Caddyfile`,
     `infra/postgres/**` (config and `archive-wal.sh`), `infra/backup/{backup,upload}.sh`, `infra/postgres-major`,
@@ -116,13 +116,14 @@ the image was attested at is therefore refused by V1 as `attestation` (no Q, as 
   `POLY_APP_IMAGE=ghcr.io/richmosko/polycarpic@<digest>`. The bundle file holds exactly `POLY_POSTGRES_IMAGE`,
   `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE`, each `=ghcr.io/richmosko/polycarpic-<postgres|tools|caddy>@sha256:<64>`,
   with name↔repo fixed. It is written root 0644 by atomic rename, only after V5.
-- Every compose call is `-p polycarpic-<project> --project-directory releases/<d>/infra/compose -f releases/<d>/infra/compose/<project>.yml --env-file releases/<d>/images.env`.
+- Every compose **`config`** call is `-p polycarpic-<project> --project-directory releases/<d>/infra/compose -f releases/<d>/infra/compose/<project>.yml --env-file releases/<d>/images.env`.
   - Edge is its own project: `-p polycarpic-edge`, `-f …/edge.yml`, plus `--env-file /etc/polycarpic/edge.env`. `up` runs
     on every prod run and compose decides whether anything changed: an equal Caddy image does not mean an
     equal `edge.yml`.
+  - Every other compose call names only the judged render with `-f` (F4).
   - The installed script fixes the project, the kind and the files; the bundle cannot choose any of them (seceng D10).
-- **R-b:** `lib/compose.py` resolves compose files from `releases/<project>-current` (a root symlink) when it exists, else
-  from the ops bundle. `backup.py` (`BUNDLE_COMPOSE`), `upload.py`, `cli.py` and `set_secret.py` all go through it.
+- **R-b:** `lib/compose.py` gives the judged render of the project's `current` (F4) when one exists, else the ops bundle's file;
+  secrets are parsed from `releases/<project>-current` (a root symlink). `backup.py` (`BUNDLE_COMPOSE`), `upload.py`, `cli.py` and `set_secret.py` all go through it.
 - After a healthy prod run, `/opt/polycarpic/images.env` becomes that release's `images.env` (tmp + rename, root 0644).
 
 ## R5 — The compose guard: the bundle does not judge itself (seceng holes 1, 2, 4; D6, D9, D10)
@@ -421,6 +422,35 @@ These checks go into `assertRoles`, which runs for both apply and `--plan`, befo
 - **(c)** Memberships, which `pg_shdepend` does not record (S5): poly_backup is a member of exactly `{pg_read_all_data}`,
   without ADMIN, and no role is a member of poly_backup.
 
+## F — Build review findings (seceng `build-review.md` @ `3bbc6626`; agreed `ruling-review.md` @ `8dc05b4d`, S31, S32)
+
+All fifteen are in this loop. Where an earlier rule differs, this table rules. F1 and F4 trace to this ruling: R13's seam let the bundle be built from the code's own list, and
+M8 was taken as enough to drop the parse. No YAML parse is added: the box's Python runs `-IS` without PyYAML, and a second parser can disagree with Compose's.
+
+Measured (this Mac, Compose v5.7.0, `config` only, no container, committed fixtures): a plain JSON render saved and rendered again is equal for `edge`; for `prod` and `staging` it
+differs only in `ulimits.core` (JSON drops a zero, and Compose refuses `{}` as input), and with `0` written back both load and print `{}` again. `$$` survives.
+**Owed before the build relies on it, on Linux, `(unmeasured)`:** `unshare` with `setpriv` around `config`, and an `up` from a saved render (a container run: the lead's go-ahead).
+
+| # | Rule | Test | Red on |
+|---|---|---|---|
+| F1 | The Dockerfile's build stage assembles `/release/infra/…` from R4's exact manifest (a missing file fails the build) and the runtime stage copies it root-owned and read-only. R4 reads `docker cp <cid>:/release/infra -`. R4 and T6 keep refusing anything off the manifest. `image.sh build` writes an all-zero `infra/release/images.env` when none exists (PR, local); `build.yml` writes the real one first, and V5 refuses zeros | (i) `image` job: `docker create` + `cp` of `polycarpic:ci`, fed to the installed `read_tar`: accepted, exactly the manifest (it also settles PAX headers and owners in a real tar); ≤ 5 s; the job also runs when `infra/ops/lib/release.py` changes. (ii) lint static: the Dockerfile's list equals `release.py`'s. (iii) the harness builds bundles from the Dockerfile's list, not from `FILES` | mutant Dockerfile copying all of `infra/`; one file dropped from either list; `cp` of `/app/infra` |
+| F2 | A child that times out, dies or prints non-UTF-8 (decoded with `errors="replace"`) is a failed child: health reads say "not healthy". Each health child's timeout is min(30 s, what is left of the 120 s); `FETCH` has a 5 s abort. One handler above `_deploy`, `edge.deploy`, `rollback`: any other exception before the first `up` → refusal `internal` (alert, no Q, exit 1); after it → R8's automatic rollback, with `internal` logged; an exception inside rollback → `rollback-unhealthy`. Always an alert. Before the first `up` the run writes `in-progress` (digest), removed at the end; it marks the **candidate's** first `up`, not step 2's Postgres. A run that finds one alerts `interrupted` and rolls back first (power loss, or systemd's 90 min kill): the first time for a digest without quarantine, and it is tried again; the second time quarantined (`interrupted`). The mark is removed once handled, so a first deploy with nothing to go back to alerts once (S32) | each of `exec`, `ps`, `inspect`, `up` hanging; a raise from any later call; non-UTF-8 output; a raise inside rollback; a leftover `in-progress`: first, second, and on a first deploy (S32); the 120 s is kept with every read hanging | mutant without the handler; mutant treating a timeout as healthy; mutant ignoring `in-progress`; mutant quarantining at once |
+| F3 | Extract, verify siblings and write `images.env` in `.incoming-*`. If `sha256-<d>` exists, it is used only when it passes F8's owner check and its tree hash equals the incoming one, else refusal `release-tree` (no Q, alert); it is never rewritten. If not, rename. A run removes only a directory it renamed itself, and only when no project's (prod, staging, edge) `current` or `previous` names it; an unreadable pointer counts as naming all. Prune uses the same test. Leftover `.incoming-*` is removed at the start of a run, under the lock | seceng's two probes (staging's X untouched when `first-deploy prod` of X is refused, and when a sibling pull fails); a tampered existing tree: `release-tree`; prune with an unreadable pointer removes nothing | mutant deleting before rename; mutant removing on refusal by digest; mutant pruning on its own project's pointers |
+| F4 | **(a) No network at render.** Every render runs as `unshare --net -- setpriv --reuid 65534 --regid 65534 --clear-groups --no-new-privs -- docker compose … config` (S31 a: as nobody, where no secret file is readable and the Docker socket is out of reach), with `HOME` and `XDG_CACHE_HOME` an empty root 0755 directory (no cached remote) and `COMPOSE_EXPERIMENTAL_GIT_REMOTE=0`, `COMPOSE_EXPERIMENTAL_OCI_REMOTE=0`. A remote include cannot be fetched, so it fails: `guard-render`, Q. A local one is resolved and judged. **(b) What was judged is what starts.** The judged plain JSON (with `ulimits.core` `{}` written back as `0`, only where the policy pins it at zero; any other empty object where a number belongs is `guard-render`, S31 c) is written root 0600 to `state/deploy/<project>/render-<12 hex of digest>.json`, rendered once more (same isolation; root passes it on stdin, `-f -`, because nobody cannot read it) and must equal the judged one, else `guard-render`. **Every** other compose call (`up`, `run`, `exec`, `ps` with files, rollback, edge, and R-b's `backup.py`, `upload.py`, `cli.py`) names only that file with `-f`; a bundle's compose file is named by `config` alone. Rollback renders, judges and writes afresh. A service's plain `environment` holds no key outside its raw one plus its listed env files' keys: `guard-env` (S31 b). S7's exception becomes: a `releases/` path only as `config`'s `-f`, `--env-file`, `--project-directory` | Linux, in T-render's lint step, fails rather than skips in CI: `include: oci://127.0.0.1:<port>` and a git URL against a listener in the host namespace: no connection, refused. Unit: every compose argv but `config` names a `state/…/render-*.json`; every `config` argv starts `unshare --net --`. The fixed point holds for the three real files; a judged file changed on disk between judge and `up`: refused (hash re-read). S31: a root-only file as `env_file` through a local include fails the render; a 0400 root canary never appears in a render; a file swapped between the two renders is refused | mutant without `unshare`; mutant upping the bundle file; mutant skipping the fixed point; mutant rendering as root; mutant without the key check |
+| F5 | Only `FileNotFoundError` is absent. Any other error on `current`, `previous`, `quarantine`, `first-attempt`, `in-progress`: `state`. A malformed quarantine line: `state`; the file is never rewritten from a partial read | unreadable and malformed `quarantine` and `current`, each project: nothing upped, file unchanged | mutant reading `OSError` as absent |
+| F6 | All five fields per project: tag `v1.*` / `edge-<n>` / `-`; tree 64 hex; time `YYYY-MM-DDTHH:MM:SSZ`; digest; commit. A miss: `state`. `tree()` never returns `-`: an unhashable tree is `release-tree` | each field bad, each project; seceng's v1.5.0 → v1.0.0 | mutant validating digest and commit only |
+| F7 | `edge-deploy` and `first-deploy` on `transient`: exit 1, cause on stderr, no alert. The timer keeps exit 0 | both commands | mutant exit 0 |
+| F8 | Rollback (auto, manual, edge) checks `releases/<d>` root-owned and not group- or world-writable, parents included, before R5 | group-writable file, foreign owner | mutant without it |
+| F9 | `_edge_up` takes the judged render's path and digest and refuses any other | unjudged and other-release renders | mutant constant |
+| F10 | `edge.env` unreadable or missing a key: prod and `edge-deploy` refuse `edge-env` before V1. The rollback's probe is required only when the baseline was 200, on every path | both | mutant reading it as "no probe" |
+| F11 | The guard refusing `current` is `current-guard-<rule>`: alert, no Q, name only | candidate not quarantined, retried next poll | mutant Q |
+| F12 | `transient-since` holds the first of an unbroken run of transients (removed by any run that gets past V5 or finds nothing new). Older than 1 h: alert `transient-stale` | 59 min none, 61 min alert, success clears | mutant never alerting |
+| F13 | Every deploy, `first-deploy`, `edge-deploy` and rollback requires `/srv/polycarpic` to be a mount point (device differs from its parent; seam `ctx.ismount`): `data-mount`, exit 4, nothing touched | unmounted: refused; `first-attempt` not written | mutant without it |
+| F14 | `logging`, `ulimits`, `mem_limit`, `tmpfs` join R5's `pinned` values | operator with `json-file`; a raised `core`; a larger tmpfs | mutant per key |
+| F15 | One-off runs get `--name polycarpic-<project>-<svc>` and a stale one is removed first. On timeout: `docker rm -f`, then `inspect` must show it gone, before any lock is released; if it is not gone: `oneoff-stuck`, alert, Q, exit 1 (a later run refuses while it exists). `migrate`'s client timeout is 30 min, above the runner's 10 min lock wait (today both are 600 s, so exit 4 can lose to the timeout); timed out → `migrate-timeout`, Q | hanging migrate: removed before `backup.lock` is free; stuck one; lock wait exit 4 still seen | mutant releasing the lock first; mutant at 600 s |
+
+**For INFRA:** the saved render bakes `host.env` and `mail.env` in, so an edit to them takes effect at the next deploy, not at a restart.
+
 ## R13 — The tests
 
 **Seam.** Unit level is `tests/infra/ops/test_deploy.py` on the POLY-98 harness (`base.py`: temp root, every outside call
@@ -428,11 +458,12 @@ faked, subprocess and sockets raise); `ctx.run` dispatches on `argv[0]` and logs
 
 | Seam | Behaviour |
 |---|---|
-| fake registry (`docker`) | dict `ref@digest → {labels, bundle tar}`; `pull` only if present; `inspect`/`create`/`cp` from the dict; `compose … config` (raw and plain) is real `docker compose config` where the runner has it, else committed fixture JSON for both; `compose up`/`run` follow scripted health over fake time |
+| fake registry (`docker`) | dict `ref@digest → {labels, bundle tar}`, the tar built from the Dockerfile's list (F1); `pull` only if present; `inspect`/`create`/`cp` from the dict; `compose … config` (raw and plain) is real `docker compose config` where the runner has it, else committed fixture JSON for both; `compose up`/`run` follow scripted health over fake time |
 | fake gh | `api` (runs, releases) and `run download` from fixtures; `attestation verify` passes or fails per (digest, `--source-digest`) |
 | real git | `git` and `ssh-keygen` in the temp root for V4 and the staging ancestry check; two keys, one in `allowed_signers` |
-| bytes child | new `ctx.run_bytes(argv, timeout=, extra_env=) -> (code, bytes, err_text)` with `fixed_env`, as qa pinned (test-plan Pins 1): R4's `docker cp <cid>:/app/infra -` is read through it, since `ctx.run` is text-mode; the tool refuses `bundle` when the tar exceeds 64 MiB `(unmeasured)`: the bundle's real size is not measured |
+| bytes child | new `ctx.run_bytes(argv, timeout=, extra_env=) -> (code, bytes, err_text)` with `fixed_env`, as qa pinned (test-plan Pins 1): R4's `docker cp <cid>:/release/infra -` is read through it, since `ctx.run` is text-mode; the tool refuses `bundle` when the tar exceeds 64 MiB `(unmeasured)`: the bundle's real size is not measured |
 | owner | `ctx.owner_of(fd, logical_path) -> (uid, gid)`; production is `os.fstat(fd)` and ignores the path. Faked for the two staging-auth paths only, because a non-root test user cannot chown to 10010; used by staging-auth's command and check alone. The fake cannot show the real read, so the box fixture's real-root case also checks a real `root:10010` file and directory (accepted) and one in another group (refused) |
+| mount | `ctx.ismount(path)` (F13) |
 | stdin, https | `ctx.stdin` (`allowed-signers install`); `ctx.https_status(host, addr, path)` (R7) |
 | premigration | `polycarpic-ops backup premigration` scripted exit and stdout (the command is POLY-99's, tested there) |
 | box fixture (vitest, provision job) | the POLY-97 box with the real ops bundle and `fakes-ops/` extended with the same fakes; at most three cases: a staging deploy end to end, one refusal, units and paths under a real root |
@@ -455,7 +486,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T4 | Monotonic: prod highest semver, not newest; lower than `current` refused; staging candidate not descending from `current` (a re-run of an old run) refused | mutant picking by date; mutant without the ancestry check |
 | T5 | A sibling failing V1, or attested at another commit, stops the deploy | mutant skipping siblings |
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
-| T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
+| T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but a `config` call's `-f`/`--env-file`/`--project-directory` values (S7, F4) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
 | T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-edge-prod`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-edge-prod` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
 | T9 | **No staging run names edge.** With and without a prod `current`, with and without prod containers, with a changed Caddyfile and caddy digest: no argv names `polycarpic-edge`, `edge.yml` or `caddy`; caddy and its mounts unchanged; auto and manual staging rollback the same. `first-deploy prod` and a later prod run bring edge up from their own judged render. A truncated `current`: the run stops with `state`, nothing upped, for deploy, `first-deploy` and `rollback` (S17). With no edge up, both edge networks present from provision, staging's `check-config` and `up` succeed | mutant letting staging up edge when prod has no `current`; mutant upping an unjudged edge render; mutant reading a malformed `current` as absent |
 | T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
@@ -463,7 +494,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; the same with one user table, or the read failing: step 3 runs; a leftover file beside `current` has no effect (S19); `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty; mutant trusting the file alone |
 | T13 | Criterion 5 inputs, in the ops unit harness (the POLY-97 box cannot host a deploy). (a) The real `backup premigration` makes a set and prints its line; the real `list-premigration` lists it; a prod deploy logs that line; logged equals listed, field for field, and passes `restore-lib.sh`'s own patterns. (b) **Parity:** POLY-99's `roundtrip.test.ts` restores a real `backup.sh` set into a scratch, but against `fake_box.py`, not the real command. On one directory (a complete set pending, one uploaded, an incomplete one), `fake_box.py` and the real command print the same list, byte for byte, and `fetch-premigration` gives the same bytes. (a), (b) and the round trip together prove criterion 5. Not proven: the backup container run from `releases/prod-current` under real compose (staging has no backup), for the first prod deploy; the timing, POLY-116 | qa's two mutants; mutants of `fake_box.py` and of `_list` that swap two fields |
-| T14 | `--pull never --no-build` on every compose up/run; only R4's `-f` files | mutant without `--pull never` |
+| T14 | `--pull never --no-build` on every compose up/run; only R4's and F4's `-f` files | mutant without `--pull never` |
 | T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
 | T16 | Two deploys together: the second exits 0 `busy` and touches nothing | mutant without `-n` |
 | T17 | `allowed-signers install`: a `cert-authority` line, a second-namespace line, an `ecdsa` key: each exit 2, nothing written; the plain form passes (S9) | mutant accepting any options |
@@ -488,10 +519,10 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 
 | Job | May add | Holds |
 |---|---|---|
-| image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
-| provision | ≤ 40 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
+| image | ≤ 5 s | F1's real-tar case only; the POLY-99 backup suite (386 s) stays as it is |
+| provision | ≤ 46 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
 | db | ≤ 10 s after the restructure below; if qa then measures more, ≤ 15 s stands with no case dropped. Today: +12 to +20 s (qa, same day; main 13.1–13.4 s) | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
-| lint | ≤ 15 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
+| lint | ≤ 20 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
 **T-pre restructure** (qa; every fault stays, apply and `--plan` each). All faults share one database and one sibling, created once with the
 fault objects; each fault stays its own `it` and undoes itself. Sharing is sound only with these, which the present cases lack:
@@ -530,7 +561,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S30 (seceng `ruling-review.md`): met by
+## S1–S32 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -546,4 +577,4 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
 | S28 | R9 edge step 2; T-edge | S29 (a, b), S30 | R11 `staging-auth`; T-sauth |
-| A13 | R7; T-probe | | |
+| A13 | R7; T-probe | S31, S32 | F4, F2 |
