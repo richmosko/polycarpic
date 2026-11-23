@@ -787,3 +787,13 @@ a second for the same digest quarantines it (`interrupted`). The mark means the 
 deploy with nothing to roll back to alerts once, not every poll. *Tests:* each of the three; red on a mutant that quarantines at once.
 
 A measure still owed before build: `unshare`, `setpriv` and an `up` from the saved file on Linux. The `up` needs the lead's go-ahead (a container run).
+
+## `c52458c8..74714230` (section F; T13)
+
+**Met:** F1-F15 as agreed, S31 and S32 folded in whole; the re-render on stdin and the 0755 HOME are right. R4, R-b, S7's exception, T7 and T14 follow. T13: no objection.
+
+**S33, two small edits.** *(a)* R-b falls back to the ops bundle's compose file when no judged render exists. With a `current` present, a missing or unreadable render stops
+the command (`state`); the fallback is for a box with no release only. *(b)* S32 needs the first interruption remembered: name the file, read it by F5's rule. *Tests:* each, red on
+a mutant that falls back, and on one that forgets. **Advisory A17:** prune removes a pruned release's `render-*.json`.
+
+**Still owed:** the three Linux measurements. If any fails, F4 comes back to a ruling before it is built. The mutants named in `build-review.md` are unchanged.
