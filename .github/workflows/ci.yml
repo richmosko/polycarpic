@@ -156,6 +156,7 @@ jobs:
       image: ${{ steps.filter.outputs.image }}
       ci: ${{ steps.filter.outputs.ci }}
       provision: ${{ steps.filter.outputs.provision }}
+      backup: ${{ steps.filter.outputs.backup }}
       e2e: ${{ steps.filter.outputs.e2e }}
       db_auth: ${{ steps.filter.outputs.db_auth }}
       db_tenancy: ${{ steps.filter.outputs.db_tenancy }}
@@ -184,7 +185,7 @@ jobs:
           # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_BASE" ]; then
-              printf '%s\n' node=true layers=true db=true image=true ci=true provision=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
+              printf '%s\n' node=true layers=true db=true image=true ci=true provision=true backup=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
@@ -596,7 +597,7 @@ jobs:
   image:
     name: image
     needs: changes
-    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true'
+    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.backup == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -663,13 +664,17 @@ jobs:
           bash infra/ci/image.sh scan polycarpic-postgres:ci
           bash infra/ci/image.sh scan polycarpic-caddy:ci
 
-      - name: Install age and the PostgreSQL client (the restore and drill tests decrypt and pg_restore on the runner)
-        if: needs.changes.outputs.image == 'true'
-        run: sudo apt-get update -y > /dev/null && sudo apt-get install -y --no-install-recommends age postgresql-client > /dev/null
-
-      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage, backup)
+      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage)
         if: needs.changes.outputs.image == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
+
+      - name: Install age and the PostgreSQL client (the restore and drill tests decrypt and pg_restore on the runner)
+        if: needs.changes.outputs.backup == 'true'
+        run: sudo apt-get update -y > /dev/null && sudo apt-get install -y --no-install-recommends age postgresql-client > /dev/null
+
+      - name: Backup, uploader, restore and drill container tests
+        if: needs.changes.outputs.backup == 'true'
+        run: pnpm exec vitest run -c tests/infra/vitest.backup.config.ts
 
       - name: Record timing
         if: always()
