@@ -291,8 +291,11 @@ These checks go into `assertRoles`, which runs for both apply and `--plan`, befo
   for FOR ROLE), ownership, and policies `TO poly_backup` (`r`, refused too). It misses settings, attributes and
   memberships, which (b) and (c) read directly.
   - Objects in a **sibling** database are not swept, because they cannot be inspected without connecting there.
-  - This loses nothing on the box: `pg_hba.conf` admits poly_backup only to `polycarpic` and replication, and rejects
+  - This loses nothing on the box: `pg_hba.prod.conf` admits poly_backup only to `polycarpic` and replication, and rejects
     it for `all` other databases (C-79). A grant in another database is unreachable to it.
+  - The CI `pg-hba-prod` rule (`infra/lint/compose-policy.mjs`) names R12(a) in its comment and message: "the four
+    C-79 lines must come first, in order; R12(a)'s preflight sweeps only this database and relies on it". A change that
+    widens pg_hba must widen this sweep in the same PR (devops builds the edit).
   - A cluster-wide sweep would also refuse every runner test, because each `freshDb()` leaves a CONNECT row behind.
 - **(b)** poly_backup's attributes must be exactly roles.sql's: LOGIN, REPLICATION, BYPASSRLS, not
   SUPERUSER/CREATEDB/CREATEROLE, CONNECTION LIMIT 3. Its `pg_db_role_setting` must be exactly
@@ -345,7 +348,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T16 | Two deploys together: the second exits 0 `busy` and touches nothing | mutant without `-n` |
 | T17 | `allowed-signers install`: a `cert-authority` line, a second-namespace line, an `ecdsa` key: each exit 2, nothing written; the plain form passes (S9) | mutant accepting any options |
 | T18 | `HOST_ONLY` pin test fails on a third name; `set-secret github_read_token` refuses a `ghp_` value with exit 2; the sweep finds the token in no output or log (S8) | mutant pin with a third name; mutant without the shape check |
-| T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5). It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read |
+| T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5); TEMPORARY to poly_backup on a **sibling** database, refused through the shared `pg_database` row. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read; mutant exempting every `pg_database` row |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it | mutant compose keeping `DB_PASSWORD_FILE` |
 
