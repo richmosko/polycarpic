@@ -21,7 +21,11 @@ def run(args, ctx):
         ctx.err("rollback: the deploy lock was not got in 10 minutes")
         return 4
     try:
-        cur, prev = rel.load_pointer(ctx, project, "current"), rel.load_pointer(ctx, project, "previous")
+        try:
+            cur, prev = rel.load_pointer(ctx, project, "current"), rel.load_pointer(ctx, project, "previous")
+        except rel.Refusal:
+            ctx.err("rollback: a state pointer is present but unparsable: stopped (state)")
+            return 1
         if not cur or not prev:
             ctx.err("rollback: there is no previous release")
             return 4

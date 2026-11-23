@@ -77,6 +77,20 @@ def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
     return code, b"".join(chunks), (errbuf[0] if errbuf else b"").decode("utf-8", "replace")
 
 
+def _real_https_status(host, addr, path):
+    """GET https://<host><path> at <addr>:443 with <host> as SNI and Host, full certificate verification, no redirect followed, 10 s. -> status code."""
+    context = ssl.create_default_context()
+    with socket.create_connection((addr, 443), timeout=10) as raw:
+        raw.settimeout(10)
+        with context.wrap_socket(raw, server_hostname=host) as tls:
+            tls.sendall(("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nUser-Agent: polycarpic-ops\r\n\r\n" % (path, host)).encode("ascii"))
+            head = tls.recv(256).decode("latin-1", "replace")
+    parts = head.split(" ", 2)
+    if len(parts) < 2 or not parts[0].startswith("HTTP/") or not parts[1].isdigit():
+        raise OSError("not an HTTP response")
+    return int(parts[1])
+
+
 def _real_resolve(name):
     return sorted(set(info[4][0] for info in socket.getaddrinfo(name, None)))
 
@@ -145,7 +159,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, resolve=None, stdin=None):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, resolve=None, stdin=None, https_status=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -165,6 +179,7 @@ class Ctx:
         self.stdin = stdin or sys.stdin
         self._run_bytes = run_bytes or _real_run_bytes
         self._resolve = resolve or _real_resolve
+        self._https_status = https_status or _real_https_status
 
     def p(self, logical):
         """A host path under the root: root-prefixed in tests, the path itself in production."""
@@ -188,6 +203,9 @@ class Ctx:
 
     def resolve(self, name):
         return self._resolve(name)
+
+    def https_status(self, host, addr, path):
+        return self._https_status(host, addr, path)
 
     def run_inherit(self, argv, extra_env=None):
         self._check(argv)

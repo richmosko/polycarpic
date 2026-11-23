@@ -27,7 +27,7 @@ SIBLINGS = ("postgres", "tools", "caddy")
 IMAGE_KEYS = ("POLY_POSTGRES_IMAGE", "POLY_TOOLS_IMAGE", "POLY_CADDY_IMAGE")
 LABEL = "org.opencontainers.image.revision"
 EVENTS = ("candidate", "verified", "refused", "transient", "busy", "quarantined", "not-newer", "premigration-set", "migrated", "up", "healthy",
-          "rolled-back", "rollback-unhealthy")
+          "rolled-back", "rollback-unhealthy", "edge-probe-baseline")
 
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -99,25 +99,56 @@ def clear_alert(ctx, project):
         pass
 
 
+BUNDLE_ID = re.compile(r"(git|sha256)-[0-9a-f]{12}")
+
+
+def bundle_id(ctx):
+    """The installed ops bundle id (readlink of /opt/polycarpic/ops/current), or None when unreadable or malformed."""
+    try:
+        name = os.path.basename(os.readlink(ctx.p("/opt/polycarpic/ops/current")))
+    except OSError:
+        return None
+    return name if BUNDLE_ID.fullmatch(name) else None
+
+
 def quarantine(ctx, project, digest, reason):
+    """A `guard-<rule>` line adds a fourth field, the installed bundle id: it lifts once another bundle is installed (R8, S18)."""
     path = os.path.join(sdir(ctx, project), "quarantine")
     prev = ts.read_text(path) or ""
-    put(ctx, project, "quarantine", prev + "%s %s %s\n" % (digest, now_utc(ctx), reason))
+    extra = ""
+    if reason.startswith("guard-"):
+        extra = " " + (bundle_id(ctx) or "-")
+    put(ctx, project, "quarantine", prev + "%s %s %s%s\n" % (digest, now_utc(ctx), reason, extra))
 
 
 def quarantined(ctx, project):
+    """The digests the poll skips. A digest with a non-guard reason is skipped for good; one with only `guard-<rule>` lines is skipped
+    only while the installed bundle id equals the stored one; a missing or malformed id on either side keeps it."""
     text = read(ctx, project, "quarantine") or ""
-    return set(line.split(" ", 1)[0] for line in text.splitlines() if line)
+    now = bundle_id(ctx)
+    held = {}
+    for line in text.splitlines():
+        parts = line.split(" ")
+        if len(parts) < 3:
+            continue
+        digest, reason = parts[0], parts[2]
+        if reason.startswith("guard-"):
+            stored = parts[3] if len(parts) > 3 else None
+            lifts = bool(stored and BUNDLE_ID.fullmatch(stored) and now and stored != now)
+            held[digest] = held.get(digest, False) or not lifts
+        else:
+            held[digest] = True
+    return set(d for d, h in held.items() if h)
 
 
 def load_pointer(ctx, project, name):
-    """`current` / `previous`: -> dict(digest, tag, commit, tree, at) or None."""
+    """`current` / `previous`: -> dict(digest, tag, commit, tree, at), None when the file is absent; present but unparsable is the refusal `state` (S17)."""
     text = read(ctx, project, name)
-    if not text:
+    if text is None:
         return None
     parts = text.strip().split(" ")
     if len(parts) != 5 or not DIGEST.fullmatch(parts[0]) or not SHA.fullmatch(parts[2]):
-        return None
+        raise Refusal("state")
     return dict(digest=parts[0], tag=parts[1], commit=parts[2], tree=parts[3], at=parts[4])
 
 

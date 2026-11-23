@@ -187,5 +187,76 @@
         "target": "/etc/caddy/Caddyfile"
       }
     ]
+  },
+  "caddyAllow": {
+    "{": {
+      "admin off": 1,
+      "http_port 8080": 1,
+      "https_port 8443": 1,
+      "log {": 1,
+      "output stderr": 1,
+      "format filter {": 1,
+      "request>uri regexp \"^(/api/auth/[^/?#]*)[^?#]*|[?#].*\" \"${1}\"": 1,
+      "request>headers>Referer delete": 1,
+      "}": 2
+    },
+    "(security_headers)": {
+      "header {": 1,
+      "defer": 1,
+      "Strict-Transport-Security \"max-age=31536000\"": 1,
+      "X-Content-Type-Options \"nosniff\"": 1,
+      "X-Frame-Options \"DENY\"": 1,
+      "Referrer-Policy \"strict-origin-when-cross-origin\"": 1,
+      "}": 1
+    },
+    "(no_store)": {
+      "@mutable not path /_app/immutable/*": 1,
+      "header @mutable {": 1,
+      "defer": 1,
+      "Cache-Control \"no-store\"": 1,
+      "}": 1
+    },
+    "(upstream)": {
+      "header_up X-Forwarded-For {remote_host}": 1,
+      "header_up -X-Real-IP": 1,
+      "header_up -Forwarded": 1,
+      "lb_try_duration 10s": 1
+    },
+    "http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN}": {
+      "import security_headers": 1,
+      "redir https://{host}{uri} permanent": 1
+    },
+    "app.{$POLY_DOMAIN}": {
+      "tls {$POLY_TLS}": 1,
+      "import security_headers": 2,
+      "import no_store": 1,
+      "handle_errors {": 1,
+      "}": 4,
+      "route {": 1,
+      "@sw header Service-Worker *": 1,
+      "respond @sw 403": 1,
+      "@auth path /api/auth /api/auth/*": 1,
+      "reverse_proxy @auth prod-auth:3000 {": 1,
+      "import upstream": 2,
+      "reverse_proxy prod-web:3000 {": 1
+    },
+    "staging.{$POLY_DOMAIN}": {
+      "tls {$POLY_TLS}": 1,
+      "import security_headers": 2,
+      "import no_store": 1,
+      "handle_errors {": 1,
+      "}": 5,
+      "route {": 1,
+      "@denied not remote_ip {$POLY_STAGING_ALLOW}": 1,
+      "respond @denied 403": 1,
+      "@sw header Service-Worker *": 1,
+      "respond @sw 403": 1,
+      "basic_auth {": 1,
+      "import /run/secrets/staging_basic_auth": 1,
+      "@auth path /api/auth /api/auth/*": 1,
+      "reverse_proxy @auth staging-auth:3000 {": 1,
+      "import upstream": 2,
+      "reverse_proxy staging-web:3000 {": 1
+    }
   }
 }

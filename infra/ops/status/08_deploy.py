@@ -10,7 +10,10 @@ STALE = 3600
 
 def _one(ctx, project):
     d = ctx.p("%s/%s" % (rel.STATE, project))
-    cur = rel.load_pointer(ctx, project, "current") if os.path.isdir(d) else None
+    try:
+        cur = rel.load_pointer(ctx, project, "current") if os.path.isdir(d) else None
+    except rel.Refusal:
+        return Line("RED", "deploy", project, "state pointer unparsable")
     if not cur:
         return Line("WAIT", "deploy", project, "not deployed")
     alert = (ts.read_text(os.path.join(d, "alert"), limit=512) or "").strip()

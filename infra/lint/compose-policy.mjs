@@ -127,6 +127,46 @@ for (const [kind, path] of Object.entries(files)) {
 }
 await Promise.all(pending);
 
+// ---- caddy-allow (POLY-100 A12): the Caddyfile is an allowlist. The seven top-level block heads appear exactly once and every non-comment, non-blank
+// trimmed line of a block equals one in the fixed list for that block, with that list's count. A Caddyfile change therefore carries a lint change.
+{
+  const text = read('infra/caddy/Caddyfile');
+  const want = policy.caddyAllow;
+  if (text == null) v('caddy-allow', 'infra/caddy/Caddyfile', 'missing');
+  else if (!want) v('caddy-allow', 'infra/lint/policy.json', 'caddyAllow is missing');
+  else {
+    const got = {};
+    let cur = null;
+    let depth = 0;
+    for (const raw of text.split('\n')) {
+      const t = raw.trim();
+      if (t === '' || t.startsWith('#')) continue;
+      if (depth === 0) {
+        if (!t.endsWith('{')) { v('caddy-allow', 'infra/caddy/Caddyfile', `a line outside any block: ${t.slice(0, 60)}`); continue; }
+        cur = t === '{' ? '{' : t.slice(0, -1).trim();
+        if (Object.hasOwn(got, cur)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head repeated: ${cur.slice(0, 60)}`);
+        got[cur] ??= {};
+        depth = 1;
+        continue;
+      }
+      if (t === '}') { depth -= 1; if (depth === 0) continue; } else if (t.endsWith('{')) depth += 1;
+      got[cur][t] = (got[cur][t] ?? 0) + 1;
+    }
+    if (depth !== 0) v('caddy-allow', 'infra/caddy/Caddyfile', 'unbalanced braces');
+    for (const head of Object.keys(got)) if (!Object.hasOwn(want, head)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head not allowed: ${head.slice(0, 60)}`);
+    for (const head of Object.keys(want)) if (!Object.hasOwn(got, head)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head missing: ${head.slice(0, 60)}`);
+    for (const head of Object.keys(got)) {
+      if (!Object.hasOwn(want, head)) continue;
+      for (const [line, n] of Object.entries(got[head])) {
+        if (want[head][line] !== n) v('caddy-allow', 'infra/caddy/Caddyfile', `${head.slice(0, 30)}: line not allowed or wrong count (${n}): ${line.slice(0, 70)}`);
+      }
+      for (const [line, n] of Object.entries(want[head])) {
+        if (got[head][line] === undefined) v('caddy-allow', 'infra/caddy/Caddyfile', `${head.slice(0, 30)}: allowed line missing (${n}): ${line.slice(0, 70)}`);
+      }
+    }
+  }
+}
+
 // ---- pg_hba
 // R12(a) (POLY-100): the migrate preflight sweeps only the current database for poly_backup and relies on these four lines; a PR that widens
 // pg_hba.prod.conf must widen that sweep in the same PR.
@@ -151,6 +191,9 @@ else for (const r of hbaRules(hbaStaging)) {
 const allowCidrs = [hbaProd, hbaStaging].flatMap((t) => (t ? hbaRules(t) : []).filter((r) => r[4] && r[4] !== 'reject' && /\//.test(r[3] ?? '')).map((r) => r[3]));
 
 // ---- rendered rules
+let guardPolicy = null;
+try { guardPolicy = JSON.parse(read('infra/deploy/compose-allow.json') ?? 'null'); } catch { guardPolicy = null; }
+if (guardPolicy == null) v('guard-policy', 'infra/deploy/compose-allow.json', 'missing or unparsable: the lint and the box guard read the env_file list from it');
 for (const [kind, cfg] of Object.entries(rendered)) {
   const rel = `infra/compose/${kind}.yml`;
   const nets = cfg.networks ?? {};
@@ -176,10 +219,11 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     if (s.sysctls && Object.keys(s.sysctls).length) v('sysctls', rel, `${at}: sysctls`);
     // POLY-100 R11: the five app services read the host env file named for their project, and nothing else reads any env_file
     const envFiles = list(s.env_file);
-    const hostEnv = kind === 'prod' ? '/etc/polycarpic/host.env' : '/etc/polycarpic/staging-host.env';
+    // one source: the list is the installed guard's own policy (infra/deploy/compose-allow.json), so the CI lint and the box guard cannot disagree
+    const allowedEnv = guardPolicy?.projects?.[kind]?.services?.[sn]?.env_files ?? [];
     const entry = typeof envFiles[0] === 'string' ? { path: envFiles[0] } : envFiles[0];
-    const hostOnly = envFiles.length === 1 && entry?.path === hostEnv && entry?.required !== false && Object.keys(entry).every((k) => k === 'path' || k === 'required');
-    if (envFiles.length && !(hostOnly && ['web', 'auth', 'worker', 'migrate', 'operator'].includes(sn))) v('env-file', rel, `${at}: env_file`);
+    const hostOnly = envFiles.length === 1 && allowedEnv.length === 1 && entry?.path === allowedEnv[0] && entry?.required !== false && Object.keys(entry).every((k) => k === 'path' || k === 'required');
+    if (envFiles.length && !hostOnly) v('env-file', rel, `${at}: env_file`);
     for (const [ek, ev] of Object.entries(s.environment ?? {})) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
       if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);

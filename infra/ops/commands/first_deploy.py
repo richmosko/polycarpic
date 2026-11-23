@@ -19,7 +19,11 @@ def add_arguments(parser):
 def run(args, ctx):
     project = args.project
     code = deploy.locked(project, ctx, first=True, wait=WAIT, existing_data=args.existing_data)
-    if code != 0 or not rel.load_pointer(ctx, project, "current"):
+    try:
+        has_current = bool(rel.load_pointer(ctx, project, "current"))
+    except rel.Refusal:
+        has_current = False
+    if code != 0 or not has_current:
         return code or 1
     units = ["polycarpic-deploy@%s.timer" % project]
     if project == "prod" and os.path.exists(ctx.p("/opt/polycarpic/images.env")):

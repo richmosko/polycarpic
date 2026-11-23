@@ -61,18 +61,20 @@ def healthy_once(ctx, project, want_refs, services):
     return True
 
 
-def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True):
-    """R7: every long-running service running, healthy and on this release's image; then web answers 200 on its health route."""
+def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True, extra=None):
+    """R7: every long-running service running, healthy and on this release's image; then web answers 200 on its health route.
+    `extra`, when given, is one more thing that must be true in the same poll (the probe through Caddy, A13)."""
     env = refs(rdir)
     want = {"postgres": env["POLY_POSTGRES_IMAGE"], "web": env["POLY_APP_IMAGE"], "auth": env["POLY_APP_IMAGE"], "worker": env["POLY_APP_IMAGE"],
             "caddy": env["POLY_CADDY_IMAGE"]}
     start = ctx.epoch()
     while True:
         if healthy_once(ctx, project, want, services):
-            if not check_http:
-                return True
-            code, out, _ = ctx.run(base(rdir, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=30)
-            if code == 0 and out.strip() == "200":
+            ok = True
+            if check_http:
+                code, out, _ = ctx.run(base(rdir, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=30)
+                ok = code == 0 and out.strip() == "200"
+            if ok and (extra is None or extra()):
                 return True
         if ctx.epoch() - start >= wait:
             return False
