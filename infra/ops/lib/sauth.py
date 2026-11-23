@@ -23,7 +23,8 @@ def check(ctx):
         return "directory missing or a link"
     try:
         st = os.fstat(dfd)
-        if st.st_uid != ctx.trusted_uid or st.st_gid != GID or stat.S_IMODE(st.st_mode) != 0o750:
+        uid, gid = ctx.owner_of(dfd, DIR)
+        if uid != ctx.trusted_uid or gid != GID or stat.S_IMODE(st.st_mode) != 0o750:
             return "directory is not root:%d 0750" % GID
         try:
             fd = os.open("staging_basic_auth", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
@@ -31,7 +32,8 @@ def check(ctx):
             return "file missing or a link"
         try:
             fs = os.fstat(fd)
-            if not stat.S_ISREG(fs.st_mode) or fs.st_uid != ctx.trusted_uid or fs.st_gid != GID or stat.S_IMODE(fs.st_mode) != 0o440:
+            fuid, fgid = ctx.owner_of(fd, PATH)
+            if not stat.S_ISREG(fs.st_mode) or fuid != ctx.trusted_uid or fgid != GID or stat.S_IMODE(fs.st_mode) != 0o440:
                 return "file is not a regular root:%d 0440 file" % GID
             data = os.read(fd, MAX + 1)
         finally:

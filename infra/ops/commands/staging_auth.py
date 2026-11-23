@@ -27,7 +27,8 @@ def _write(ctx, data):
         return 4, False
     try:
         st = os.fstat(dfd)
-        if st.st_uid != ctx.trusted_uid or st.st_gid != sauth.GID or stat.S_IMODE(st.st_mode) != 0o750:
+        uid, gid = ctx.owner_of(dfd, sauth.DIR)
+        if uid != ctx.trusted_uid or gid != sauth.GID or stat.S_IMODE(st.st_mode) != 0o750:
             ctx.err("staging-auth: %s is not root:%d 0750: run provision" % (sauth.DIR, sauth.GID))
             return 4, False
         existed = True

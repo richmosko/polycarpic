@@ -5,7 +5,7 @@ Seams: run(argv, stdin, timeout, env) -> (code, stdout text, stderr text), raisi
 getpass(prompt); isatty(); confirm(prompt); now() -> aware UTC datetime; sleep(seconds); chown(fd_or_path, uid, gid); geteuid();
 tls_probe(host, port) -> {"ok": True, "not_after": datetime} | {"ok": False, "reason": str} (raises OSError when nothing answers);
 statvfs(path) with the host path; run_bytes(argv, stdin, timeout, env) -> (code, stdout bytes, stderr text) for a child that prints a tar
-(POLY-100 R4); https_status(host, addr, path) -> HTTP status of GET https://<host><path> at <addr>, raising OSError (POLY-100 A13).
+(POLY-100 R4); https_status(host, addr, path) -> HTTP status of GET https://<host><path> at <addr>, raising OSError (POLY-100 A13); owner_of(fd, logical path) -> (uid, gid) (POLY-100 S30: the staging basic-auth file's owner and group are compared with root:10010).
 """
 import datetime
 import getpass as _getpass
@@ -75,6 +75,11 @@ def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
     if timer and not timer.is_alive() and code < 0 and total < MAX_BYTES:
         raise TimeoutError(argv[0])
     return code, b"".join(chunks), (errbuf[0] if errbuf else b"").decode("utf-8", "replace")
+
+
+def _real_owner_of(fd, path):
+    st = os.fstat(fd)
+    return st.st_uid, st.st_gid
 
 
 def _real_https_status(host, addr, path):
@@ -155,7 +160,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, stdin=None, https_status=None):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, stdin=None, https_status=None, owner_of=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -175,6 +180,7 @@ class Ctx:
         self.stdin = stdin or sys.stdin
         self._run_bytes = run_bytes or _real_run_bytes
         self._https_status = https_status or _real_https_status
+        self._owner_of = owner_of or _real_owner_of
 
     def p(self, logical):
         """A host path under the root: root-prefixed in tests, the path itself in production."""
@@ -198,6 +204,10 @@ class Ctx:
 
     def https_status(self, host, addr, path):
         return self._https_status(host, addr, path)
+
+    def owner_of(self, fd, path):
+        """(uid, gid) of an open file or directory: `fd` is what the box reads; `path` is its logical path, for a harness that cannot chown."""
+        return self._owner_of(fd, path)
 
     def run_inherit(self, argv, extra_env=None):
         self._check(argv)
