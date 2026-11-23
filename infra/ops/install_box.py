@@ -52,6 +52,12 @@ def _write_target(ops, target):
     if target is None:
         return
     path = os.path.join(ops, "ssh-target")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            if fh.read() == target + "\n" and (os.stat(path).st_mode & 0o777) == 0o644:
+                return  # unchanged: a second install of the same id must touch nothing
+    except OSError:
+        pass
     tmp = path + ".new"
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(target + "\n")
