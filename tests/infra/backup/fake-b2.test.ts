@@ -76,6 +76,17 @@ describe('fake-b2 native half (restore/drill through POLY_B2_AUTH_URL)', () => {
     expect(JSON.parse(api('/b2api/v3/b2_authorize_account', basic('0049fixturereadkeyid00000001', 'K004FIXTUREREADAPPKEY0000000000000'))).authorizationToken).toBeTruthy();
     expect(JSON.parse(api('/b2api/v3/b2_authorize_account', basic('0049fixturekeyid0000000001', 'K004FIXTUREAPPLICATIONKEY00000000000'))).code).toBe('unauthorized');
   });
+  it('b2_authorize_account returns s3ApiUrl (the plain native origin); PUT and DELETE on it behave as on the TLS half: a PUT stores a version, DELETE is 403, retention is 403', () => {
+    const auth = JSON.parse(api('/b2api/v3/b2_authorize_account', basic('0049fixturereadkeyid00000001', 'K004FIXTUREREADAPPKEY0000000000000')));
+    const s3 = auth.apiInfo.storageApi.s3ApiUrl as string;
+    expect(s3).toBe(fake.nativeUrl);
+    const md5 = sh('bash', ['-c', "printf hello | openssl dgst -md5 -binary | base64"]).out.trim();
+    const code = (args: string[]) => sh('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', ...args]).out;
+    expect(code(['-X', 'PUT', '-H', `Content-MD5: ${md5}`, '-H', 'Authorization: AWS4-HMAC-SHA256 Credential=KEYID1/20260101/x/s3/aws4_request', '--data-binary', 'hello', `${s3}/poly-test-bucket/i/drill/probe-x`])).toBe('200');
+    expect(fake.store()['i/drill/probe-x']).toHaveLength(1);
+    expect(code(['-X', 'DELETE', `${s3}/poly-test-bucket/i/drill/probe-x`])).toBe('403');
+    expect(code(['-X', 'PUT', '--data-binary', 'x', `${s3}/poly-test-bucket/i/drill/probe-x?retention`])).toBe('403');
+  });
   it('lists versions (newest first per name, hide markers as action=hide) and downloads one by fileId; an untokened call is 401', () => {
     const auth = JSON.parse(api('/b2api/v3/b2_authorize_account', basic('0049fixturereadkeyid00000001', 'K004FIXTUREREADAPPKEY0000000000000')));
     const tok = auth.authorizationToken as string;

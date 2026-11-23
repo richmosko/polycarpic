@@ -54,6 +54,9 @@ export function laptop(s: Stack, fake?: Fake): Laptop {
   writeFileSync(credential, `${READ_KEY_ID}\n${READ_KEY}\n`); chmodSync(credential, 0o600);
   const infra = join(dir, 'infra');
   cpSync(join(ROOT, 'infra'), infra, { recursive: true, filter: (src) => !/node_modules|\/\.git/.test(src) });
+  // drill.sh reads roles.sql as `$here/../packages/db/sql/roles.sql` (DR5, DR6)
+  mkdirSync(join(dir, 'packages', 'db', 'sql'), { recursive: true });
+  copyFileSync(join(ROOT, 'packages', 'db', 'sql', 'roles.sql'), join(dir, 'packages', 'db', 'sql', 'roles.sql'));
 
   const read = (p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
   return {

@@ -137,7 +137,7 @@ def public(v):
             "contentLength": len(v["data"]), "contentSha1": hashlib.sha1(v["data"]).hexdigest()}
 
 
-class Native(Base):
+class Native(S3):  # the S3 verbs (PUT, DELETE) are served on the plain native origin too, for drill.sh's DR10, which reads s3ApiUrl from b2_authorize_account
     def json(self, code, obj):
         self.send(code, json.dumps(obj), "application/json")
 
@@ -157,7 +157,7 @@ class Native(Base):
                 return self.json(401, {"code": "unauthorized", "message": "bad key"})
             host = self.headers.get("Host")
             return self.json(200, {"accountId": "acct-fixture", "authorizationToken": TOKEN, "apiInfo": {"storageApi": {
-                "apiUrl": STATE["apiUrl"] or "http://%s" % host, "downloadUrl": STATE["apiUrl"] or "http://%s" % host,
+                "apiUrl": STATE["apiUrl"] or "http://%s" % host, "downloadUrl": STATE["apiUrl"] or "http://%s" % host, "s3ApiUrl": STATE["apiUrl"] or "http://%s" % host,
                 "allowed": {"buckets": [{"id": BUCKET_ID, "name": BUCKET}], "capabilities": ["listFiles", "readFiles"], "namePrefix": None}}}})
         if not self.authed():
             log("GET", "-", u.path)
