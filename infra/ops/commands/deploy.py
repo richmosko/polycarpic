@@ -46,12 +46,12 @@ def run(args, ctx):
 
 
 def _deploy(project, ctx, work):
-    digest = "-"
+    seen = {"digest": "-"}
     try:
         tok = rel.token(ctx)
         cur = rel.load_pointer(ctx, project, "current")
         try:
-            digest, commit, tag = _candidate(project, ctx, tok, work, cur)
+            digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen)
         except _Skip:
             return 0
         rel.log(ctx, project, "candidate", digest, commit)
@@ -62,6 +62,7 @@ def _deploy(project, ctx, work):
         rel.log(ctx, project, "transient", str(err))
         return 0
     except rel.Refusal as err:
+        digest = seen["digest"]
         rel.log(ctx, project, "refused", err.name, digest)
         if err.quarantine and digest != "-":
             rel.quarantine(ctx, project, digest, err.name)
@@ -74,7 +75,7 @@ class _Skip(Exception):
     pass
 
 
-def _candidate(project, ctx, tok, work, cur):
+def _candidate(project, ctx, tok, work, cur, seen):
     """R2: -> (digest, commit, tag). Raises _Skip when there is nothing new, or the candidate is quarantined."""
     if project == "staging":
         digest, commit, _ = rel.staging_candidate(ctx, tok, work)
@@ -82,6 +83,7 @@ def _candidate(project, ctx, tok, work, cur):
     else:
         digest, tag = rel.prod_candidate(ctx, tok, work)
         commit = None
+    seen["digest"] = digest
     rel.put(ctx, project, "last-poll", rel.now_utc(ctx) + "\n")
     if cur and cur["digest"] == digest:
         raise _Skip()
