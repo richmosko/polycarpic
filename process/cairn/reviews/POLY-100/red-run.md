@@ -143,3 +143,13 @@ unit `test_t8_each_unsafe_render…` (the S14 subtests) and real-render cases "e
 | T13 (`test_deploy_t13.py`) | the logged set cut to its first field; the shape check off | `test_the_logged_set_is_what_list_premigration…`, `test_a_line_restore_would_refuse…` |
 
 Not run: mutants for the provision-job T-net cases ("names only", "no overlap check") and the box half of T-sauth (`owner_of` returning constants): the container slot is spent; both need a mutated copy of `provision.sh` / `ctx.py` inside the box.
+
+## Provision-job mutants (container runs; one edit, one test file, file restored, tree clean before the next)
+
+| Test file | Mutant | Red |
+|---|---|---|
+| `edge-net.test.ts` (T-net) | `provision.sh` `edge_networks`: the subnet/driver compare dropped (names only) | the three "a different existing network … never replaced" cases |
+| same | on a mismatch: `network rm` then `create` (replaces) | the same three |
+| same | `provision-check.sh` H21 without the overlap check | the pg_hba-range and 10.200.0.0/16 cases |
+| same | `provision-check.sh` H21 without the subnet/driver compare | "fails on another subnet", "fails on another driver" |
+| `sauth-box.test.ts` (T-sauth, real root) | `ctx._real_owner_of` returns `(0, 10010)` | four of the five refused cases (file/directory in another group, file/directory owned by another user); the accepted case and group-writable stay as they were |

@@ -8,15 +8,14 @@ Plan: `test-plan.md` (pins), `red-run.md` (mutants). Numbers are this Mac, my wo
 |---|---|---|---|
 | ops unit: `unittest discover -p 'test_deploy_*.py'` + `test_staging_auth.py` | 148 tests green | 38 s earlier, 52 s on a busy machine (other teammates' suites) | 40 s (architect-100, 52910589): re-measure on a quiet machine |
 | ops unit: the other `tests/infra/ops/test_*.py` (POLY-98/99 pins), file by file | green | — | — |
-| lint: `vitest run -c tests/infra/vitest.config.ts` | 539/539 | 23.7 s | ≤ 15 s over control (T-render): control on main not re-measured this session |
+| lint: `vitest run -c tests/infra/vitest.config.ts` | 539/539 | 23.4 s vs control (main, 390 tests) 13.7 s = **+9.7 s** | ≤ 15 s |
 | ci: `vitest run -c tests/ci/vitest.config.ts` | 587/587 | — | — |
 | db: `tests/db/runner.test.ts` | 44/44 | 21.2 s vs control (main's file) 13.2 s = **+8 s** | ≤ 10 s |
-| provision: `vitest.provision.config.ts` | 188/189 | 83 s | ≤ 25 s unit + ≤ 60 s box fixture (no control measured) |
+| provision: `vitest.provision.config.ts` | **189/189** | ≈ 83 s vs control (main, 171 tests) 72.4 s = **+10.6 s** | ≤ 60 s box fixture |
 | image: `vitest.image.config.ts` | 88/90 | — | 0 s added (no new file; harness fixed for the required image variables) |
 | backup: `vitest.backup.config.ts` | 93/112 on this Mac | ≈ 11 min | — |
 
 Reds, with my reading:
-- provision `ops.test.ts` "a second install of the same id changes nothing": a re-install rewrites something under `/opt/polycarpic` (devops-100's).
 - image `postgres.test.ts` ×2 (0440 file ownership refusals): Docker Desktop does not enforce bind-mount uid/gid; CI on Linux decides.
 - backup: uploader hook and backup/restore timeouts, `drill` ×5, "no mode exits 0": `infra/backup` is unchanged on the branch, so I read these as this Mac's load; CI decides.
 
@@ -32,7 +31,5 @@ Reds, with my reading:
 
 ## Open
 
-- T-lock mutant (no advisory lock), T5 mutants, T11 mutant: not run.
 - T13 as a container case against POLY-99's fake ssh and real restore: not written; the unit version holds the line's grammar against restore's own regexes.
-- Control timings for the lint and provision jobs.
 - The ruling's real-render drift check runs in the lint job (`compose-real.test.ts`); it fails, never skips, without the compose plugin only by virtue of the `docker compose` call failing.
