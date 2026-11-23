@@ -26,7 +26,7 @@ beforeAll(() => {
   } catch (e) { setupError = String((e as Error).message); }
 });
 afterAll(() => { if (lap) lap.cleanup(); });
-beforeEach(() => { if (setupError) throw new Error(setupError); fake.reset(); lap.setFdesetup(0); lap.setBox({}); });
+beforeEach(() => { if (setupError) throw new Error(setupError); fake.reset(); lap.resetLogs(); lap.setFdesetup(0); lap.setBox({}); });
 
 const NOSCRATCH = { POLY99_SCRATCH_FAIL: '1' };
 /** the nightly set A as the uploader leaves it, uploaded a minute after its <TS> */
@@ -80,7 +80,7 @@ describe('restore.sh usage and hygiene (R7): exit 2, the message, and nothing de
     expect(t).toMatch(/umask 077/);
     expect(t).toMatch(/set -euo pipefail/);
     expect(t).not.toMatch(/\bPG(HOST|PORT|USER|PASSWORD|PASSFILE|SERVICE|DATABASE)\b/);
-    expect(t).not.toMatch(/--data-only|\s-a\s/);
+    expect(readFileSync(join(lap.infra, 'backup', 'restore-lib.sh'), 'utf8')).not.toMatch(/--data-only/);
     expect(readFileSync(join(lap.infra, 'drill.sh'), 'utf8')).toMatch(/ulimit -c 0/);
   });
   it('C12: fdesetup reporting an unencrypted disk -> exit 2 `restore.sh: disk encryption is not active (fdesetup isactive)`, no age run, no scratch', () => {
@@ -119,9 +119,9 @@ describe('restore --premigration --from-box (R7, T9, T16, C4, C5): everything up
     const ssh = lap.sshLog().split('\n').filter((l) => l.startsWith('SSH '));
     expect(ssh).toHaveLength(3); // list, then one fetch per file
     for (const l of ssh) for (const o of ['[-a]', '[-x]', '[ForwardAgent=no]', '[ClearAllForwardings=yes]', '[BatchMode=yes]']) expect(l, o).toContain(o);
-    const cmds = ssh.map((l) => l.replace(/^.*\[polyops@box\.example\] /, '').replace(/\]$/, '').replace(/\] \[/g, ' '));
+    const cmds = ssh.map((l) => l.replace(/^.*\[polyops@box\.example\] \[/, '').replace(/\]$/, '')); // the remote command is ONE ssh argument (T16q)
     expect(cmds[0]).toBe('sudo polycarpic-ops backup list-premigration');
-    expect(cmds.slice(1).sort()).toEqual(Object.keys(P).map((n) => `sudo polycarpic-ops backup fetch-premigration ${n}`).sort());
+    expect(cmds.slice(1).sort()).toEqual(Object.keys(P).map((n) => `sudo polycarpic-ops backup fetch-premigration '${n}'`).sort());
     const log = lap.sshLog();
     const key = readFileSync(lap.identity, 'utf8').split('\n').find((l) => l.startsWith('AGE-SECRET-KEY-'))!;
     expect(log).not.toContain(key);

@@ -36,7 +36,7 @@ afterAll(() => {
   if (s) { try { s.superSql(`DELETE FROM public.canary_t WHERE v = '${AFTER}'`); } catch { /* best effort */ } s.clearSpool(); }
   if (fake) fake.reset();
 });
-beforeEach(() => { if (setupError) throw new Error(setupError); lap.setFdesetup(0); });
+beforeEach(() => { if (setupError) throw new Error(setupError); lap.resetLogs(); lap.setFdesetup(0); });
 const B = (what: string) => ['--identity', lap.identity, '--read-credential', lap.credential, '--bucket', 'poly-test-bucket', what, '--instance', INSTANCE];
 const scratch = (out: string) => /^scratch container: (\S+)$/m.exec(out)?.[1] ?? '';
 const q = (c: string, sql: string) => sh('docker', ['exec', c, 'psql', '-U', 'postgres', '-d', 'polycarpic', '-tAc', sql]).out.trim();

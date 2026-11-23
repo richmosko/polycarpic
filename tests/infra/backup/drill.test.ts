@@ -29,7 +29,7 @@ beforeAll(() => {
   } catch (e) { setupError = String((e as Error).message); }
 });
 afterAll(() => { if (lap) lap.cleanup(); if (fake) fake.reset(); });
-beforeEach(() => { if (setupError) throw new Error(setupError); lap.setFdesetup(0); fake.reset(); });
+beforeEach(() => { if (setupError) throw new Error(setupError); lap.resetLogs(); lap.setFdesetup(0); fake.reset(); });
 
 const tsOf = (n: string) => /-(\d{8}T\d{6}Z)\.age$/.exec(n)![1]!;
 const TS0 = () => tsOf(Object.keys(SET)[0]!);

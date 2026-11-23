@@ -22,6 +22,8 @@ export type Laptop = {
   dir: string; infra: string; log: string; dockerLog: string; ageLog: string; boxDir: string; identity: string; credential: string;
   sshLog: () => string; ageCalls: () => string[]; dockerCalls: () => string[];
   setFdesetup: (code: number) => void;
+  /** empty the ssh, docker and age logs: every test starts with no calls from an earlier one */
+  resetLogs: () => void;
   setBox: (o: { files?: Record<string, Buffer>; record?: Array<[string, string]>; list?: string | null }) => void;
   run: (script: 'restore.sh' | 'drill.sh', args: string[], o?: { env?: Record<string, string>; infra?: string; identityMode?: number; cwd?: string }) => Res & { stdoutLines: string[] };
   mutantInfra: (file: string, from: string | RegExp, to: string) => string;
@@ -65,6 +67,7 @@ export function laptop(s: Stack, fake?: Fake): Laptop {
     dir, infra, log, dockerLog, ageLog, boxDir, identity, credential,
     sshLog: () => read(log), ageCalls: () => read(ageLog).split('\n').filter(Boolean), dockerCalls: () => read(dockerLog).split('\n').filter(Boolean),
     setFdesetup: (code) => writeFileSync(join(dir, 'fde'), String(code)),
+    resetLogs: () => { for (const f of [log, dockerLog, ageLog]) writeFileSync(f, ''); },
     setBox: (o) => {
       rmSync(join(boxDir, 'premigration'), { recursive: true, force: true }); mkdirSync(join(boxDir, 'premigration'), { recursive: true });
       for (const [n, b] of Object.entries(o.files ?? {})) writeFileSync(join(boxDir, 'premigration', n), b);
