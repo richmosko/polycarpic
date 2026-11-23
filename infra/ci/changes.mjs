@@ -62,11 +62,12 @@ export const TABLE = {
   // POLY-97: infra/hetzner/ and infra/operator/ and the dry-run test files belong to the `provision` job. infra/provision*.sh and the
   // box helpers (Dockerfile, fakes, box.ts, pg.ts) stay here too, because tests/infra/image/provision-db.test.ts runs them.
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/|hetzner\/|operator\/|ops\/)/, /^bin\//,
-    /^infra\/ci\/(image|install-trivy)\.sh$/, /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
+    /^infra\/ci\/(image|install-trivy)\.sh$/, /^infra\/ops\/lib\/release\.py$/, // POLY-100 F1: the built-image test feeds the bundle to the installed `read_tar`
+    /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
   ],
   // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run, shellcheck and the operator-tool unit tests. Reads the compose
   // files (secret table), the Postgres pin and prod config (D checks), roles.sql, and the workflow that defines the job.
-  provision: [/^infra\/hetzner\//, /^infra\/provision(-check)?\.sh$/, /^infra\/operator\//, /^infra\/ops\//, /^tests\/infra\/(provision|operator|ops)\//, /^tests\/infra\/vitest\.provision\.config\.ts$/,
+  provision: [/^infra\/hetzner\//, /^infra\/provision(-check)?\.sh$/, /^infra\/operator\//, /^infra\/ops\//, /^infra\/deploy\//, /^tests\/infra\/(provision|operator|ops)\//, /^tests\/infra\/vitest\.provision\.config\.ts$/,
     /^infra\/compose\//, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^\.github\/workflows\/ci\.yml$/,
     /^infra\/backup\//, /^infra\/(restore|drill)\.sh$/], // POLY-99: the shellcheck step and the unit files the provision dry run installs
   // POLY-99 (ruling Guards): the backup, uploader, restore and drill container suite (tests/infra/backup) is one more step of the `image` job and
