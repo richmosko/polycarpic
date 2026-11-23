@@ -155,6 +155,7 @@ class World(object):
         self.bad_flags = []
         self.run_hang, self.run_names, self.stuck_oneoff, self.run_started = set(), [], set(), set()
         self.inspect_fail, self.inspect_calls = {}, []
+        self.child_secs = None  # G7: each health child (compose ps, exec; docker inspect) after the run's first `up` takes this long on the fake clock, or its timeout if shorter (and then times out)
         self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
         self.config_wrapped = []
         self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
@@ -247,6 +248,7 @@ class World(object):
 
     # --- the children ---
     def handler(self, runner):
+        self._runner = runner
         runner.on(lambda a: a[0] == "docker", fn=self._docker)
         runner.on(lambda a: a[0] == "unshare", fn=self._unshare)
         runner.on(lambda a: a[0] == "gh", fn=self._gh)
@@ -354,6 +356,8 @@ class World(object):
             return self._compose(argv, stdin)
         if sub == "inspect" and "inspect" in self.hang and self.hang_from < len(self.up_marks) <= self.hang_from + (10 ** 9 if self.hang_through else 1):
             raise TimeoutError("inspect")
+        if sub == "inspect":
+            self._child_time()
         if sub == "inspect" and argv[2] in self.inspect_fail and argv[2] in self.run_started:  # G4: how `docker inspect` of a hung one-off fails ("timeout" or (code, stderr))
             f = self.inspect_fail[argv[2]]
             self.inspect_calls.append(argv[2])
@@ -373,6 +377,16 @@ class World(object):
     # --- docker compose: renders from committed fixtures (gen_compose.py), containers scripted ---
     APP_SVC = ("web", "auth", "worker", "migrate", "operator")
     KEY = {"postgres": "POSTGRES", "caddy": "CADDY"}
+
+    def _child_time(self, hang_window=True):
+        if self.child_secs is None or not self.up_marks or not (self.hang_from < len(self.up_marks) <= self.hang_from + 1):
+            return
+        timeout = self._runner.calls[-1]["timeout"] if getattr(self, "_runner", None) and self._runner.calls else None
+        take = self.child_secs if timeout is None else min(self.child_secs, timeout)
+        if getattr(self, "_ctx_sleep", None):
+            self._ctx_sleep(take)  # the fake clock moves by what the child took
+        if timeout is not None and timeout < self.child_secs:
+            raise TimeoutError("health child")
 
     def sleeps_total(self):
         return sum(self.sleeps_ref) if self.sleeps_ref is not None else 0
@@ -428,6 +442,8 @@ class World(object):
                 raise TimeoutError(subcmd)
             if subcmd in self.raise_cmd:
                 raise self.raise_cmd[subcmd]
+        if subcmd in ("ps", "exec"):
+            self._child_time()
         rest = argv[i + 1:]
         if self.on_compose:
             self.on_compose(subcmd, list(argv))
@@ -620,6 +636,7 @@ class DeployTest(OpsTest):
             if sleeps_hook:
                 rr.sleeps = HookList(sleeps_hook)
             w.sleeps_ref = rr.sleeps
+            w._ctx_sleep = rr.ctx.sleep
         r = self.host.go(cmd, *argv, runner=runner, ctx_extra=extra, on_ready=ready, **kw)
         r.world = w
         return r
