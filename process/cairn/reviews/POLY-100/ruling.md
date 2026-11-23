@@ -17,6 +17,7 @@ The ruling proceeds on each recommendation in §D unless the issue file says oth
 | M5 | `--source-ref` enforced | `--source-ref refs/heads/other` | exit 1 |
 | M6 | `--source-digest` enforced | the run's `headSha`; then 40 zeros | exit 0; **exit 1** |
 | M7 | `--predicate-type` | `https://slsa.dev/provenance/v1`; `https://cyclonedx.org/bom` | both exit 0: each pins which attestation is checked |
+| M8 | Does a raw render keep env sources? (Compose v5.7.0, no container) | a file with `"include": [x.yml]` (quoted key) and `env_file: [<host file>]`; `config --no-interpolate --no-normalize --format json`, then plain `config --format json` | raw: `env_file` kept as `{path, required}`, and the included service `x` **appears**; plain: the env keys are inlined, no path (seceng SM3) |
 
 So the box needs **a** GitHub token (M3, M4), and nothing it reads is private (M1, M2); scope is §D1. M6 is what binds an
 image to a commit: the source digest comes from the Fulcio certificate GitHub issues, not from anything the build writes,
@@ -117,19 +118,23 @@ next poll.
 ## R5 — The compose guard: the bundle does not judge itself (seceng holes 1, 2, 4; D6, D9, D10)
 
 `lib/compose_guard.py` is part of the **installed** ops bundle, not the release. Its policy is installed with it at
-`infra/deploy/compose-allow.json`. It runs as V7: before R6 step 2's postgres `up`, before every `compose run`/`up` of a
-candidate, and again before rollback's `up` of `previous` (S3). Steps: (1) refuse any bundle compose line matching
-`^\s*(include|extends)\s*:`; (2) render `docker compose … config --format json` with R4's exact argv; (3) check by
-allowlist. Refusal `guard-<rule>`, quarantined:
+`infra/deploy/compose-allow.json`. It runs as V7 on the candidate, and again on whichever bundle is used before any `compose
+run`/`up` of it: `current`'s in R6 steps 2–3 and rollback's `previous` (S3, S13). It reads two renders with R4's exact argv:
+**raw** (`config --no-interpolate --no-normalize --format json`), which keeps `env_file` paths (M8), and **plain**
+(`config --format json`) for values. No line regex: `include` is resolved by both renders (M8; `extends` likewise, `(unmeasured)`, a T8 case), so
+whatever they add is a service, key, volume, config or network that the allowlist sees and refuses (S10). The policy is
+a table per project and service: the **allowed key set**, plus pinned values. Refusal `guard-<rule>`, quarantined:
 
 | Rule | Refuses |
 |---|---|
 | `service` | a service not allowlisted for the project; any `build` |
+| `key` | any service key outside its installed set. This closes `volumes_from`, `network_mode`/`pid`/`ipc`/`uts`/`cgroup` with **any** value (`container:`, `service:`, `host`), `cgroup_parent`, `runtime`, `sysctls`, `extra_hosts`, `group_add`, `links`, `external_links`, `storage_opt`, `privileged`, `cap_add`, `devices`, `userns_mode`, without naming each |
+| `pinned` | `user` ≠ the policy's uid:gid; `read_only` ≠ `true` where the policy says so; `cap_drop` without `ALL`; `security_opt` ≠ the policy's list exactly |
 | `image` | an `image` not exactly one of the four refs V1–V5 just verified |
 | `name` | a top-level `name` ≠ the `-p` value; any `container_name` |
-| `priv` | `privileged`; any `cap_add`; `devices`; `pid`/`ipc`/`userns_mode: host`; any `network_mode`; `security_opt` without `no-new-privileges:true` or with `unconfined` |
-| `bind` | a bind source not allowlisted for that service, or writable where the allowlist says `:ro`; always: `/`, `/run`, the Docker or containerd socket, `/opt/polycarpic/ops`, `/var/lib/polycarpic/state`, `secrets/host/`, any `releases/` path but the allowlisted read-only config files |
-| `secret` | a secret file outside the project's prefix and the service's own directory |
+| `mount` | a volume type other than `bind` or `tmpfs`; any top-level named volume (a `driver_opts` bind can reach `/`); a bind source not allowlisted for that service, or writable where the policy says `:ro`; always `/`, `/run`, the Docker or containerd socket, `/opt/polycarpic/ops`, `/var/lib/polycarpic/state`, `secrets/host/`, any `releases/` path but the allowlisted read-only config files |
+| `file` | a top-level `configs` or `secrets` `file` that the policy does not list for a service that uses it (SM4) |
+| `env` | an `env_file` path (raw render) that the policy does not list for that project's service; staging may never name `/etc/polycarpic/host.env` |
 | `network` | a network outside the project's allowlist (e.g. a staging service on `polycarpic-prod_default` or `polycarpic-prod-edge`) |
 | `ports` | a `ports` entry on anything but caddy, or not on `POLY_BIND_ADDR` |
 
@@ -143,8 +148,8 @@ Q = quarantine. Steps 3–4 are prod only (staging has no backup service).
 | # | Step | Stops on (refusal, Q?) |
 |---|---|---|
 | 1 | Lock (R1), candidate (R2), V1–V7 (R3–R5) | as R3 |
-| 2 | Postgres not running in the project → `up -d --no-deps postgres` from the candidate bundle, healthy ≤ 120 s | `postgres-start` |
-| 3 | `polycarpic-ops backup premigration` (subprocess, 65 min timeout) **before any candidate container holds a credential** (seceng A-a). Go on only on exit 0 **and** a last line `^premigration-set <TS> dump-…\.age=<64 hex> globals-…\.age=<64 hex>$` (as `backup.py` prints, INFRA §6.4); that line goes to `deploy.log` verbatim. One dump per tag-rare prod deploy; duration `(unmeasured)`, POLY-104 | `premigration-<code>`, no Q; next poll retries |
+| 2 | Postgres not running in the project → `up -d --no-deps postgres` from **`current`'s** bundle and `images.env` (S12), healthy ≤ 120 s. The candidate's Postgres image never opens live data before step 3's backup; only `first-deploy`, with no `current`, starts the candidate's | `postgres-start` |
+| 3 | `polycarpic-ops backup premigration` (subprocess, 65 min timeout) **before any candidate container holds a credential** (seceng A-a). Go on only on exit 0 **and** a last line `^premigration-set <TS> dump-…\.age=<64 hex> globals-…\.age=<64 hex>$` (as `backup.py` prints, INFRA §6.4); that line goes to `deploy.log` verbatim. The backup runs through `lib/compose.py` from `releases/prod-current`, so its containers are `current`'s images, never the candidate's (S12). One dump per tag-rare prod deploy; duration `(unmeasured)`, POLY-104 | `premigration-<code>`, no Q; next poll retries |
 | 4 | Take `backup.lock` (≤ 30 min) and hold it to the end, so no nightly starts during migrate or recreate | `backup-lock` |
 | 5 | `compose run --rm --no-deps -T <svc> <svc> check-config` for migrate, web, auth, worker; each exit 0 | `check-config`, Q |
 | 6 | `migrate --plan`: 0 → step 8; 3 → on | 2 `plan-diverged`, Q; other `plan-error`, no Q |
@@ -152,8 +157,10 @@ Q = quarantine. Steps 3–4 are prod only (staging has no backup service).
 | 8 | `up -d --pull never --no-build` for the project; edge per R9 | — |
 | 9 | Health (R7): healthy → state (R10), prune (R4), clear alert | unhealthy → R8 |
 
-`first-deploy` skips step 3: the project has never had a release, and before `provision --stage database` poly_backup
-does not exist. The timer's `deploy` never skips it and refuses while the project has no `current` (`not-first-deployed`).
+Every `compose` argv before step 5 names `current`'s directory and image refs (S12). `first-deploy` skips step 3: the
+project has never had a release, and before `provision --stage database` poly_backup does not exist. It refuses
+(`existing-data`, exit 4) when the project's Postgres data directory is non-empty, unless given `--existing-data`, which
+makes step 3 required (seceng A8: a lost state dir must not let real data migrate unbacked). The timer's `deploy` never skips it and refuses while the project has no `current` (`not-first-deployed`).
 On the first deploy, `--plan` exit 2 naming `roles-missing` prints
 `run: sudo polycarpic-ops provision --stage database --project <p>` and exits 4.
 
@@ -191,6 +198,16 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   R5's `network` rule refuses a staging service on an edge network (S4).
 - Prod's first deploy recreates caddy from prod's bundle unconditionally (`--force-recreate caddy`), even when the digest
   is unchanged, so no staging-era Caddy image or Caddyfile survives into prod (S4). R7 then includes caddy.
+- **No prod key for staging-era code (S11).** The Caddyfile comes from the bundle, and site addresses can come from
+  placeholders and imports, so the installed guard cannot reliably read which names it serves. seceng's form (i), "the
+  guard refuses the prod hostname", is therefore enforced at the CA's side instead. No CA can validate a name that does
+  not resolve to the box, and on Hetzner Caddy holds no DNS token.
+  - While prod has no `current`, a staging run that would render `edge.yml` first resolves `app.<POLY_DOMAIN>` through a
+    new `ctx.resolve` seam. If it resolves at all, the run skips edge, alerts `edge-prod-name` and leaves caddy unchanged.
+  - Form (ii) is also required, because a wipe alone revokes nothing already sent out. Prod's first deploy stops caddy,
+    empties `/srv/polycarpic/caddy` and `/srv/polycarpic/caddy-config`, then recreates it. Prod therefore starts with a
+    fresh ACME account and fresh keys.
+  - Consequence for POLY-104 (§L5): the `app.` A/AAAA records are created at the first prod deploy, not before.
 - `/etc/polycarpic/edge.env` (`POLY_DOMAIN`, `POLY_BIND_ADDR`, `POLY_STAGING_ALLOW`, `POLY_TLS`; root 0644) is written by
   `provision.sh`, with a provision-check line.
 
@@ -274,9 +291,10 @@ faked, subprocess and sockets raise); `ctx.run` dispatches on `argv[0]` and logs
 
 | Seam | Behaviour |
 |---|---|
-| fake registry (`docker`) | dict `ref@digest → {labels, bundle tar}`; `pull` only if present; `inspect`/`create`/`cp` from the dict; `compose … config` is real `docker compose config` where the runner has it, else a committed fixture JSON; `compose up`/`run` follow scripted health over fake time |
+| fake registry (`docker`) | dict `ref@digest → {labels, bundle tar}`; `pull` only if present; `inspect`/`create`/`cp` from the dict; `compose … config` (raw and plain) is real `docker compose config` where the runner has it, else committed fixture JSON for both; `compose up`/`run` follow scripted health over fake time |
 | fake gh | `api` (runs, releases) and `run download` from fixtures; `attestation verify` passes or fails per (digest, `--source-digest`) |
 | real git | `git` and `ssh-keygen` in the temp root for V4 and the staging ancestry check; two keys, one in `allowed_signers` |
+| resolver | new `ctx.resolve(name)` seam (getaddrinfo in production), scripted per name |
 | premigration | `polycarpic-ops backup premigration` scripted exit and stdout (the command is POLY-99's, tested there) |
 | box fixture (vitest, provision job) | the POLY-97 box with the real ops bundle and `fakes-ops/` extended with the same fakes; at most three cases: a staging deploy end to end, one refusal, units and paths under a real root |
 
@@ -299,11 +317,11 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T5 | A sibling failing V1, or attested at another commit, stops the deploy | mutant skipping siblings |
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
 | T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
-| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; the same for rollback's `previous` | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check |
-| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest |
+| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`) |
+| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe |
 | T10 | Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
-| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log` | mutant running `check-config` first; mutant ignoring the line |
+| T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8) | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
 | T14 | `--pull never --no-build` on every compose up/run; only R4's `-f` files | mutant without `--pull never` |
 | T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
@@ -371,6 +389,8 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
   - create the token (§D1), and run the one-call check;
   - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment);
   - after the first `build.yml` run, confirm that the three new GHCR packages are public `(unmeasured)`.
+- **L5.** POLY-104 needs a comment: no `app.` DNS record before the first prod deploy (R9, S11). Otherwise every
+  staging edge run skips with `edge-prod-name`.
 
 ## E — Doc passages (owners, at the verdict)
 
@@ -383,7 +403,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S9 (seceng `ruling-review.md` @ `7196ebfd`, read against `43af9303`): met by
+## S1–S13 (seceng `ruling-review.md` @ `4aeb7161`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -398,4 +418,8 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S7 no argv element under `releases/` but `-f`/`--env-file`/`--project-directory` | R4; T7 |
 | S8 `HOST_ONLY` exactly two names; `github_pat_` shape; never printed | R11; T18 |
 | S9 signers plain form only | R11; T17 |
+| S10 per-service key/value allowlist; env sources; no line regex | R5 (`key`, `pinned`, `mount`, `file`, `env`; raw + plain renders, M8); T8 |
+| S11 no prod key for staging-era Caddy | R9: (i) enforced by the resolve precondition, not a Caddyfile read (the reason is given there), plus (ii) the wipe; T9; §L5 |
+| S12 `current`'s images until step 5 | R6 step 2, step 3, the note under the table; T12 |
+| S13 rollback through the guard | R5, R8; T8 |
 
