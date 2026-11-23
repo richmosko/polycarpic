@@ -90,13 +90,19 @@ class Staging(DeployTest):
         r = self.deploy("staging")
         self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused not-newer"))
 
-    def test_t4_positive_descendant_and_same_commit_are_not_refused(self):
-        for cur in (self.world.commit_a, self.world.commit_b):
-            self.seed("staging", digest("cur-" + cur), "-", cur)
-            self.candidate()
-            r = self.deploy("staging")
-            self.assertNotEqual(self.alert_name("staging"), "not-newer", r.err)
-            self.assertIsNotNone(first_docker(r, "pull"))
+    def test_t4_positive_a_descendant_is_not_refused(self):
+        self.seed("staging", digest("cur-a"), "-", self.world.commit_a)
+        self.candidate()
+        r = self.deploy("staging")
+        self.assertNotEqual(self.alert_name("staging"), "not-newer", r.err)
+        self.assertIsNotNone(first_docker(r, "pull"))
+
+    def test_t4_positive_the_same_commit_with_a_new_digest_is_not_refused(self):
+        self.seed("staging", digest("cur-b"), "-", self.world.commit_b)
+        self.candidate()
+        r = self.deploy("staging")
+        self.assertNotEqual(self.alert_name("staging"), "not-newer", r.err)
+        self.assertIsNotNone(first_docker(r, "pull"))
 
     def test_same_digest_as_current_exits_0_touching_nothing(self):
         x = self.candidate()

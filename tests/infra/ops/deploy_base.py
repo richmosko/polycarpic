@@ -404,6 +404,11 @@ class DeployTest(OpsTest):
     def seed(self, project, dig, tag, commit):
         d = self.host.mkdir("%s/%s" % (STATE, project))
         self.host.write("%s/%s/current" % (STATE, project), "%s %s %s %s %s\n" % (dig, tag, commit, "0" * 64, utc()))
+        # what V6 reads of `current`: its release's Postgres major (a seeded current is not a full release; first-deploy builds real ones)
+        rdir = "/opt/polycarpic/releases/sha256-%s" % dig.split(":")[1]
+        self.host.write(rdir + "/infra/postgres-major", (REPO / "infra" / "postgres-major").read_bytes())
+        self.host.write(rdir + "/images.env", "".join("POLY_%s_IMAGE=ghcr.io/richmosko/polycarpic-%s@%s\n" % (n.upper(), n, digest("cur-" + n)) for n in ("postgres", "tools", "caddy"))
+                        + "POLY_APP_IMAGE=ghcr.io/richmosko/polycarpic@%s\n" % dig)
 
     def state(self, project, name):
         f = self.sdir(project) / name

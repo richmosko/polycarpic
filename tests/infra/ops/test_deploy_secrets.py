@@ -124,7 +124,9 @@ class Signers(OpsTest):
         self.assertEqual(self.host.p(SIGNERS).read_text(), new)
         self.assertEqual(len(r.confirms), 1)
 
-    def test_t17_comments_and_blank_lines_are_not_a_way_to_smuggle_options(self):
-        r = self.install("# a note\n\n" + self.line(self.k1) + "\n")
-        self.assertEqual(r.rc, 0, r.err)
+    def test_t17_comment_lines_are_not_the_plain_form_so_the_whole_file_is_refused(self):
+        for text in ("# a note\n" + self.line(self.k1) + "\n", self.line(self.k1) + "\n# trailing\n"):
+            r = self.install(text, confirm="yes")
+            self.assertEqual(r.rc, 2, text)
+            self.assertFalse(self.host.p(SIGNERS).exists())
         self.assertEqual(self.install('rel namespaces="git" cert-authority %s\n' % self.k1, confirm="yes").rc, 2)

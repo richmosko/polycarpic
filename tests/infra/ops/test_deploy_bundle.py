@@ -56,7 +56,7 @@ def member(name, typ=tarfile.REGTYPE, mode=0o644, link="", data=b"", size=None):
     return add
 
 
-class Bundle(DeployTest):
+class BundleBase(DeployTest):
     def candidate(self, tar):
         w = self.world
         x = digest("x")
@@ -70,7 +70,8 @@ class Bundle(DeployTest):
 
     def releases(self):
         d = self.host.p("/opt/polycarpic/releases")
-        return sorted(os.listdir(str(d))) if d.exists() else []
+        own = "sha256-" + self.current_digest.split(":")[1]  # the seeded `current`'s release (postgres-major only)
+        return sorted(n for n in os.listdir(str(d)) if n != own) if d.exists() else []
 
     def refused_bundle(self, tar):
         x = self.candidate(tar)
@@ -83,6 +84,21 @@ class Bundle(DeployTest):
         self.assertTrue(any(a[1] == "rm" for a in r.world.docker_log), "the created container is removed")
         return r
 
+
+    def setUp_fresh(self):
+        self.tearDown_world()
+
+    def tearDown_world(self):
+        # a second candidate in the same test: clear what the first one wrote
+        import shutil
+        shutil.rmtree(str(self.sdir("staging")), ignore_errors=True)
+        shutil.rmtree(str(self.host.p("/opt/polycarpic/releases")), ignore_errors=True)
+        self.seed("staging", self.current_digest, "-", self.world.commit_a)
+        self.world.registry.clear(), self.world.attested.clear(), self.world.runs.clear(), self.world.artifacts.clear()
+        self.world.docker_log.clear()
+
+
+class Bundle(BundleBase):
     # ---- T6: each unsafe member is refused ----
     def test_t6_a_symlink_member(self):
         self.refused_bundle(make_tar(good_files(), [member("infra/compose/x.yml", tarfile.SYMTYPE, link="/etc/shadow")]))
@@ -165,17 +181,6 @@ class Bundle(DeployTest):
             self.setUp_fresh()
             self.refused_bundle(make_tar(good_files(bad)))
 
-    def setUp_fresh(self):
-        self.tearDown_world()
-
-    def tearDown_world(self):
-        # a second candidate in the same test: clear what the first one wrote
-        import shutil
-        shutil.rmtree(str(self.sdir("staging")), ignore_errors=True)
-        self.seed("staging", self.current_digest, "-", self.world.commit_a)
-        self.world.registry.clear(), self.world.attested.clear(), self.world.runs.clear(), self.world.artifacts.clear()
-        self.world.docker_log.clear()
-
     # ---- positive: a good bundle is extracted, 0755/0644, no links, under releases/sha256-<hex>/ ----
     def test_a_good_bundle_is_extracted_to_releases_and_not_refused_as_bundle(self):
         x = self.candidate(make_tar(good_files()))
@@ -195,7 +200,7 @@ class Bundle(DeployTest):
         self.assertEqual([a for a in r.world.docker_log if a[1] == "create"][0][:3], ["docker", "create", "--name"])
 
 
-class Siblings(Bundle):
+class Siblings(BundleBase):
     """T5 (S1, R3 V5): every sibling image passes V1 with the same C and the same flags, then V2 and V3."""
 
     def verifies(self, r):

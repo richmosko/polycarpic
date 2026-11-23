@@ -55,8 +55,17 @@ class Flow(DeployTest):
         x = self.staging_candidate(kw.pop("script", None))
         return x, self.deploy("staging", **kw)
 
+    mark = 0
+
+    def deploy(self, *a, **kw):
+        self.mark = len(self.world.compose_log)  # compose calls of the run under test only
+        return super().deploy(*a, **kw)
+
+    def since(self, r):
+        return r.world.compose_log[self.mark:]
+
     def ups(self, r):
-        return [c for c in r.world.compose_log if c["cmd"] == "up"]
+        return [c for c in self.since(r) if c["cmd"] == "up"]
 
     def images_of(self, project=STAGING):
         return {s: c["image"] for s, c in self.world.containers.get(project, {}).items()}
@@ -143,7 +152,7 @@ class Flow(DeployTest):
         x, r = self.upgrade()
         self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused check-config"))
         self.assertIn(x, self.state("staging", "quarantine"))
-        self.assertEqual([c for c in r.world.compose_log if c["cmd"] == "run" and "migrate" in c["rest"]], [])
+        self.assertEqual([c for c in self.since(r) if c["cmd"] == "run" and "migrate" in c["rest"] and "check-config" not in c["rest"]], [])
 
     # --- T10: unhealthy -> rollback ---
     def test_t10_unhealthy_rolls_back_from_the_previous_bundle_without_migrating_and_is_quarantined_once(self):
