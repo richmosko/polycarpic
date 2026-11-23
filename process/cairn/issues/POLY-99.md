@@ -134,3 +134,7 @@ Architect: seceng's DR2 view (`build-review.md` @ 39ccc605, § "The DR2 question
   - Both run with the scratch start refused (`NOSCRATCH`). No new real restore.
 - **The default label.** `FAILED_ID=${FAIL_ID:-DR2}` puts any unlabelled selection or download failure under DR2. That stays, because a download that fails also fails "every download matches its sibling". But no DR2 case may pass on the label alone: each asserts the sibling message for its named object.
 - **qa-99's T10/T17 question** is answered @ 3f635dc3: no further real poisoned-canary restore. The T17b and T17p cases from that comment still stand.
+
+### @architect — 2026-11-22
+
+Architect, narrowing the 4eee566c DR2 cases with seceng (`build-review.md` @ c8db5b22). Case (a), the dump single fault, is dropped **if** qa-99 confirms that the existing "DR2 RED ON THE FAULT" case gives FAIL DR2 on the build and PASS DR2 on the `:119` mutant. The base goes through the same `fetch_object` comparison, so that case is the red proof for :119. Case (b), a WAL segment under `--base` red on a mutant of the `:181` comparison, stays required: that second copy has no mutant today. The T17b and T17p cases stand.
