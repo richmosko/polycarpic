@@ -82,6 +82,7 @@ class World(object):
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
+        self.plan_out, self.psql_result = "", (0, "0\n", "")
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
         self._git_origin()
@@ -332,8 +333,10 @@ class World(object):
             svc = rest[pos[0]]
             tail = rest[pos[0] + 2:]
             if "--plan" in tail:
-                return self.plan_code, "", ""
+                return self.plan_code, self.plan_out, ""
             return self.run_codes.get((svc, tail[0] if tail else ""), 0), "", ""
+        if subcmd == "exec" and "psql" in argv:
+            return self.psql_result  # S19's table read: (code, out, err); stdout's last line is the user-table count
         if subcmd == "exec":
             web = self.containers.get(project, {}).get("web")
             bad = web and web["image"].split("@")[1] in self.bad_apps

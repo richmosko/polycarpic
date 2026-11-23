@@ -213,3 +213,87 @@ class Prod(ProdBase):
             self.assertNotIn("polycarpic-edge", " ".join(c["argv"]))
         self.assertFalse([s for s in r.world.stopped if "caddy" in s[2]])
 
+
+
+class FirstAttempt(ProdBase):
+    """S19 (ruling ad00423d): a first-deploy that stopped at roles-missing may be rerun with no flag, but only on an empty database."""
+
+    DATA = "/srv/polycarpic/pg-prod"
+
+    def setUp(self):
+        super().setUp()
+
+        def init_data(cmd, argv):  # starting Postgres initialises its data directory
+            if cmd == "up" and "postgres" in argv:
+                self.host.write(self.DATA + "/PG_VERSION", "17\n")
+        self.world.on_compose = init_data
+        self.release_of("v1.0.0")
+
+    def roles_missing(self):
+        self.world.plan_code, self.world.plan_out = 2, "refused (roles-missing): poly_migrator is not provisioned\n"
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 4, r.err)
+        self.assertIn("run: sudo polycarpic-ops provision --stage database --project prod", r.err)
+        self.assertIsNone(self.state("prod", "current"))
+        self.assertIsNotNone(self.state("prod", "first-attempt"), "the attempt is recorded before Postgres starts")
+        self.world.plan_code, self.world.plan_out = 3, ""
+        return r
+
+    def test_a_rerun_after_roles_missing_succeeds_with_no_flag_and_no_backup_on_an_empty_database(self):
+        self.roles_missing()
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(self.world.premigration_calls, [])
+        self.assertIsNone(self.state("prod", "first-attempt"), "removed when healthy")
+        self.assertIsNotNone(self.state("prod", "current"))
+
+    def test_the_same_rerun_with_the_first_attempt_file_gone_exits_4(self):
+        self.roles_missing()
+        os.unlink(str(self.sdir("prod") / "first-attempt"))
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 4, r.err)
+        self.assertIn("existing-data", r.err.splitlines()[-1])
+        self.assertEqual(self.world.premigration_calls, [])
+
+    def test_a_rerun_with_one_user_table_requires_the_backup(self):
+        self.roles_missing()
+        self.world.psql_result = (0, "1\n", "")
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(len(self.world.premigration_calls), 1)
+
+    def test_a_rerun_whose_table_read_fails_or_is_unparsable_requires_the_backup(self):
+        for result in ((1, "", "psql: error\n"), (0, "", ""), (0, "ok\n", ""), (0, "0 tables\n", "")):
+            self.world.premigration_calls.clear()
+            shutil.rmtree(str(self.sdir("prod")), ignore_errors=True)
+            self.world.containers.clear()
+            self.host.write(self.DATA + "/PG_VERSION", "")
+            os.unlink(str(self.host.p(self.DATA + "/PG_VERSION")))
+            self.roles_missing()
+            self.world.psql_result = result
+            r = self.deploy("prod", cmd="first-deploy")
+            self.assertEqual(len(self.world.premigration_calls), 1, result)
+
+    def test_a_failing_backup_on_a_rerun_refuses_and_prints_the_provision_command(self):
+        self.roles_missing()
+        self.world.psql_result = (0, "2\n", "")
+        self.world.premigration = (1, "", "no poly_backup\n")
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused premigration-1"))
+        self.assertIn("run: sudo polycarpic-ops provision --stage database --project prod", r.err)
+
+    def test_a_leftover_first_attempt_beside_current_has_no_effect_and_is_removed(self):
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 0, r.err)
+        self.host.write("/var/lib/polycarpic/state/deploy/prod/first-attempt", utc() + "\n")
+        self.release_of("v1.1.0")
+        r = self.deploy("prod")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(len(self.world.premigration_calls), 1, "an ordinary deploy takes its backup whatever the file says")
+        self.assertIsNone(self.state("prod", "first-attempt"))
+
+    def test_the_file_is_not_written_when_the_data_directory_is_already_non_empty(self):
+        self.host.write(self.DATA + "/PG_VERSION", "17\n")
+        r = self.deploy("prod", cmd="first-deploy")
+        self.assertEqual(r.rc, 4, r.err)
+        self.assertIsNone(self.state("prod", "first-attempt"))
