@@ -820,3 +820,15 @@ the zero write-back (S31 c) goes. A third render must not be used to make the YA
 **F16 (new, blocks): every real one-off run fails.** `run` has no `--no-build`, so `check-config` and `migrate` exit with "unknown flag". Our fake accepts any flag, and R3 and T14 require
 this one: I read them and passed them too. *Required:* drop it from `run` (`build` is refused by the guard, and `--pull never` stays). *Test:* every flag of every `docker`, `gh` and
 `git` argv the code builds is checked against the real tool's `--help`, in the lint job (gh and git where installed, never skipped for Compose). Red on the old `run_argv`.
+
+## `121609fe..8a4eae45` (crossed with S34 by one second)
+
+**Accept: JSON as ruled; S34's YAML form is withdrawn as a requirement.** What starts is the same corrected JSON the guard judged, so a dropped zero can change behaviour but cannot
+start anything unjudged; the limits that matter are pinned. S34 answers "another render than the one judged" (it judges the JSON of the saved YAML), so it stays the
+fallback if the comparison fails. Conditions kept:
+- the guard judges the JSON **after** the write-back, and `up` names those bytes, hash re-read;
+- the `create` comparison is for every service, and runs from the file as nobody rendered it. An `up` from it is POLY-104's, since `create` fixes the configuration;
+- `unshare` and `setpriv` are measured **together**, with no-new-privileges, on Ubuntu.
+
+**F16: met for Compose** (R3, T14, real `--help`). Still owed from F16: the same flag check for plain `docker`, `gh` and `git` argv, where the runner has them. The fakes accept any
+flag there too.
