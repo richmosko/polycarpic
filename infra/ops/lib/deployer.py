@@ -64,6 +64,13 @@ class _Skip(Exception):
     pass
 
 
+class _Stop(Exception):
+    """The run ends here with this exit code; the alert and log are already written."""
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
 def _unlink(ctx, project, name):
     try:
         os.unlink(os.path.join(rel.sdir(ctx, project), name))
@@ -73,16 +80,23 @@ def _unlink(ctx, project, name):
 
 # ---- F12: a silent freeze is an alert after an hour
 def mark_transient(ctx, project):
-    since = rel.read(ctx, project, "transient-since")
-    now = ctx.epoch()
-    if since is None:
-        rel.put(ctx, project, "transient-since", rel.now_utc(ctx) + "\n")
-        return
-    t0 = rel.ts.parse(since.strip())
-    if t0 is None:
-        raise Refusal("state")
-    if now - t0 > STALE:
-        rel.alert(ctx, project, "transient-stale")
+    """Never raises (G6): a bad or unwritable file is alerted `state`, and the run still ends as a transient."""
+    try:
+        since = rel.read(ctx, project, "transient-since")
+        now = ctx.epoch()
+        if since is None:
+            rel.put(ctx, project, "transient-since", rel.now_utc(ctx) + "\n")
+            return
+        t0 = rel.ts.parse(since.strip())
+        if t0 is None:
+            raise Refusal("state")
+        if now - t0 > STALE:
+            rel.alert(ctx, project, "transient-stale")
+    except Exception:
+        try:
+            rel.alert(ctx, project, "state")
+        except Exception:
+            pass
 
 
 def clear_transient(ctx, project):
@@ -97,21 +111,29 @@ def _handle_interrupted(project, ctx, cur):
     digest = ip.strip()
     if not rel.DIGEST.fullmatch(digest):
         raise Refusal("state")
-    rel.log(ctx, project, "refused", "interrupted", digest)
     rel.alert(ctx, project, "interrupted")
+    rel.log(ctx, project, "refused", "interrupted", digest)
     prev = rel.read(ctx, project, "interrupted")
     if prev is not None and prev.strip() == digest:
         rel.quarantine(ctx, project, digest, "interrupted")  # the second time for the same digest
     else:
         rel.put(ctx, project, "interrupted", digest + "\n")  # the first time: tried again
-    try:
-        if cur and project == "edge":
-            from lib import edge
-            edge.restore(ctx, cur)
-        elif cur:
-            restore(project, ctx, cur, project == "prod")
-    finally:
-        _unlink(ctx, project, "in-progress")
+    ok = True
+    if cur:  # G6: the answer of the restore counts; the mark is cleared only after a good one
+        try:
+            if project == "edge":
+                from lib import edge
+                ok = edge.restore(ctx, cur)
+            else:
+                ok = restore(project, ctx, cur, project == "prod")
+        except Exception:
+            ok = False
+    if not ok:
+        rel.log(ctx, project, "rollback-unhealthy", digest)
+        rel.alert(ctx, project, "rollback-unhealthy")
+        ctx.err("deploy: rollback-unhealthy")
+        raise _Stop(1)
+    _unlink(ctx, project, "in-progress")
 
 
 def _internal(project, ctx, err, digest, run):
@@ -154,6 +176,8 @@ def _deploy(project, ctx, work, first, existing_data):
         return 0
     except Refusal as err:
         return refuse(project, ctx, err, seen["digest"])
+    except _Stop as stop:
+        return stop.code
 
 
 def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
@@ -216,17 +240,19 @@ def check_edge_env(ctx):
 
 
 def refuse(project, ctx, err, digest="-"):
-    rel.log(ctx, project, "refused", err.name, digest)
-    if err.quarantine and digest != "-":
-        rel.quarantine(ctx, project, digest, err.name)
+    """G6: the alert first, then the log, then the quarantine, each in its own `try`, so a failed write cannot stop the next."""
     text = err.help_lines or ()
-    for line in text:
-        rel.log(ctx, project, "help", line)
-    rel.alert(ctx, project, err.name, text)
+    for step in (lambda: rel.alert(ctx, project, err.name, text),
+                 lambda: [rel.log(ctx, project, "refused", err.name, digest)] + [rel.log(ctx, project, "help", line) for line in text],
+                 lambda: rel.quarantine(ctx, project, digest, err.name) if err.quarantine and digest != "-" else None):
+        try:
+            step()
+        except Exception as fail:
+            ctx.err("deploy: could not write a record: %s" % fail.__class__.__name__)
     for line in text:
         ctx.err(line)
     ctx.err("deploy: refused " + err.name)
-    return err.code
+    return err.code if err.code else 1
 
 
 def _first_preconditions(project, ctx, existing_data):

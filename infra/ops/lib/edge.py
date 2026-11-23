@@ -67,7 +67,7 @@ def deploy(tag, ctx):
         os.chmod(work, 0o700)
         try:
             return _run(tag, ctx, work, seen, run)
-        except (rel.Transient, Refusal):
+        except (rel.Transient, Refusal, deployer._Stop):
             raise
         except Exception as err:  # F2: one handler: before the first `up` a refusal, after it a rollback to edge's previous
             rel.log(ctx, "edge", "refused", "internal", seen["digest"])
@@ -84,6 +84,8 @@ def deploy(tag, ctx):
         return 1
     except Refusal as err:
         return deployer.refuse("edge", ctx, err, seen["digest"])
+    except deployer._Stop as stop:
+        return stop.code
     finally:
         if work:
             rel.remove_tree(work)
