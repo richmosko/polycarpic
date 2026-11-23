@@ -381,3 +381,14 @@ deploy, makes any later certificate from another account fail at the CA. Today C
 only account store.
 
 **Gate: not open.** S14 and S15 are two small ruling edits, plus their T8 and T9 cases. Everything else is met.
+
+## Re-check @ `569f8798` (S14, S15)
+
+| Condition | At `569f8798` |
+|---|---|
+| S14 network judged by its resolved entry | **Met.** R5 `network` compares the top-level entry's `name`, `external` and `driver` to the installed list and refuses any other property. SM6's file is refused. T8 carries it. |
+| S15 `app.` record only after the prod wipe | **Met.** R9 Order, `edge-prod-name-early` exit 4 changing nothing, the instruction printed last, T9, §L5. |
+| No `--caddy-never-staged` flag (architect's deviation) | **Accept; better than my form.** The refusal fires only when a staging-era caddy container exists and prod has no `current`, which is computed from root's state and Docker. The case my flag covered, a host where no staging edge ever ran, has no caddy container and is not refused, so the flag could only have added a bypass. A caddy that existed and was removed cannot be issuing anything. Whatever it left in `/srv/polycarpic/caddy` is emptied by the first-deploy wipe (S11 ii). |
+| A9 CAA `accounturi` | Advisory, as I filed it. |
+
+**Gate: open.** S1–S15 are met at `569f8798`. D1(b), D2(a), D3(a): I recommend each, with the plain-language text above.
