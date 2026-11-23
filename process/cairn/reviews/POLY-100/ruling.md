@@ -207,6 +207,10 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 - **What health sees of Caddy.** Its healthcheck is `caddy version`, so R7 catches a Caddy that does not start, not one
   that starts and routes wrongly. Such a release needs the manual rollback.
 
+- **What lifts a quarantine.** A `guard-<rule>` line holds only while its bundle id equals the installed one. After
+  `install.sh` installs another bundle the next poll takes the digest again and runs V1–V7 in full; the operator clears
+  nothing. Every other reason holds for good: there is no clear command, and the fix is a new digest.
+
 ## R9 — Edge (seceng hole 3; §D2)
 
 - `edge.yml`, the Caddyfile and the Caddy image come from **prod's** signed release, and are rendered and upped only by
@@ -247,7 +251,7 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 | File | Content |
 |---|---|
 | `current`, `previous` | one line `<digest> <tag or -> <commit> <tree sha256> <UTC>` |
-| `quarantine` | lines `<digest> <UTC> <reason>` |
+| `quarantine` | lines `<digest> <UTC> <reason>`; a `guard-<rule>` line adds a fourth field, the installed ops bundle id (`readlink /opt/polycarpic/ops/current`) |
 | `deploy.log` | append `<UTC> <event> <fields>`. Events are a closed set: `candidate verified refused transient busy quarantined not-newer premigration-set migrated up healthy rolled-back rollback-unhealthy` |
 | `alert` | one line `<UTC> <refusal or event>`. Written on every stop or rollback; removed on the next healthy run |
 | `last-poll` | UTC of the last run that read GitHub successfully (seceng A-c) |
@@ -380,6 +384,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-prod-edge` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
 | T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check; mutants where `EAI_AGAIN`, a missing `POLY_DOMAIN` or a failing `compose ps` reads as safe; mutant wiping under a running caddy when staging has no `current` |
 | T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
+| T10q | A `guard-<rule>` digest is skipped while the bundle id is unchanged; after the id changes it is judged again in full (deploys if it passes, is refused again if not). An `unhealthy` digest stays skipped after the same change | mutant lifting every reason; mutant never lifting; mutant lifting without V1 |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8) | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
