@@ -146,3 +146,36 @@ class NonUtf8(unittest.TestCase):
         from lib import ctx
         code, out, err = ctx._real_run(["/nonexistent/binary"])
         self.assertEqual(code, 127)
+
+
+class S33(unittest.TestCase if False else DeployTest):
+    """S33 (ruling 121609fe): the `interrupted` file's read rule and what clears it."""
+    new_commit = fl.Flow.new_commit
+    staging_candidate = fl.Flow.staging_candidate
+    hex_dir = fl.Flow.hex_dir
+    first = fl.Flow.first
+    ups = fl.Flow.ups
+    since = fl.Flow.since
+    mark = 0
+    setUp = F2.setUp
+
+    def test_an_unreadable_interrupted_file_is_state(self):
+        self.first()
+        self.staging_candidate()
+        p = self.host.p("%s/staging/interrupted" % SDIR)
+        p.mkdir()
+        r = self.deploy("staging")
+        self.assertEqual((r.rc, last(r)), (1, "deploy: refused state"), r.err)
+
+    def test_another_digest_between_two_interruptions_is_not_banned(self):
+        self.first()
+        x2 = self.staging_candidate()
+        self.host.write("%s/staging/interrupted" % SDIR, x2 + "\n")  # x2 was interrupted once
+        x3 = self.staging_candidate()  # main moved on: another digest is tried (and becomes healthy)
+        self.assertEqual(self.deploy("staging").rc, 0)
+        self.assertEqual(self.state("staging", "current").split()[0], x3)
+        self.assertIsNone(self.state("staging", "interrupted"), "removed when another digest is tried / becomes healthy")
+        # x2 comes back interrupted again: this is its FIRST interruption again, not its second
+        self.host.write("%s/staging/in-progress" % SDIR, x2 + "\n")
+        self.assertNotIn(x2, self.state("staging", "quarantine") or "")
+

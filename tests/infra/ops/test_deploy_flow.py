@@ -83,7 +83,7 @@ class Flow(DeployTest):
         self.assertEqual(set(self.images_of().values()) & {"ghcr.io/richmosko/polycarpic@" + x2}, {"ghcr.io/richmosko/polycarpic@" + x2})
 
     # --- T14 ---
-    def test_t14_every_up_and_run_carries_pull_never_and_no_build_and_only_release_files(self):
+    def test_t14_every_up_and_run_carries_pull_never_and_up_alone_carries_no_build(self):  # ruling 8a4eae45: `compose run` has no --no-build; `up` has
         self.first()
         x2, r = self.upgrade()
         cs = [c for c in r.world.compose_log if c["cmd"] in ("up", "run")]
@@ -91,12 +91,10 @@ class Flow(DeployTest):
         for c in cs:
             a = c["argv"]
             self.assertEqual(a[a.index("--pull") + 1], "never", a)
-            self.assertIn("--no-build", a)
-            for i, tok in enumerate(a):
-                if tok in ("-f", "--env-file", "--project-directory"):
-                    if a[i + 1].endswith("/etc/polycarpic/edge.env"):
-                        continue  # R4: the edge calls name the host's edge.env
-                    self.assertIn("/opt/polycarpic/releases/sha256-", a[i + 1])
+            if c["cmd"] == "up":
+                self.assertIn("--no-build", a)
+            else:
+                self.assertNotIn("--no-build", a, "real Compose rejects `run --no-build`; the guard refuses any `build` instead")
 
     # --- T7: the bundle is data; nothing it carries runs or replaces anything ---
     def test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release(self):
@@ -114,7 +112,7 @@ class Flow(DeployTest):
             a = c["argv"]
             for i, tok in enumerate(a):
                 if "/releases/" in tok:
-                    self.assertIn(a[i - 1] if i else "", PATH_FLAGS + ("--project-directory",), "an argv element under releases/ outside -f/--env-file/--project-directory: %r" % a)
+                    self.assertTrue("config" in a and a[i - 1] in PATH_FLAGS, "a releases/ path outside config's -f/--env-file/--project-directory (ruling F4): %r" % (a,))
             self.assertNotIn("/releases/", a[0])
         # the box's own programs: the installed ops bundle is byte-identical
         self.assertEqual({k: v for k, v in before.items() if k.startswith("opt/polycarpic/ops")}, {k: v for k, v in after.items() if k.startswith("opt/polycarpic/ops")})
@@ -208,10 +206,10 @@ class Flow(DeployTest):
         x2 = self.staging_candidate()
         orig = self.world._compose
 
-        def exec_503(argv):
+        def exec_503(argv, stdin=None):
             if "exec" in argv:
                 return 0, "503\n", ""
-            return orig(argv)
+            return orig(argv, stdin)
         self.world._compose = exec_503
         r = self.deploy("staging")
         self.assertEqual(r.err.splitlines()[-1] if r.err else "", "deploy: rollback-unhealthy")
