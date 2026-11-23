@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -22,7 +22,7 @@ INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh a
 - [ ] A failed attestation, a bad tag signature and a wrong commit label each stop the deploy and alert.
 - [ ] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running.
 - [ ] The script never rewrites itself.
-- [ ] The bad-migration rollback runbook restores from the pre-migration backup on the operator's laptop within 60 minutes (measured in the restore drill).
+- [ ] The bad-migration rollback runbook's inputs are proven: `backup premigration`, then a restore from the pre-migration backup on the operator's laptop (T13). The 60-minute timing is measured in the restore drill, POLY-116.
 - [ ] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction).
 - [ ] Two migrate runs started together: the second waits on the advisory lock and then applies nothing.
 
@@ -83,3 +83,7 @@ From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.m
 
 Feature started. Branch: `feature/poly-100-pull-based-deploy`.
 From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8; ruling R6 is the contract): the deploy calls `polycarpic-ops backup premigration` and migrates only on exit 0 (1 failed, 3 not ready, 4 lock not got in 30 min), writing the `premigration-set …` line to deploy.log. Also this issue's: write /opt/polycarpic/images.env; enable both timers; publish and attest the tools image; install the ops bundle from the verified image; the deploy lock alongside backup.lock; `github_read_token` joins HOST_ONLY only through seceng's pinned-set review (secrets/host/, root:root 0400).
+
+### @team-lead — 2026-11-23
+
+Criterion 5 reworded with the Principal's agreement (2026-11-23), at the architect's request (ruling §L1): this loop proves the runbook's inputs (T13); the 60-minute timing is POLY-116's, where the timed drill lives. The old text read "within 60 minutes (measured in the restore drill)".
