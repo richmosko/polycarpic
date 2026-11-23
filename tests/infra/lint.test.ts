@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { baseline, giveSecret, materialise, PG_DIGEST, PG_IMAGE_ENV, secretFile, type FxSet } from './baseline.ts';
+import { ENV_FILES, baseline, giveSecret, materialise, PG_DIGEST, PG_IMAGE_ENV, secretFile, type FxSet } from './baseline.ts';
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..', '..');
 const LINT = join(ROOT, 'infra', 'lint', 'compose-policy.mjs');
@@ -238,37 +238,57 @@ describe.concurrent('compose-policy lint: fail fixtures (pass baseline + one mut
   });
 });
 
-// POLY-100 R11 / seceng: env_file is allowed only as the project's own host env file, a single entry, on the five app services.
-// (This loosens POLY-95's "no env_file anywhere" lint to exactly that; the refusals below are what keeps it from being a hole.)
-const HOST = { prod: '/etc/polycarpic/host.env', staging: '/etc/polycarpic/staging-host.env' } as const;
-const APP5 = ['web', 'auth', 'worker', 'migrate', 'operator'];
-const ENV_FAIL: [string, 'prod' | 'staging', string, any][] = [
-  ['an unrelated file', 'prod', 'worker', ['/etc/passwd']],
-  ['a path that merely starts with the host env', 'prod', 'worker', ['/etc/polycarpic/host.env.evil']],
-  ['a path that merely contains the host env', 'prod', 'worker', ['/tmp/etc/polycarpic/host.env']],
+// POLY-100 S27 (ruling-review.md @ d6cb5d6b): env_file is an exact, ordered list per service and project; every other service has none. The lint compares the
+// whole list, empty included, from the raw YAML. (This loosens POLY-95's "no env_file anywhere" lint to exactly that table; the refusals are what keeps it from being a hole.)
+const ALL = (['prod', 'staging'] as const).flatMap((p) => Object.entries(ENV_FILES[p]).map(([n, l]) => [p, n, [...l]] as ['prod' | 'staging', string, string[]]));
+const H = { prod: '/etc/polycarpic/host.env', staging: '/etc/polycarpic/staging-host.env' };
+const M = { prod: '/etc/polycarpic/mail.env', staging: '/etc/polycarpic/staging-mail.env' };
+type EF = [string, 'prod' | 'staging', string, any];
+const ENV_FAIL: EF[] = [
+  ['an unrelated file', 'prod', 'worker', [H.prod, '/etc/passwd']],
+  ['a prefix of the host env', 'prod', 'web', ['/etc/polycarpic/host.env.evil']],
   ['a longer name sharing the prefix', 'prod', 'web', ['/etc/polycarpic/host.envx']],
   ['a directory prefix', 'prod', 'web', ['/etc/polycarpic/host']],
-  ['a traversal out of the host env', 'prod', 'web', ['/etc/polycarpic/host.env/../../passwd']],
+  ['a traversal that resolves to the allowed path', 'prod', 'web', ['/etc/polycarpic/../polycarpic/host.env']],
+  ['a traversal out of the file', 'prod', 'web', ['/etc/polycarpic/host.env/../../passwd']],
   ['a relative path', 'prod', 'web', ['host.env']],
-  ['staging naming prod\'s file', 'staging', 'web', [HOST.prod]],
-  ['prod naming staging\'s file', 'prod', 'web', [HOST.staging]],
-  ['the host env and a second file', 'prod', 'worker', [HOST.prod, '/etc/passwd']],
-  ['the object form with required: false', 'prod', 'auth', [{ path: HOST.prod, required: false }]],
-  ['the object form with an extra key', 'prod', 'auth', [{ path: HOST.prod, required: true, format: 'raw' }]],
-  ['the object form with another path', 'staging', 'auth', [{ path: '/etc/passwd', required: true }]],
-  ['a service outside the five (prod postgres)', 'prod', 'postgres', [HOST.prod]],
-  ['a service outside the five (prod backup)', 'prod', 'backup', [HOST.prod]],
-  ['a service outside the five (prod uploader)', 'prod', 'uploader', [HOST.prod]],
-  ['a service outside the five (staging postgres)', 'staging', 'postgres', [HOST.staging]],
+  ['a variable', 'prod', 'web', ['${HOST_ENV}']],
+  ["staging naming prod's host env", 'staging', 'web', [H.prod]],
+  ["prod naming staging's host env", 'prod', 'web', [H.staging]],
+  ["staging auth naming prod's mail env", 'staging', 'auth', [H.staging, M.prod]],
+  ["prod auth naming staging's mail env", 'prod', 'auth', [H.prod, M.staging]],
+  ['mail env on web', 'prod', 'web', [H.prod, M.prod]],
+  ['mail env on migrate', 'staging', 'migrate', [H.staging, M.staging]],
+  ['mail env on operator', 'prod', 'operator', [H.prod, M.prod]],
+  ['auth missing its mail env (a subset)', 'prod', 'auth', [H.prod]],
+  ['worker missing its mail env (a subset)', 'staging', 'worker', [H.staging]],
+  ['auth with the two swapped', 'prod', 'auth', [M.prod, H.prod]],
+  ['worker with the two swapped', 'staging', 'worker', [M.staging, H.staging]],
+  ['a duplicate', 'prod', 'auth', [H.prod, H.prod]],
+  ['the host env twice and the mail env', 'prod', 'auth', [H.prod, M.prod, H.prod]],
+  ['a third file', 'prod', 'worker', [H.prod, M.prod, '/etc/polycarpic/extra.env']],
+  ['required: false on the host env', 'prod', 'web', [{ path: H.prod, required: false }]],
+  ['required: false on the mail env', 'prod', 'auth', [H.prod, { path: M.prod, required: false }]],
+  ['an extra key in the object form', 'prod', 'auth', [{ path: H.prod, required: true, format: 'raw' }, M.prod]],
+  ['the object form with another path', 'staging', 'auth', [{ path: '/etc/passwd', required: true }, M.staging]],
+  ['postgres with the host env', 'prod', 'postgres', [H.prod]],
+  ['backup with the host env', 'prod', 'backup', [H.prod]],
+  ['uploader with the host env', 'prod', 'uploader', [H.prod]],
+  ['staging postgres with the host env', 'staging', 'postgres', [H.staging]],
 ];
 const ENV_PASS: [string, 'prod' | 'staging', string, any][] = [
-  ...(['prod', 'staging'] as const).flatMap((p) => APP5.map((n) => [`${p} ${n}: the plain path`, p, n, [HOST[p]]] as [string, 'prod' | 'staging', string, any])),
-  ['prod auth: the object form with required: true', 'prod', 'auth', [{ path: HOST.prod, required: true }]],
-  ['staging worker: the object form without required', 'staging', 'worker', [{ path: HOST.staging }]],
+  ...ALL.map(([p, n, l]) => [`${p} ${n}: the exact list`, p, n, l] as [string, 'prod' | 'staging', string, any]),
+  ['prod auth: the object form with required: true', 'prod', 'auth', [{ path: H.prod, required: true }, M.prod]],
+  ['staging worker: the object form without required', 'staging', 'worker', [{ path: H.staging }, { path: M.staging, required: true }]],
 ];
-describe.concurrent('POLY-100: env_file is the host env file and nothing else', () => {
+describe.concurrent('POLY-100 S27: env_file is the exact list of its service', () => {
   it.each(ENV_FAIL)('refused: %s', async (_n, proj, sn, val) => {
     const r = await runSet((s) => { svc(s, proj, sn).env_file = val; });
+    expect(r.code, r.err).not.toBe(0);
+    expect(r.err).toMatch(rule('env-file'));
+  });
+  it.each(ALL.map(([p, n]) => [p, n] as const))('refused: %s %s with no list at all (the whole list, empty included, is compared)', async (proj, sn) => {
+    const r = await runSet((s) => { delete svc(s, proj, sn).env_file; });
     expect(r.code, r.err).not.toBe(0);
     expect(r.err).toMatch(rule('env-file'));
   });
@@ -276,14 +296,14 @@ describe.concurrent('POLY-100: env_file is the host env file and nothing else', 
     const r = await runSet((s) => { svc(s, proj, sn).env_file = val; });
     expect({ code: r.code, err: r.err }).toEqual({ code: 0, err: '' });
   });
-  it('the CI lint and the box guard read the same list: the five app services, each with exactly the project\'s host env file', () => {
+  it('the shared list holds the S27 table literally, and the lint and the box guard read it from the same file', () => {
     const allow = JSON.parse(readFileSync(join(ROOT, 'infra', 'deploy', 'compose-allow.json'), 'utf8'));
     for (const proj of ['prod', 'staging'] as const) {
-      const withEnv = Object.entries<any>(allow.projects[proj].services).filter(([, sp]) => (sp.env_files ?? []).length).map(([n]) => n).sort();
-      expect(withEnv, proj).toEqual(APP5.filter((n) => n in allow.projects[proj].services).sort());
-      for (const n of withEnv) expect(allow.projects[proj].services[n].env_files, `${proj} ${n}`).toEqual([HOST[proj]]);
-      for (const [n, sp] of Object.entries<any>(allow.projects[proj].services)) if (!APP5.includes(n)) expect(sp.env_files ?? [], `${proj} ${n}`).toEqual([]);
+      const got: Record<string, string[]> = {};
+      for (const [n, sp] of Object.entries<any>(allow.projects[proj].services)) if ((sp.env_files ?? []).length) got[n] = sp.env_files;
+      expect(got, proj).toEqual(ENV_FILES[proj]);
     }
+    expect(allow.projects.edge?.services?.caddy?.env_files ?? []).toEqual([]);
   });
 });
 

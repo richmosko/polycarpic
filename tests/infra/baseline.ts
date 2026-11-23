@@ -1,9 +1,10 @@
 // POLY-95 R7: the pass fixture, built in code so every fail fixture is "the pass fixture plus ONE mutation".
 // The shape follows INFRA §2.2 and the gate-1 ruling (process/cairn/reviews/POLY-95/ruling.md @ 9e59e9b + A1 703fa9b).
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';
 
+const REPO = join(dirname(new URL(import.meta.url).pathname), '..', '..');
 export const PG_DIGEST = 'sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317';
 export const PG_IMAGE_ENV = `ghcr.io/richmosko/polycarpic-postgres:17.10@sha256:${'d'.repeat(64)}`;
 const APP = `ghcr.io/richmosko/polycarpic@sha256:${'a'.repeat(64)}`;
@@ -101,8 +102,17 @@ function project(kind: 'prod' | 'staging'): Y {
     if (!services[svc]) continue;
     for (const n of names) giveSecret(proj, prod, svc, n);
   }
+  for (const [svc, list] of Object.entries(ENV_FILES[kind])) if (services[svc]) services[svc].env_file = [...list]; // S27: the exact lists
   return proj;
 }
+
+/** S27 (ruling-review.md @ d6cb5d6b), held literally: the env_file list of each service, in order. Every other service has none. */
+export const ENV_FILES = {
+  prod: { auth: ['/etc/polycarpic/host.env', '/etc/polycarpic/mail.env'], worker: ['/etc/polycarpic/host.env', '/etc/polycarpic/mail.env'],
+          web: ['/etc/polycarpic/host.env'], migrate: ['/etc/polycarpic/host.env'], operator: ['/etc/polycarpic/host.env'] },
+  staging: { auth: ['/etc/polycarpic/staging-host.env', '/etc/polycarpic/staging-mail.env'], worker: ['/etc/polycarpic/staging-host.env', '/etc/polycarpic/staging-mail.env'],
+             web: ['/etc/polycarpic/staging-host.env'], migrate: ['/etc/polycarpic/staging-host.env'], operator: ['/etc/polycarpic/staging-host.env'] },
+} as const;
 
 const HBA_PROD = `host  replication  poly_backup    10.201.10.0/29  scram-sha-256
 host  polycarpic   poly_backup    10.201.10.0/29  scram-sha-256
@@ -241,7 +251,8 @@ export function baseline(): FxSet {
       'infra/postgres/pg_hba.staging.conf': HBA_STAGING,
       'infra/postgres/postgresql.prod.conf': 'archive_mode = on\nallow_alter_system = off\n',
       'infra/postgres/postgresql.staging.conf': 'archive_mode = off\nallow_alter_system = off\n',
-      'infra/caddy/Caddyfile': CADDYFILE,
+      'infra/caddy/Caddyfile': readFileSync(join(REPO, 'infra', 'caddy', 'Caddyfile'), 'utf8'), // POLY-100 A12: the lint holds the real Caddyfile as an allowlist, so the baseline is the real one
+      'infra/deploy/compose-allow.json': readFileSync(join(REPO, 'infra', 'deploy', 'compose-allow.json'), 'utf8'), // the lint and the box guard read the env_file lists from it (S27)
       'tests/db/docker/Dockerfile': 'ARG PG_BASE\nFROM ${PG_BASE}\nRUN apt-get update && apt-get install -y --no-install-recommends postgresql-17-pgtap && rm -rf /var/lib/apt/lists/*\n',
       '.github/workflows/ci.yml': 'name: ci\non: push\njobs:\n  db:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n',
     },
