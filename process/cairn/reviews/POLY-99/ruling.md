@@ -282,7 +282,7 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 | DR5 | After `roles.sql` is re-run on each instance: `DO $$BEGIN END$$` as poly_app fails with `permission denied for language plpgsql`; `query_to_xml('SELECT 1', true, false, '')` fails with `permission denied for function` (SQLSTATE 42501, the message asserted) |
 | DR6 | Each role in `roles.sql` exists in both instances |
 | DR7 | The row count of every FORCE-RLS table equals between the dump and the base restores |
-| DR8 | No `public.session` row lacks an `app.session_handle` row (F4) |
+| DR8 | No `public.session` row lacks an `app.session_handle` row (F4). *(Correction, verdict read:)* FAIL, not PASS, when either table is absent: a check with nothing to check fails loudly |
 | DR9 | Trial balance sums to zero per entity; the hash-chain verifier passes; the newest journal entry is within 20 min of the drill's start. SKIP while the schema has no ledger (today) |
 | DR11 | R7's replay check on every chosen artifact (archive time vs name vs upload time) |
 | DR10 | With the box credential: deleting an object, uploading over an existing version, shortening a retention, changing the bucket default retention are each refused |
@@ -387,6 +387,18 @@ GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 - **Scratch stack:** the derivative image built from `infra/postgres/Dockerfile`, the prod `postgresql.prod.conf` and
   `pg_hba.prod.conf`, `roles.sql` applied, poly_backup's password set; `backup` and `uploader` started from the
   **rendered `prod.yml` service definitions**, with only image refs and host paths overridden.
+  - *(Correction, verdict read; measured.)* After `roles.sql`, the stack applies the real migration chain from
+    `packages/db/migrations`. Each file runs in journal order as `poly_owner`, one transaction per file, after the
+    `drizzle` schema and tracking table are created.
+    - Measured: twice, on `polycarpic-postgres:ci`, 0.39 s and 0.44 s for the whole chain, with
+      `public.session` and `app.session_handle` present after it.
+    - The stack plants one `session` row with its handle before the set is taken. So DR8, DR7 (real FORCE-RLS tables)
+      and INFRA's F4 run on real tables.
+    - Tests:
+      - the happy drill passes DR8 with one session counted;
+      - a mutant restore that loads the dump data-only, or deletes the handle in the scratch, makes DR8 FAIL;
+      - with the tables dropped from a scratch, DR8 FAILs and names them.
+    - Cost: under 1 s of setup, plus a slightly larger set. No new restore.
 - **Spool watcher:** `inotifywait -m -r` on the spool and on the backup container's `/tmp` (`CREATE`, `CLOSE_WRITE`,
   `MOVED_TO`) in a side container. In `/tmp`, nothing but the passfile may appear. In the spool, each
   created name must match R2 or the `.inflight` temporary form. Each closed file must start with the age header and
