@@ -141,10 +141,15 @@ def _files(sp, svc, plain):
 
 
 def _env(sp, raw_svc):
+    got = []
     for e in raw_svc.get("env_file") or []:
-        path = e.get("path") if isinstance(e, dict) else e
-        if path not in sp.get("env_files", []):
-            fail("env")
+        if isinstance(e, dict):
+            if set(e) - {"path", "required"} or e.get("required") is False:
+                fail("env")
+            e = e.get("path")
+        got.append(e)
+    if got != sp.get("env_files", []):  # exact list, exact paths: no prefix, pattern, relative path, second file or other project's host env
+        fail("env")
 
 
 def _ports(sp, svc, bind_addr):

@@ -177,7 +177,8 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     // POLY-100 R11: the five app services read the host env file named for their project, and nothing else reads any env_file
     const envFiles = list(s.env_file);
     const hostEnv = kind === 'prod' ? '/etc/polycarpic/host.env' : '/etc/polycarpic/staging-host.env';
-    const hostOnly = envFiles.length === 1 && envFiles[0]?.path === hostEnv && envFiles[0]?.required !== false && Object.keys(envFiles[0]).every((k) => k === 'path' || k === 'required');
+    const entry = typeof envFiles[0] === 'string' ? { path: envFiles[0] } : envFiles[0];
+    const hostOnly = envFiles.length === 1 && entry?.path === hostEnv && entry?.required !== false && Object.keys(entry).every((k) => k === 'path' || k === 'required');
     if (envFiles.length && !(hostOnly && ['web', 'auth', 'worker', 'migrate', 'operator'].includes(sn))) v('env-file', rel, `${at}: env_file`);
     for (const [ek, ev] of Object.entries(s.environment ?? {})) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
