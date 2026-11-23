@@ -273,6 +273,11 @@ expired. POLY-103 sends `alert` outward.
 - **Env wiring.** web, auth, worker, migrate and operator get:
   - `env_file: /etc/polycarpic/host.env` (staging: `staging-host.env`);
   - `DATABASE_HOST/PORT/NAME/USER/SSLMODE/PASSWORD_FILE` and `APP_ENV` in `environment:`.
+  - `PLAID_ENV` in `environment:`, beside `APP_ENV`: `sandbox` in `staging.yml`, `production` in `prod.yml`. Never in
+    `host_env()`: it follows the project, not the host, and `environment:` wins over `env_file`, so a host file cannot
+    change it. Prod says `production` from the first deploy, and check-config stays strict (C-77). The value opens
+    nothing by itself: nothing outside `packages/config` reads it today, and a Plaid call also needs `plaid_secret`. An
+    unset-allowed rule would be a gap to remember to close when the adapter lands.
 
   `DB_PASSWORD_FILE` is removed: no service passes `check-config` with it today. This covers the operator (POLY-98 M4) and
   the worker (POLY-142).
@@ -367,7 +372,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T18 | `HOST_ONLY` pin test fails on a third name; `set-secret github_read_token` refuses a `ghp_` value with exit 2; the sweep finds the token in no output or log (S8) | mutant pin with a third name; mutant without the shape check |
 | T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5); TEMPORARY to poly_backup on a **sibling** database, refused through the shared `pg_database` row. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read; mutant exempting every `pg_database` row |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
-| T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it | mutant compose keeping `DB_PASSWORD_FILE` |
+| T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped |
 
 Every refusal test asserts the exit code and the refusal name, and each guard has a positive case. Criterion 6 is
 `tests/db/runner.test.ts` "a failing file leaves schema and tracking unchanged", which is already green; qa cites it.
@@ -437,6 +442,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
   - §4.4–§4.6;
   - §4.4's re-run sentence, which is wrong: a re-run keeps the original commit;
   - §7.1 first-deploy;
+  - D-9: no provision-check line checks staging's `PLAID_ENV`; `check-config` and T-env do;
   - §8.6.
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
