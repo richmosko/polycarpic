@@ -514,6 +514,51 @@ requires:
 
 Nothing else changed. The plan gate stays clear.
 
+## Two build choices, ruled before build green (test-plan pins 28–29; qa `e2c7974d`, `49fff8d9`)
+
+**B-1. T16: a validated name must also be passed safely. Two guards, not one.** **Refused as agreed**: "the builder
+passes the box name to ssh as a raw word, and the grammar check is the only guard". The test must not shape the code
+toward a single guard.
+- *Mechanism.* ssh has no remote argv. It joins its arguments with spaces, and `polyops`'s login shell parses the
+  result **before** `sudo` runs. So `--` or argv discipline on the laptop does not reach the remote side. The only
+  second guard is quoting for that shell. A hostile name that gets past the grammar check runs as `polyops`, who is
+  root by `sudo` (R-29). The name comes from `list-premigration`, whose spool the backup uid writes.
+- *Required in `restore.sh`:*
+  1. The grammar check, as pinned (the `# T16` line).
+  2. The remote command is one string, built by a single function. Only that function may build it, and only for the
+     two fixed forms: `sudo polycarpic-ops backup list-premigration` and `sudo polycarpic-ops backup
+     fetch-premigration '<name>'`. The name is wrapped in single quotes, and any `'` inside it becomes `'\''`. R2 names
+     contain none, so this is the second guard, not a rewrite. Mark that line `# T16q`.
+  3. `ssh … -- <user@host> "<that string>"`. The `--` stops a hostile `--from-box` value from being read as an ssh
+     option (`-oProxyCommand=…`), on top of the `bad --from-box` pattern check. No other remote command is ever sent.
+- *Fake ssh.* It must run the remote string through a real `sh -c`, as sshd does. A fake that execs argv cannot see
+  shell injection, and T16 would then pass on code that is exploitable.
+- *How T16 shows red with two guards.* The hostile names are the five already pinned. One of them, `$(touch <canary>)`,
+  writes a canary file in the box fixture.
+  - **T16a**, the mutant without the `# T16` check: red, because it sends a `fetch-premigration` for the hostile name.
+    The assertion is "exit 5 and no further ssh command". The canary stays absent, because `# T16q` still quotes the
+    name.
+  - **T16b**, the mutant without both `# T16` and `# T16q`: red, because the canary file appears. This proves the
+    fake's shell is real.
+  - **T16c**, the mutant without `# T16q` only: green. The check alone stops it. That is expected, and shows the
+    quoting is an independent guard, not dead code.
+  - Plus a static case: the ssh line holds `--` before the destination.
+
+**B-2. No production script reads a test variable.** **Ruled: none may.**
+- *Rule.* No tracked file under `infra/` reads `POLY99_SCRATCH_FAIL` or any other test-only variable. The shim that
+  reads `POLY99_SCRATCH_FAIL` lives under `tests/` only, and is put on `PATH` by the harness.
+- *The one override production honours* is `POLY_B2_AUTH_URL`, bounded by C8. It is named in the allowlist, never
+  matched by a pattern.
+- *The proof.* A new case in `tests/infra/lint-poly99.test.ts`, the **`no-test-vars`** rule:
+  - Over `git ls-files infra/`, no file matches `\bPOLY99_`, `\bPOLY_TEST`, `\bFAKE_` or `_FAKE\b`.
+  - Every `POLY_*` name read in `infra/backup/`, `infra/restore.sh`, `infra/drill.sh` and `infra/ops/` is in a
+    pinned allowlist: `POLY_INSTANCE`, `POLY_POSTGRES_IMAGE`, `POLY_TOOLS_IMAGE`, `POLY_APP_IMAGE`,
+    `POLY_B2_AUTH_URL`, plus any the builder shows is already read on `main`.
+  - *Red:* a fixture copy of `restore.sh` with a `${POLY99_SCRATCH_FAIL:-}` read fails the rule, and so does one
+    reading an unlisted `POLY_DEBUG`.
+  - Today `git grep POLY99_` finds the name only under `tests/` and in `test-plan.md`, so the rule starts green on
+    the tree.
+
 **Noted for the build review:**
 - I will read `infra/lint/policy.json` (the uploader's allowlist, which devops-99 changed) by name, as a diff
   against `09aeeeb2`.
