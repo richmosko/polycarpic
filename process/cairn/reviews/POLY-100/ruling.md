@@ -36,7 +36,7 @@ IN: R1–R13. OUT:
 | Box-side copy back into prod (`restore-apply`) | POLY-158 | DECISIONS 2026-11-23 D2. |
 | Criterion 5's **timing** (60 min, on the laptop) | POLY-116 | The timed drill is the GA gate there. This loop proves the runbook's inputs (T13). **§L1.** |
 | Outbound alert route; token-expiry alert; Rekor watch (seceng A-b) | POLY-103 | Monitoring. This loop writes the files it reads (R10). |
-| Live first deploy; real `check-config` in the rendered env; units under real systemd; the real token (§D1) | POLY-104 | First staging deploy. |
+| Live first deploy; the guard over the real bundle under the box's own compose version, plus one refused case (SM6); real `check-config` in the rendered env; units under real systemd; the real token (§D1) | POLY-104 | First staging deploy. |
 | Home-box DNS-plugin Caddy build; home egress allowlist (`tuf-repo-cdn.sigstore.dev`, `ghcr.io`, `api.github.com`, `github.com`) | POLY-120 | Home box is post-GA. |
 | `polycarpic-ops self-update` (INFRA §8.7) | **§L2** (unhomed) | The ops tool keeps updating by `install.sh` (§D3). |
 | `migrate --plan` under a read-only credential (seceng A-a) | not taken | R6 takes the prod backup before any candidate container holds a credential, which closes the same window. |
@@ -120,7 +120,9 @@ the image was attested at is therefore refused by V1 as `attestation` (no Q, as 
   `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE`, each `=ghcr.io/richmosko/polycarpic-<postgres|tools|caddy>@sha256:<64>`,
   with name↔repo fixed. It is written root 0644 by atomic rename, only after V5.
 - Every compose call is `-p polycarpic-<project> --project-directory releases/<d>/infra/compose -f releases/<d>/infra/compose/<project>.yml --env-file releases/<d>/images.env`.
-  - Prod's edge calls add `-f …/edge.yml --env-file /etc/polycarpic/edge.env`.
+  - Edge is its own project: `-p polycarpic-edge`, `-f …/edge.yml`, plus `--env-file /etc/polycarpic/edge.env`. `up` runs
+    whenever the project owns edge and compose decides whether anything changed: an equal Caddy image does not mean an
+    equal `edge.yml`.
   - The installed script fixes the project, the kind and the files; the bundle cannot choose any of them (seceng D10).
 - **R-b:** `lib/compose.py` resolves compose files from `releases/<project>-current` (a root symlink) when it exists, else
   from the ops bundle. `backup.py` (`BUNDLE_COMPOSE`), `upload.py`, `cli.py` and `set_secret.py` all go through it.
@@ -168,7 +170,7 @@ Q = quarantine. Steps 3–4 are prod only (staging has no backup service).
 | 8 | `up -d --pull never --no-build` for the project; edge per R9 | — |
 | 9 | Health (R7): healthy → state (R10), prune (R4), clear alert | unhealthy → R8 |
 
-Every `compose` argv before step 5 names `current`'s directory and image refs (S12). `first-deploy` skips step 3: the
+The guard judges `current`'s render before step 2's `up`, on staging too. Every `compose` argv before step 5 names `current`'s directory and image refs (S12). `first-deploy` skips step 3: the
 project has never had a release, and before `provision --stage database` poly_backup does not exist. It refuses
 (`existing-data`, exit 4) when the project's Postgres data directory is non-empty, unless given `--existing-data`, which
 makes step 3 required (seceng A8: a lost state dir must not let real data migrate unbacked). The timer's `deploy` never skips it and refuses while the project has no `current` (`not-first-deployed`).
@@ -191,13 +193,19 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 - **Automatic:** at the 120 s mark:
   1. Quarantine the candidate (`<digest> <UTC> unhealthy`).
   2. Re-check `previous`'s tree hash, run the R5 guard on its render (S3), then `up -d` from its bundle and `images.env`.
-  3. Run R7 again.
+  3. If this run could have changed edge (its project owned edge, R9), do the same for edge from the same release:
+     guard the **edge** render, then `up` caddy. Step 8 changes caddy before health is judged, so a rollback that leaves
+     edge alone keeps the failed release's Caddy in front of prod.
+  4. Run R7 again, caddy included. Both renders are judged before either `up` (S3).
   - Healthy → `rolled-back`, alert.
   - Unhealthy, or no `previous` (first deploy) → `rollback-unhealthy`, alert, change nothing else (INFRA §8.6).
   - **Rollback never migrates.**
   - Criterion 3's "within 120 s" means the rollback **starts** no later than 120 s after `up -d`.
 - **Manual:** `polycarpic-ops rollback <project>` makes no GitHub call. It quarantines `current` and ups `previous` from
-  `releases/`, after the tree-hash re-check, R1's integrity check and the R5 guard, then runs R7.
+  `releases/`, after the tree-hash re-check, R1's integrity check and the R5 guard, then runs R7. It restores edge on
+  the same rule.
+- **What health sees of Caddy.** Its healthcheck is `caddy version`, so R7 catches a Caddy that does not start, not one
+  that starts and routes wrongly. Such a release needs the manual rollback.
 
 ## R9 — Edge (seceng hole 3; §D2)
 
@@ -218,6 +226,10 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   - Form (ii) is also required, because a wipe alone revokes nothing already sent out. Prod's first deploy stops caddy,
     empties `/srv/polycarpic/caddy` and `/srv/polycarpic/caddy-config`, then recreates it. Prod therefore starts with a
     fresh ACME account and fresh keys.
+  - **These checks fail closed.** Only "no such name" (`EAI_NONAME`, `EAI_NODATA`) counts as not resolving; any other
+    resolver error, a missing `POLY_DOMAIN` and a failing `compose ps` each count as "resolves" / "caddy exists" /
+    "prod exists". The wipe first removes every caddy container `compose ps` lists for `polycarpic-edge`, with or
+    without a staging `current`, and stops (`edge-wipe`) unless a second `ps` shows none.
   - **Order (S15).** Caddy retries a failed issuance in the background, so a running staging-era Caddy would obtain
     the certificate in the minutes between the record appearing and the wipe. The `app.` A/AAAA records are therefore
     created only **after** `first-deploy prod` has stopped, emptied and recreated caddy, and `first-deploy prod` prints
@@ -241,9 +253,14 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 | `last-poll` | UTC of the last run that read GitHub successfully (seceng A-c) |
 
 New status modules: `08_deploy.py` — OK digest, tag, age; RED while `alert` exists, naming it; WARN when `last-poll`
-is older than 1 h (freeze or outage); WAIT not deployed. `09_token.py` — from `token-expiry`, which the deploy writes from
-the `github-authentication-token-expiration` header when present `(unmeasured)`: OK > 14 d; WARN ≤ 14 d or unknown; RED
-expired. POLY-103 sends `alert` outward.
+is older than 1 h (freeze or outage); WAIT not deployed. `09_token.py` — from
+`state/deploy/token-expiry`, which each run rewrites from one `gh api -i rate_limit` call, through the same token handling
+as R2: the header block ends at the first blank line, and only a `github-authentication-token-expiration` value of the
+form `YYYY-MM-DD HH:MM:SS <UTC or ±hhmm>` is accepted. A missing or malformed header deletes the file and never stops the
+run. `gh api -i` does print headers (measured: the rate-limit header came back); whether a fine-grained token sends this one is
+`(unmeasured)`, POLY-104. With no file, the item estimates 90 days (INFRA §3.3) from the token file's mtime and says
+`estimated`. OK > 14 d, WARN ≤ 14 d, RED expired, either way, so there is no permanent WARN. A token given a shorter life
+than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outward.
 
 ## R11 — CI, images, env wiring, signers (F3, F10; POLY-85, 97, 98 comments)
 
@@ -284,7 +301,8 @@ expired. POLY-103 sends `alert` outward.
 - `HOST_ONLY` becomes exactly `{"heartbeat_url": "host", "github_read_token": "host"}` in `lib/secrets.py` and the
   `provision-check.sh` mirror; the file is `secrets/host/github_read_token`, root:root 0400 (seceng's pinned-set review:
   S8, approved). `set-secret` accepts only the fine-grained form (`github_pat_` then 82 word characters) and refuses a
-  classic `ghp_` token with exit 2. `list-secrets` and `09_token.py` print path, mode and expiry, never the value.
+  classic `ghp_` token with exit 2. `list-secrets` prints name, state, mode, owner and size (no path, no
+  expiry); `09_token.py` prints days left. Neither prints the value.
 - **`polycarpic-ops allowed-signers install`.** It reads the file on stdin from the laptop. Each line must be
   exactly `<principal> namespaces="git" ssh-ed25519 <base64>`, and there must be at least one. Any other option
   (`cert-authority` above all, `valid-before`/`valid-after`, a second namespace) or key type exits 2, nothing written (S9). It writes
@@ -360,8 +378,8 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
 | T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
 | T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-prod-edge` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
-| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check |
-| T10 | Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check |
+| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check; mutants where `EAI_AGAIN`, a missing `POLY_DOMAIN` or a failing `compose ps` reads as safe; mutant wiping under a running caddy when staging has no `current` |
+| T10 | (Edge) A prod run that changes Caddy's image or `edge.yml`, then goes unhealthy: caddy is back on `previous`'s image, its edge render judged first; a refused edge render ups nothing; manual `rollback` the same. Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check; mutant restoring the project only; mutant skipping the edge guard |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8) | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle |
 | T13 | Criterion 5 inputs: the `premigration-set` line in `deploy.log` is what `restore.sh --premigration --from-box` lists (box fixture, POLY-99's fake ssh) | — (timing is POLY-116) |
@@ -372,6 +390,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T18 | `HOST_ONLY` pin test fails on a third name; `set-secret github_read_token` refuses a `ghp_` value with exit 2; the sweep finds the token in no output or log (S8) | mutant pin with a third name; mutant without the shape check |
 | T-pre | The runner exits 2 `backup-acl` on each of: `GRANT CREATE ON SCHEMA public` (flip the two `it.fails`); `GRANT UPDATE (col)`; EXECUTE on a definer function; `TEMPORARY` on the database; `ALTER DEFAULT PRIVILEGES … TO poly_backup`; `ALTER TABLE … OWNER TO poly_backup`; `ALTER ROLE poly_backup SET default_transaction_read_only = off`; `GRANT poly_owner TO poly_backup`; `GRANT pg_write_all_data TO poly_backup`; `GRANT poly_backup TO poly_app` (S5); TEMPORARY to poly_backup on a **sibling** database, refused through the shared `pg_database` row. It **passes** on roles.sql's own state | mutant `assertRoles` without the sweep; mutant without the membership read; mutant exempting every `pg_database` row |
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
+| T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped |
 
 Every refusal test asserts the exit code and the refusal name, and each guard has a positive case. Criterion 6 is
@@ -384,7 +403,7 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
 | provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18 |
 | db | ≤ 10 s | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
-| lint | ≤ 5 s | T-env; workflow statics for R11 |
+| lint | ≤ 15 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
 **Builder split.** R12 is backend-lead's, as POLY-100f (filed): about 40 lines in `packages/db/src/migrate.ts` plus T-pre
 and T-lock, disjoint from every infra path; backend-lead owns the refusal codes the deploy reads. devops-engineer builds R1–R11.
