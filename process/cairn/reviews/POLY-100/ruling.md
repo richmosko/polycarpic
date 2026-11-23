@@ -95,8 +95,8 @@ the image was attested at is therefore refused by V1 as `attestation` (no Q, as 
 `tag-name` is checked before `not-newer`.
 
 **Nothing with a candidate digest is created, run or composed before V1–V7 pass.** The only exceptions are `pull`,
-`image inspect`, and R4's `docker create`, which never starts. Every `compose up` and `compose run` carries
-`--pull never --no-build`, so compose never resolves a tag.
+`image inspect`, and R4's `docker create`, which never starts. Every `compose up` carries `--pull never --no-build` and every
+`compose run` `--pull never` (`run` has no `--no-build`, measured on v5.7.0 and v5.7.1; the guard refuses any `build`), so compose never resolves a tag.
 
 ## R4 — The release bundle is data (F5, F8, R-b; seceng D7, D8, hole 5)
 
@@ -430,7 +430,12 @@ M8 was taken as enough to drop the parse. No YAML parse is added: the box's Pyth
 
 Measured (this Mac, Compose v5.7.0, `config` only, no container, committed fixtures): a plain JSON render saved and rendered again is equal for `edge`; for `prod` and `staging` it
 differs only in `ulimits.core` (JSON drops a zero, and Compose refuses `{}` as input), and with `0` written back both load and print `{}` again. `$$` survives.
-**Owed before the build relies on it, on Linux, `(unmeasured)`:** `unshare` with `setpriv` around `config`, and an `up` from a saved render (a container run: the lead's go-ahead). If any fails, F4 comes back to a ruling before it is built.
+Measured on Linux (devops-100, Alpine dind, Compose v5.7.1): `config` in `unshare -n` renders, and a remote include then reaches nothing (without it Compose connects); as uid 65534 it
+renders, reads no secret, no state and no Docker socket. A JSON render saved **unchanged** is refused (`core: {}`); `create` and `run` from a YAML render match the source.
+**The judged and saved format stays JSON, with `core` `{}` written back as `0`.** A YAML file would come from another render than the one judged, and the box has no YAML parser. `{}` is zero: in Compose's
+JSON a non-zero limit shows, and an absent limit shows no `core` key, so F14 pins `{}` (a zero, seen) and refuses anything else.
+**Owed, `(unmeasured)`, before F4 is relied on:** `create` from the **corrected** JSON against `create` from the source, for every service of the three files, `HostConfig` and `Config` equal but for the order of `Env`
+(JSON drops other zero values too, and this shows whether one matters); Ubuntu's own `unshare` with `setpriv`. If either fails, F4 comes back to a ruling before it is built.
 
 | # | Rule | Test | Red on |
 |---|---|---|---|
@@ -447,7 +452,7 @@ differs only in `ulimits.core` (JSON drops a zero, and Compose refuses `{}` as i
 | F11 | The guard refusing `current` is `current-guard-<rule>`: alert, no Q, name only | candidate not quarantined, retried next poll | mutant Q |
 | F12 | `transient-since` holds the first of an unbroken run of transients (removed by any run that gets past V5 or finds nothing new). Older than 1 h: alert `transient-stale` | 59 min none, 61 min alert, success clears | mutant never alerting |
 | F13 | Every deploy, `first-deploy`, `edge-deploy` and rollback requires `/srv/polycarpic` to be a mount point (device differs from its parent; seam `ctx.ismount`): `data-mount`, exit 4, nothing touched | unmounted: refused; `first-attempt` not written | mutant without it |
-| F14 | `logging`, `ulimits`, `mem_limit`, `tmpfs` join R5's `pinned` values | operator with `json-file`; a raised `core`; a larger tmpfs | mutant per key |
+| F14 | `logging`, `ulimits`, `mem_limit`, `tmpfs` join R5's `pinned` values | operator with `json-file`; a raised `core`, and no `core`; a larger tmpfs | mutant per key |
 | F15 | One-off runs get `--name polycarpic-<project>-<svc>` and a stale one is removed first. On timeout: `docker rm -f`, then `inspect` must show it gone, before any lock is released; if it is not gone: `oneoff-stuck`, alert, Q, exit 1 (a later run refuses while it exists). `migrate`'s client timeout is 30 min, above the runner's 10 min lock wait (today both are 600 s, so exit 4 can lose to the timeout); timed out → `migrate-timeout`, Q | hanging migrate: removed before `backup.lock` is free; stuck one; lock wait exit 4 still seen | mutant releasing the lock first; mutant at 600 s |
 
 **For INFRA:** the saved render bakes `host.env` and `mail.env` in, so an edit to them takes effect at the next deploy, not at a restart.
@@ -495,7 +500,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8); `first-deploy` → `roles-missing` → `first-deploy` again succeeds with no flag; the same with the `first-attempt` file gone: exit 4; the same with one user table, or the read failing: step 3 runs; a leftover file beside `current` has no effect (S19); `--existing-data` with the real `backup.py` render: every `${…:?}` is set | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle; mutant writing `first-attempt` when the directory is non-empty; mutant trusting the file alone |
 | T13 | Criterion 5 inputs, in the ops unit harness (the POLY-97 box cannot host a deploy). (a) The real `backup premigration` makes a set and prints its line; the real `list-premigration` lists it; a prod deploy logs that line; logged equals listed, field for field, and passes `restore-lib.sh`'s own patterns. (b) **Parity:** POLY-99's `roundtrip.test.ts` restores a real `backup.sh` set into a scratch, but against `fake_box.py`, not the real command. On one directory (a complete set pending, one uploaded, an incomplete one), `fake_box.py` and the real command print the same list, byte for byte, and `fetch-premigration` gives the same bytes. (a), (b) and the round trip together prove criterion 5. Not proven: the backup container run from `releases/prod-current` under real compose (staging has no backup), for the first prod deploy; the timing, POLY-116 | qa's two mutants; mutants of `fake_box.py` and of `_list` that swap two fields |
-| T14 | `--pull never --no-build` on every compose up/run; only R4's and F4's `-f` files | mutant without `--pull never` |
+| T14 | `--pull never --no-build` on every compose `up`, `--pull never` on every `run`; the fake compose refuses a flag its subcommand does not have (lists committed from the real `--help`, compared with the runner's in T-render); only R4's and F4's `-f` files | mutant without `--pull never`; mutant passing `--no-build` to `run` |
 | T15 | The fixture token is in gh's child env only: absent from every docker, compose and git child env, argv, `deploy.log`, every file under the root and `tags.git` (config, `FETCH_HEAD`, packed refs); gh's config dir empty after a run; no `/root/.docker/config.json` (S6). A gh outage is `transient`, not quarantined | mutant exporting `GH_TOKEN` into the deploy's whole env; mutant passing `--token`; mutant quarantining on a network failure |
 | T16 | Two deploys together: the second exits 0 `busy` and touches nothing | mutant without `-n` |
 | T17 | `allowed-signers install`: a `cert-authority` line, a second-namespace line, an `ecdsa` key: each exit 2, nothing written; the plain form passes (S9) | mutant accepting any options |
