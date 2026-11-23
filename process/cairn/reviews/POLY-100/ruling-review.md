@@ -659,3 +659,9 @@ so the certificate may lag the record at launch (unmeasured). That is launch tim
   ruling's R5 and T8 carry it. The real name, in all three compose files and the policy, is `polycarpic-edge-prod`. A T8
   case on a network that does not exist proves nothing about the real one. *Required:* R5 and T8 use
   `polycarpic-edge-prod`; qa checks the committed fixtures and tests for the wrong name; devops corrects INFRA §2.2's row.
+
+## `dac66f0a` (S24)
+
+**Met,** with one test to add: T-net has no case for the rule that both subnets sit outside `pg_hba`'s allow ranges and the
+10.200.0.0/16 pool. Add one overlapping each, provision-check fails, red on a mutant without that check. "Present and
+different: stop, never replace" is right. Open: S21's tag compare, S26; S22, S23, S25 wait on §L6.
