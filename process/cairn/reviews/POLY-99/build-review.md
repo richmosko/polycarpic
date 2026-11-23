@@ -349,6 +349,44 @@ No fix remains on my side. If the gate turns anything red, that item reopens, an
 packages apps` changes only `restore.sh`'s `usage()` text and the matching line of `infra/README.md`. It adds no
 parsing and no code path. The conditional PASS stands on `ac42a4d1`, on the same gate.
 
+### DR8 change @ `106f1a9bd75b9d7fdcfcb15122fa22910e068510` (`git diff ac42a4d1..106f1a9b -- infra`: `drill.sh` only)
+
+**Accepted.** DR8 now FAILs, naming what is missing, when the restored dump lacks `public.session` or
+`app.session_handle`. It PASSes only when both exist and no session lacks its handle, and the PASS line now counts the
+sessions. That is the right direction. A check with nothing to check was a silent PASS, and a data-only or partial
+restore is exactly what DR8 exists to catch (INFRA F4).
+
+**Advisory A-h (fails closed, so it does not gate).** `missing=$(psql_in …)` is a plain assignment under `set -e`. If
+the scratch has died by then, psql's failure ends the drill at once:
+- there is no `DRILL FAILED` line;
+- the exit is psql's code (2 on a connection failure), which collides with the drill's "usage" exit 2.
+The GA gate accepts exit 0 only, so nothing passes wrongly. Prefer `missing=$(psql_in …) || missing='(the scratch did
+not answer)'`, so DR8 FAILs and the drill reaches its verdict.
+
+### The DR2 question (qa: replacing the sibling comparison with `if false` stays green)
+
+**My view: a test gap, not a redundant check. DR2 must have a single-fault case that only it can see.**
+- *Why DR2 is not redundant.* age authenticates every chunk, so a corrupted **object** already fails decryption, and
+  that is reported as DR11. The sibling comparison is what catches the cases age cannot:
+  - a version that decrypts fine but is not the one the uploader recorded, such as a mix-up between versions;
+  - a sibling that disagrees with its object.
+  It is also the mechanism behind F2's `sibling yes|no` listing, and behind `--accept-version` exiting 4 on a bad
+  version. Removing it would silently weaken F2.
+- *Why the mutant stays green (likely).* The drill's fault run combines several faults at once. DR2's FAIL can then
+  arise from another path: `FAILED_ID=${FAIL_ID:-DR2}` labels any refused selection or download as DR2, and a
+  corrupted object fails at decryption anyway. So the run shows "DR2 FAIL" without the comparison being the cause.
+- *Required (qa's case, no code change if the build is right):*
+  - A clean set in which **only one sibling is wrong**: the object is intact, so it decrypts, and only its
+    `.sha256` sibling carries another hash.
+  - Expect `FAIL DR2` with the object's kind and TS, and DR1, DR3–DR8 and DR11 PASS: the drill carries on, under
+    NONFATAL.
+  - Expect `restore.sh --dump` on the same fixture to exit 4 with "does not match its sha256 sibling".
+  - Red: the `if false` mutant gives `PASS DR2`, and restore goes on.
+  - Run it once for a dump object (`fetch_object`) and once for a WAL segment (the comparison in `prepare_base`),
+    since there are two copies of the comparison.
+- If that case turns out green on the mutant too, the comparison is unreachable on the current code. That would be a
+  drill defect, and I review the fix.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
