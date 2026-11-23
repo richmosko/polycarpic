@@ -18,3 +18,11 @@ Not yet shown red (pending): symlink/hardlink/device/fifo/sparse/pax members are
 
 Red on `main` before R12: 36 T-pre cases (18 faults × apply / `--plan`) fail; the two positives and T-lock pass.
 T-lock's mutant (no advisory lock) is run at the gate.
+
+## G5 secrets (`test_deploy_secrets.py`)
+
+| Test | Mutant | Red |
+|---|---|---|
+| T18 token shape | `lib/secrets.py` `GITHUB_TOKEN` pattern → `\w+` | `test_t18_a_classic_token_is_refused_with_exit_2_and_nothing_written` |
+
+T17 (`allowed-signers install`) is red on the missing command and the missing `ctx.stdin` seam (pinned: Ctx kwarg `stdin`, a text stream, no child process).
