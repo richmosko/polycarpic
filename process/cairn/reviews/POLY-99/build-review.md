@@ -536,6 +536,28 @@ each red on the tree before its own fix:
 
 No fix remains on my side. A red reopens only its own item. D1 is still built as (a).
 
+### Gate met: **PASS on `a780368fea8426f529e6a44c6120b65842c37930`**
+
+qa's `gate.md` @ `988f405b` shows every item on my list green on `a780368f`, with the backup suite at 112/112. Each
+was shown red on the tree before its fix:
+
+| Item | Red before its fix |
+|---|---|
+| F1–F4 | 11 cases on `5501a740` |
+| F5 | on `e7c7cc6b^`, with stdout read apart from stderr |
+| F4 real Docker | on `314b2dcf^`: a labelled scratch was left after the kill |
+| F6, F7, INCOMPLETE | 5 cases on `4a75ade1^` |
+| WAL DR2 | its mutant reaches the scratch |
+| F8 | the mutant's SKIP stayed `INCOMPLETE` on `4a75ade1` |
+
+I read the two **loosened** rows in `gate.md`:
+- `738c8e87`: the T10 and T17 mutants are now seen at the scratch start rather than by the restored canary.
+- `1ebe9044`: a dropped `-a` pattern, restored in the next row.
+
+The first one keeps the proof. A mutant that gets past its check reaches the scratch, and that is what the case
+asserts, while the one real T10 restore still checks the canary. Neither weakens a security case. **The conditional is
+discharged. The build review is PASS on `a780368f`.** D1 is built as (a), pending the Principal.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
