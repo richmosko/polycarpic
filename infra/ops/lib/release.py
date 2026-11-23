@@ -36,6 +36,9 @@ TAG = re.compile(r"v1\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 BODY = re.compile(r"digest: (sha256:[0-9a-f]{64})")
 MAX_FILE = 1 << 20
 MAX_TREE = 8 << 20
+MAX_TAR = 64 << 20
+MAX_MEMBERS = 512
+MAX_NAME = 200
 
 
 class Refusal(Exception):
@@ -311,12 +314,18 @@ def allowed_member(name):
 def read_tar(data):
     """-> {path: (bytes, executable)} or raises Refusal('bundle'). Nothing is written until every member passed."""
     files, total = {}, 0
+    if len(data) > MAX_TAR:
+        raise Refusal("bundle", True)
     try:
         tar = tarfile.open(fileobj=io.BytesIO(data), mode="r:")
         members = tar.getmembers()
     except (tarfile.TarError, EOFError, OSError):
         raise Refusal("bundle", True)
+    if len(members) > MAX_MEMBERS:
+        raise Refusal("bundle", True)
     for m in members:
+        if len(m.name) > MAX_NAME or m.pax_headers or m.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
+            raise Refusal("bundle", True)
         name = m.name.rstrip("/") if m.isdir() else m.name
         parts = name.split("/")
         if name.startswith("/") or ".." in parts or "" in parts or "." in parts:

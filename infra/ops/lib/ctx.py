@@ -38,14 +38,43 @@ def _real_run(argv, stdin=None, timeout=None, env=None):
     return p.returncode, p.stdout, p.stderr
 
 
+MAX_BYTES = (64 << 20) + 1  # run_bytes reads at most this much of a child's stdout, then kills it (POLY-100 R4: an over-cap tar is refused)
+
+
 def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
+    import tempfile
+    import threading
     try:
-        p = subprocess.run(argv, input=stdin, capture_output=True, timeout=timeout, env=env, shell=False, check=False)
-    except subprocess.TimeoutExpired:
-        raise TimeoutError(argv[0])
+        p = subprocess.Popen(argv, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, env=env, shell=False)
     except OSError as err:
         return 127, b"", "%s: %s\n" % (argv[0], err.strerror or err.__class__.__name__)
-    return p.returncode, p.stdout, p.stderr.decode("utf-8", "replace")
+    errbuf = []
+    reader = threading.Thread(target=lambda: errbuf.append(p.stderr.read(65536)))
+    reader.daemon = True
+    reader.start()
+    timer = threading.Timer(timeout, p.kill) if timeout else None
+    if timer:
+        timer.start()
+    chunks, total = [], 0
+    try:
+        while total < MAX_BYTES:
+            block = p.stdout.read(min(1 << 20, MAX_BYTES - total))
+            if not block:
+                break
+            chunks.append(block)
+            total += len(block)
+        if total >= MAX_BYTES:
+            p.kill()
+        code = p.wait()
+    finally:
+        if timer:
+            timer.cancel()
+        p.stdout.close()
+    reader.join(5)
+    if timer and not timer.is_alive() and code < 0 and total < MAX_BYTES:
+        raise TimeoutError(argv[0])
+    return code, b"".join(chunks), (errbuf[0] if errbuf else b"").decode("utf-8", "replace")
 
 
 def _real_resolve(name):
