@@ -91,6 +91,8 @@ describe('backup.sh usage and preconditions (R1): exit code, exact stderr, nothi
         }
       } finally { writeFileSync(recipientsPath(s.dir), s.recipient); }
       expect(nothingPublished()).toEqual(EMPTY);
+      sh('docker', ['rm', '-f', name]);
+      s.startBackupContainer(); // sees the restored recipients file
       const ok = exec(['nightly']);
       expect({ code: ok.code, err: ok.err.slice(-200) }).toEqual({ code: 0, err: expect.any(String) });
     } finally { sh('docker', ['rm', '-f', name]); s.clearSpool(); }
