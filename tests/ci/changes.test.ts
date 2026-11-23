@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { ci, node } from './helpers.ts';
 
-const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e'] as const; // `backup` (POLY-99) has its own cases in tests/infra/backup-wiring.test.ts
+const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'backup'] as const; // POLY-99: `backup` gates the backup/restore/drill container suite (ruling Guards @ 91d8e94e)
 const run = (paths: string[]) => {
   const r = node('changes.mjs', { input: paths.join('\0') + '\0' });
   const out: Record<string, string> = {};
@@ -50,7 +50,7 @@ const CASES: [string[], string[], string][] = [
   [['.trivyignore'], ['image'], '.trivyignore dropped from `image` (the scan reads it)'],
   [['tests/layers/tsc/package.json'], ['layers', 'image'], 'tests/layers/tsc/package.json dropped from `image` (it enters the image context)'],
   [['packages/config/src/index.ts', 'packages/config/log.schema.json'], ['node', 'db'], 'packages/config dropped from `db` (the closure of tests/db and of the spawned entrypoints reaches @poly/config)'],
-  [['packages/db/sql/roles.sql'], ['node', 'db'], 'packages/db/sql dropped from `db` (bootstrap reads it by join(DB_PKG, ...))'],
+  [['packages/db/sql/roles.sql'], ['node', 'db', 'backup'], 'packages/db/sql dropped from `db` (bootstrap reads it by join(DB_PKG, ...))'],
   [['packages/tenancy/src/index.ts'], ['node', 'db'], 'packages/tenancy dropped from `db` (tests/db imports it)'],
   [['packages/tenancy/permission-matrix.json'], ['node', 'db'], 'permission-matrix.json dropped from `db` (matrix.test reads it by join(ROOT, ...))'],
   [['apps/migrate/src/cli.ts'], ['node', 'db', 'e2e'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
@@ -60,9 +60,9 @@ const CASES: [string[], string[], string][] = [
   [['tests/log/canary.ts'], ['node', 'db'], 'tests/log dropped from `db` (the canaries are imported by two db files)'],
   // POLY-95 R3: the infra suite and the Postgres FROM line are inputs of the jobs that read them.
   [['tests/infra/lint.test.ts'], ['image'], 'tests/infra dropped from `image` (the lint job and the container tests both read it)'],
-  [['infra/postgres/Dockerfile'], ['image', 'db', 'e2e'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
+  [['infra/postgres/Dockerfile'], ['image', 'db', 'e2e', 'backup'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
   [['infra/postgres-major'], ['image', 'db', 'e2e'], 'infra/postgres-major dropped from `db`'],
-  [['infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/lint/policy.json'], ['image'], '`db` widened to all of infra/postgres, or infra/lint/compose dropped from `image`'],
+  [['infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/lint/policy.json'], ['image', 'backup'], '`db` widened to all of infra/postgres, or infra/lint/compose dropped from `image`'],
   // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run is its own `provision` job; image keeps only what the database-stage test needs.
   [['infra/hetzner/create.sh'], ['provision'], 'infra/hetzner dropped from `provision`, or left in `image`'],
   [['infra/operator/dns-check.py'], ['provision'], 'infra/operator dropped from `provision`, or left in `image`'],
@@ -73,7 +73,7 @@ const CASES: [string[], string[], string][] = [
   [['infra/provision.sh'], ['image', 'provision'], 'infra/provision.sh dropped from `image` (the database-stage test runs it) or from `provision`'],
   [['infra/provision-check.sh'], ['image', 'provision'], 'infra/provision-check.sh dropped from `provision`'],
   [['tests/infra/image/provision-db.test.ts'], ['image'], 'the database-stage test dropped from `image`, or pulled into `provision`'],
-  [['packages/db/sql/roles.sql'], ['node', 'db', 'provision'], 'roles.sql dropped from `provision` (the database stage and D checks run it)'],
+  [['packages/db/sql/roles.sql'], ['node', 'db', 'provision', 'backup'], 'roles.sql dropped from `provision` (the database stage and D checks run it)'],
   // POLY-98 R11: polycarpic-ops (infra/ops/**) and its unit tests (tests/infra/ops/**) belong to `provision`, not `image`; the wiring pin file sits in tests/infra and stays in `image`.
   [['infra/ops/commands/status.py'], ['provision'], 'infra/ops left in `image` (the infra lookahead lacks ops/) or missing from `provision`'],
   [['infra/ops/install.sh'], ['provision'], 'infra/ops/install.sh left in `image` or missing from `provision`'],

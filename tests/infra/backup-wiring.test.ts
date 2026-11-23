@@ -33,7 +33,7 @@ describe('POLY-99 change filter: every path a job executes or reads selects that
 });
 
 describe('POLY-99 change key `backup` (ruling Guards @ 2bf5a6ba): the container suite runs only when one of its paths changed', () => {
-  for (const p of ['infra/backup/upload.sh', 'infra/restore.sh', 'infra/drill.sh', 'infra/postgres/archive-wal.sh', 'infra/compose/prod.yml', 'infra/ops/commands/backup.py', 'infra/ops/commands/upload.py', 'tests/infra/backup/restore.test.ts']) {
+  for (const p of ['infra/backup/upload.sh', 'infra/restore.sh', 'infra/drill.sh', 'infra/postgres/archive-wal.sh', 'infra/postgres/Dockerfile', 'infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/ops/commands/backup.py', 'infra/ops/commands/upload.py', 'packages/db/sql/roles.sql', 'tests/infra/backup/restore.test.ts']) {
     it(`${p} sets backup`, () => { expect(changed([p]), p).toContain('backup'); });
   }
   it('a PR touching none of them leaves `backup` false', () => {
