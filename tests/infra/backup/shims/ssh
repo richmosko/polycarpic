@@ -8,6 +8,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -a|-x|-T|-q|-v) shift ;;
     -o|-i|-l|-p|-F) shift 2 ;;
+    --) shift; break ;;
     *) break ;;
   esac
 done
