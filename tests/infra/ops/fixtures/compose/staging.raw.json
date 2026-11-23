@@ -63,6 +63,10 @@
         {
           "path": "/etc/polycarpic/staging-host.env",
           "required": true
+        },
+        {
+          "path": "/etc/polycarpic/staging-mail.env",
+          "required": true
         }
       ],
       "environment": {
@@ -391,6 +395,10 @@
       "env_file": [
         {
           "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/staging-mail.env",
           "required": true
         }
       ],

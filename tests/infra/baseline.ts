@@ -231,14 +231,14 @@ export function baseline(): FxSet {
       name: 'polycarpic-edge',
       services: {
         caddy: hard(10010, {
-          image: CADDY, ports: ['${POLY_BIND_ADDR:?}:80:8080', '${POLY_BIND_ADDR:?}:443:8443'], networks: ['edge-prod', 'edge-staging'],
+          image: CADDY, environment: { POLY_DOMAIN: '${POLY_DOMAIN:?}', POLY_STAGING_ALLOW: '${POLY_STAGING_ALLOW:?}', POLY_TLS: '${POLY_TLS:?}' }, ports: ['${POLY_BIND_ADDR:?}:80:8080', '${POLY_BIND_ADDR:?}:443:8443'], networks: ['edge-prod', 'edge-staging'],
           volumes: ['/srv/polycarpic/caddy:/data', '../caddy/Caddyfile:/etc/caddy/Caddyfile:ro'],
           secrets: [{ source: 'staging_basic_auth__caddy', target: 'staging_basic_auth' }],
         }),
       },
       networks: {
-        'edge-prod': { name: 'polycarpic-edge-prod', ipam: { config: [{ subnet: '10.201.30.0/28' }] } },
-        'edge-staging': { name: 'polycarpic-edge-staging', ipam: { config: [{ subnet: '10.202.30.0/28' }] } },
+        'edge-prod': { name: 'polycarpic-edge-prod', external: true }, // T-net: provision.sh creates the two edge networks, no compose file does
+        'edge-staging': { name: 'polycarpic-edge-staging', external: true },
       },
       secrets: { staging_basic_auth__caddy: { file: secretFile(true, 'caddy', 'staging_basic_auth') } },
     },

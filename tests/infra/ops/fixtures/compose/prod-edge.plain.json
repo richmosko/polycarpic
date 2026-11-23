@@ -24,24 +24,13 @@
     },
     "edge-prod": {
       "name": "polycarpic-edge-prod",
-      "ipam": {
-        "config": [
-          {
-            "subnet": "10.201.30.0/28"
-          }
-        ]
-      },
+      "ipam": {},
       "external": true
     },
     "edge-staging": {
       "name": "polycarpic-edge-staging",
-      "ipam": {
-        "config": [
-          {
-            "subnet": "10.202.30.0/28"
-          }
-        ]
-      }
+      "ipam": {},
+      "external": true
     }
   },
   "secrets": {

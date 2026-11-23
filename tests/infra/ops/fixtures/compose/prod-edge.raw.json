@@ -23,23 +23,10 @@
     },
     "edge-prod": {
       "external": true,
-      "ipam": {
-        "config": [
-          {
-            "subnet": "10.201.30.0/28"
-          }
-        ]
-      },
       "name": "polycarpic-edge-prod"
     },
     "edge-staging": {
-      "ipam": {
-        "config": [
-          {
-            "subnet": "10.202.30.0/28"
-          }
-        ]
-      },
+      "external": true,
       "name": "polycarpic-edge-staging"
     },
     "upload-net": {
@@ -107,6 +94,10 @@
       "env_file": [
         {
           "path": "/etc/polycarpic/host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/mail.env",
           "required": true
         }
       ],
@@ -683,6 +674,10 @@
       "env_file": [
         {
           "path": "/etc/polycarpic/host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/mail.env",
           "required": true
         }
       ],

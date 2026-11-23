@@ -151,8 +151,12 @@ const ROWS: Row[] = [
     s.staging.networks.prodnet = { name: 'polycarpic-prod_default', external: true };
     svc(s, 'staging', 'web').networks.prodnet = {};
   }, 'cross-project', 'only the edge network compared'],
-  ['edge subnet overlaps a pg_hba allow CIDR', (s) => { s.edge.networks['edge-prod'].ipam.config[0].subnet = '10.201.1.0/28'; }, 'edge-overlap', 'edge subnets not compared with pg_hba allow lines'],
-  ['edge network without a fixed subnet', (s) => { delete s.edge.networks['edge-staging'].ipam; }, 'edge-overlap', 'unfixed edge subnet accepted'],
+  // POLY-100 T-net (ruling dac66f0a): the edge networks are created by provision.sh; no compose file creates one, so the subnet checks moved to provision-check.
+  ['edge.yml creates an edge network (an ipam on it)', (s) => { s.edge.networks['edge-prod'] = { name: 'polycarpic-edge-prod', ipam: { config: [{ subnet: '10.201.30.0/28' }] } }; }, 'edge-overlap', 'a created edge network accepted'],
+  ['edge.yml edge network not external', (s) => { s.edge.networks['edge-staging'] = { name: 'polycarpic-edge-staging' }; }, 'edge-overlap', 'non-external edge network accepted'],
+  ['edge.yml edge network with another name', (s) => { s.edge.networks['edge-staging'] = { name: 'polycarpic-edge-other', external: true }; }, 'edge-overlap', 'edge network name not pinned'],
+  ['prod.yml declares its edge network with an ipam', (s) => { s.prod.networks['edge-prod'] = { name: 'polycarpic-edge-prod', external: true, ipam: { config: [{ subnet: '10.201.30.0/28' }] } }; }, 'edge-overlap', 'ipam on an external edge network accepted'],
+  ['staging.yml edge network not external', (s) => { s.staging.networks['edge-staging'] = { name: 'polycarpic-edge-staging' }; }, 'edge-overlap', 'non-external edge network accepted in a project file'],
   // C-79
   ['backup-net not internal', (s) => { s.prod.networks['backup-net'].internal = false; }, 'backup-net-internal', 'internal: true not required'],
   ['backup-net without a fixed subnet', (s) => { delete s.prod.networks['backup-net'].ipam; }, 'backup-net-subnet', 'missing subnet accepted'],

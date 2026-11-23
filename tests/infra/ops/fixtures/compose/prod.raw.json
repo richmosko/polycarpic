@@ -88,6 +88,10 @@
         {
           "path": "/etc/polycarpic/host.env",
           "required": true
+        },
+        {
+          "path": "/etc/polycarpic/mail.env",
+          "required": true
         }
       ],
       "environment": {
@@ -601,6 +605,10 @@
       "env_file": [
         {
           "path": "/etc/polycarpic/host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/mail.env",
           "required": true
         }
       ],
