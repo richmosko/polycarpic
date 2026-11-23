@@ -97,6 +97,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.hang, self.raise_cmd, self.hang_from = set(), {}, 10 ** 9
         self.config_wrapped = []
         self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
         self.unmounted = set()
@@ -285,6 +286,8 @@ class World(object):
             return 0, "", ""
         if sub == "compose":
             return self._compose(argv, stdin)
+        if sub == "inspect" and "inspect" in self.hang and len(self.up_marks) > self.hang_from:
+            raise TimeoutError("inspect")
         if sub == "inspect":
             c = self.by_name.get(argv[2])
             if c is None:
@@ -346,6 +349,11 @@ class World(object):
                 subcmd = argv[i]
                 break
         self.compose_log.append(dict(argv=list(argv), project=project, cmd=subcmd, rest=argv[i + 1:]))
+        if len(self.up_marks) > self.hang_from:  # F2: after the run's first `up`, these commands hang (TimeoutError, as ctx.run raises) or raise
+            if subcmd in self.hang:
+                raise TimeoutError(subcmd)
+            if subcmd in self.raise_cmd:
+                raise self.raise_cmd[subcmd]
         rest = argv[i + 1:]
         if self.on_compose:
             self.on_compose(subcmd, list(argv))
