@@ -351,5 +351,6 @@ jobs:
               echo "images.env: a line is not in the fixed grammar" >&2; status=1
             fi
           done < images.env
-          [ "$(echo $seen | wc -w)" = 3 ] || { echo "images.env: not exactly postgres, tools and caddy" >&2; status=1; }
+          read -r -a seen_names <<< "$seen"
+          [ "${#seen_names[@]}" = 3 ] || { echo "images.env: not exactly postgres, tools and caddy" >&2; status=1; }
           exit "$status"

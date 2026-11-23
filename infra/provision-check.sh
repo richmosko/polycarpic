@@ -280,7 +280,12 @@ for u in polycarpic-deploy@.service polycarpic-deploy@.timer; do
   [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h17="$h17 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
 done
 allow=$here/deploy/compose-allow.json
-if [ ! -f "$allow" ]; then h17="$h17 $allow is missing;"; elif [ "$(stat -c %u "$allow")" != 0 ]; then h17="$h17 $allow is not root-owned;"; fi
+# the owner is judged on the installed copy only: polycarpic-ops runs this from /opt/polycarpic/ops/<id>, whose whole tree it has already checked
+# is root-owned and not writable by others; run from a checkout, the file belongs to whoever checked it out
+if [ ! -f "$allow" ]; then h17="$h17 $allow is missing;"
+else
+  case "$here" in /opt/polycarpic/ops/*) [ "$(stat -c %u "$allow")" = 0 ] || h17="$h17 $allow is not root-owned;" ;; esac
+fi
 report H17 "deploy units and guard policy" "$h17" "rerun: sudo bash provision.sh --stage host ... (installs the units); the policy ships with polycarpic-ops install.sh"
 
 # ------------------------------------------------------------------ H18 allowed_signers (WAIT before prod)
