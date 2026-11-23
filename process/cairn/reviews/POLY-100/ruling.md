@@ -348,7 +348,7 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
     and only auth and worker list that file, as a second `env_file` entry. `check-config` is unchanged: `MAIL_FROM` is not a secret, and
     the refusal on web, migrate and operator keeps the sender setting with the two services that hold the Resend key, so a
     service that gains it by a wiring mistake does not start. `effective_mail_from` reads `mail.env`, then an old `host.env`, whose key the rerun
-    drops. The lint, `compose-allow.json` (exact list per service) and provision-check follow: H10 allows `host.env` only
+    drops. The lint and `compose-allow.json` hold seceng's S27 exact `env_file` lists (`ruling-review.md` @ `d6cb5d6b`), and provision-check follows: H10 allows `host.env` only
     `TLS_MODE`, `PUBLIC_ORIGIN`, `POLY_INSTANCE`, checks the mail files' one key and `mail.` address, and the host-file list gains both.
 
   `DB_PASSWORD_FILE` is removed: no service passes `check-config` with it today. This covers the operator (POLY-98 M4) and
@@ -453,7 +453,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T-net | All three compose files declare both edge networks they use as external, by exact name, and no file creates one (red on `d634da53`'s `edge.yml`); `provision.sh` creates exactly the two, reruns with no change, and stops on a different subnet (fake docker, provision job); provision-check fails on a missing network, another subnet, another driver, an edge subnet inside a `pg_hba` allow range, and one inside 10.200.0.0/16 (one case each, with provision-check's expected subnet changed to match, so only the overlap rule can refuse). T-render renders `edge.yml` in the external form | today's files; mutant recreating a network that differs; mutant checking names only; mutant without the overlap check |
 | T-caddy | `caddy-allow` passes the real file and refuses: `forward_auth` in a site; a second global `log`; `php_fastcgi` on one line with its block; `import other`; an extra site block; a repeated allowed line; `@denied` moved below `basic_auth`; a `command` on caddy; a literal `POLY_TLS` with a newline. provision refuses an `edge.env` value with a newline, and one with `}` (S20) | mutant naming bad directives instead of allowing; mutant comparing counts, not order |
 | T-probe | Baseline 200 then 502: rollback and quarantine; baseline 200 then a certificate failure: the same; baseline failing: healthy, `edge-probe-baseline` logged and alerted, no quarantine; first deploy and staging: no probe | mutant without the probe; mutant without the baseline; mutant skipping verification (real `https_status` against a local self-signed listener) |
-| T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped; mutants with `mail.env` on web, missing from worker, or `MAIL_FROM` back in `host.env`; the guard and the lint refuse `mail.env` on web and prod's `mail.env` in staging |
+| T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped; mutants with `mail.env` on web, missing from worker, or `MAIL_FROM` back in `host.env`; the guard and the lint refuse `mail.env` on web and prod's `mail.env` in staging; S27's cases, with its literal pin test |
 
 Every refusal test asserts the exit code and the refusal name, and each guard has a positive case. Criterion 6 is
 `tests/db/runner.test.ts` "a failing file leaves schema and tracking unchanged", which is already green; qa cites it.
@@ -546,6 +546,7 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S18 unreadable bundle id keeps the quarantine | R8; T10q |
 | S20 ordered Caddyfile lines; caddy `environment`/`command` pinned | R11 `caddy-allow`; T-caddy |
 | S21 what a guard refusal prints | R10 help; R11 `install.sh --commit`; T-help |
+| S27 exact `env_file` list per service | R11; T-env |
 | S26 the prod edge network is `polycarpic-edge-prod` | R5, T8 |
 | S24 networks from provision (S22, S23, S25 wait on §L6) | R9; T-net |
 | S19 rerun skips the backup only on an empty database | R6; T12 |
