@@ -69,7 +69,7 @@ describe('polycarpic-ops install: install.sh to install_box.py on a real root', 
   });
 
   it('a third id deletes the oldest, keeps the previous, and each output names its previous', () => {
-    const r = ops(`for n in a b c; do bump $n; install_ops | sed "s/^/OUT /"; ls /opt/polycarpic/ops | tr '\\n' ' ' | sed "s/^/LS /"; echo; done`);
+    const r = ops(`for n in a b c; do bump $n; install_ops | sed "s/^/OUT /"; ls /opt/polycarpic/ops | grep -v '^ssh-target$' | tr '\\n' ' ' | sed "s/^/LS /"; echo; done`);
     const outs = r.out.split('\n').filter((l) => l.startsWith('OUT installed'));
     expect(outs[0]).toMatch(/\(previous: none\)$/);
     expect(outs[1]).toMatch(/\(previous: git-[0-9a-f]{12}\)$/);

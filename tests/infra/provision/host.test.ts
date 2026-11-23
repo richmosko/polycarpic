@@ -213,26 +213,30 @@ describe('provision.sh host stage (R5)', () => {
     expect(Number(r.out.trim())).toBeGreaterThan(0);
   });
 
-  it('host.env and staging-host.env: root 0644, TLS_MODE, PUBLIC_ORIGIN per project, MAIL_FROM default under mail.<domain>, POLY_INSTANCE, nothing else', () => {
-    const r = run(`stat -c '%n %a %U' /etc/polycarpic/host.env /etc/polycarpic/staging-host.env; echo ==; cat /etc/polycarpic/host.env; echo ==; cat /etc/polycarpic/staging-host.env`, { image: HOST });
-    const [st, prod, stg] = r.out.split('==').map((x) => x.trim());
+  it('host.env and staging-host.env: root 0644, TLS_MODE, PUBLIC_ORIGIN per project, POLY_INSTANCE, nothing else; MAIL_FROM lives alone in mail.env and staging-mail.env (S27)', () => {
+    const r = run(`stat -c '%n %a %U' /etc/polycarpic/host.env /etc/polycarpic/staging-host.env /etc/polycarpic/mail.env /etc/polycarpic/staging-mail.env; echo ==; cat /etc/polycarpic/host.env; echo ==; cat /etc/polycarpic/staging-host.env; echo ==; cat /etc/polycarpic/mail.env; echo ==; cat /etc/polycarpic/staging-mail.env`, { image: HOST });
+    const [st, prod, stg, mail, smail] = r.out.split('==').map((x) => x.trim());
     expect(st).toMatch(/host\.env 644 root/);
+    expect(st!.split('\n').every((l) => /^\S+ 644 root$/.test(l)), st).toBe(true);
     const kv = (t: string) => Object.fromEntries(t.split('\n').filter(Boolean).map((l) => [l.split('=')[0], l.slice(l.indexOf('=') + 1).replace(/^"(.*)"$/, '$1')]));
     const p = kv(prod!), s = kv(stg!);
-    expect(Object.keys(p).sort()).toEqual(['MAIL_FROM', 'POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
-    expect(Object.keys(s).sort()).toEqual(['MAIL_FROM', 'POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(p).sort()).toEqual(['POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(s).sort()).toEqual(['POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(kv(mail!))).toEqual(['MAIL_FROM']);
+    expect(Object.keys(kv(smail!))).toEqual(['MAIL_FROM']);
     expect(p.TLS_MODE).toBe('real-domain');
     expect(p.PUBLIC_ORIGIN).toBe('https://app.polycarpic.com');
     expect(s.PUBLIC_ORIGIN).toBe('https://staging.polycarpic.com');
-    expect(p.MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
+    expect(kv(mail!).MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
+    expect(kv(smail!).MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
     expect(p.POLY_INSTANCE).toBeTruthy();
     expect(s.POLY_INSTANCE).not.toBe(p.POLY_INSTANCE);
   });
 
   it('--mail-from under mail.<domain> is accepted; one elsewhere is refused (exit non-zero, names mail.<domain>) and nothing is written', () => {
-    const ok = run(`${ENTER} ${HOSTRUN} --mail-from "Polycarpic <hello@mail.polycarpic.com>" >/dev/null 2>&1; grep MAIL_FROM /etc/polycarpic/host.env`);
+    const ok = run(`${ENTER} ${HOSTRUN} --mail-from "Polycarpic <hello@mail.polycarpic.com>" >/dev/null 2>&1; grep MAIL_FROM /etc/polycarpic/mail.env`);
     expect(ok.out).toContain('hello@mail.polycarpic.com');
-    const bad = run(`${ENTER} ${HOSTRUN} --mail-from "evil@polycarpic.com" 2>&1${rc}; ls /etc/polycarpic/host.env 2>&1 | grep -c 'No such'; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^cryptsetup luksFormat' || true`);
+    const bad = run(`${ENTER} ${HOSTRUN} --mail-from "evil@polycarpic.com" 2>&1${rc}; ls /etc/polycarpic/mail.env 2>&1 | grep -c 'No such'; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^cryptsetup luksFormat' || true`);
     expect(bad.out).not.toMatch(/rc=0/);
     expect(bad.out).toMatch(/mail\.polycarpic\.com/);
     const [nosuch, fmt] = bad.out.trim().split('\n').slice(-2);
@@ -356,8 +360,11 @@ describe('provision-check: one planted fault per check, with id, found value and
     failLine(check('groupadd -g 10001 websvc; usermod -aG websvc polyops'), 'H9', ['polyops', '10001']);
     failLine(check('groupadd docker; usermod -aG docker polyops'), 'H9', ['docker']);
   });
-  it('H10: MAIL_FROM outside mail.<domain>, and a secret-named key in host.env', () => {
-    failLine(check(`sed -i 's/^MAIL_FROM=.*/MAIL_FROM=x@polycarpic.com/' /etc/polycarpic/host.env`), 'H10', ['mail_from']);
+  it('H10: MAIL_FROM outside mail.<domain>, MAIL_FROM back in host.env, a second key in the mail file, a missing mail file, and a secret-named key in host.env', () => {
+    failLine(check(`sed -i 's/^MAIL_FROM=.*/MAIL_FROM=x@polycarpic.com/' /etc/polycarpic/mail.env`), 'H10', ['mail_from']);
+    failLine(check(plantAppend('/etc/polycarpic/host.env', 'MAIL_FROM=x@mail.polycarpic.com')), 'H10', ['mail_from']);
+    failLine(check(plantAppend('/etc/polycarpic/staging-mail.env', 'POLY_INSTANCE=x')), 'H10', ['staging-mail.env']);
+    failLine(check('rm /etc/polycarpic/mail.env'), 'H10', ['mail.env']);
     failLine(check(plantAppend('/etc/polycarpic/host.env', 'RESEND_API_KEY=abc')), 'H10', ['resend_api_key']);
     failLine(check(plantAppend('/etc/polycarpic/staging-host.env', 'DB_PASSWORD=abc')), 'H10', ['db_password']);
   });

@@ -66,7 +66,7 @@ export function snapshot(tag: string, from: string | null, script: string) {
   return r;
 }
 
-export const HOST_ARGS = `--stage host --target hetzner --domain ${DOMAIN}`;
+export const HOST_ARGS = `--stage host --target hetzner --domain ${DOMAIN} --bind-addr 192.0.2.10 --staging-allow 192.0.2.0/24 --acme-email ops@polycarpic.com`; // POLY-100 R9: the flags that write edge.env (H19 fails without it)
 export const CHECK = `POLY_NTP_WAIT=2 bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 
 /** cloud-init applied (test key substituted for the placeholder), then the host stage, once: the snapshot every H test starts from. */
