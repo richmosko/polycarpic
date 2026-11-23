@@ -44,6 +44,10 @@ Unit file `tests/infra/ops/test_deploy.py`; it joins the existing provision-job 
     (migrate: `… migrate migrate`, plan: `… migrate migrate --plan`). Every compose `up`/`run` has `--pull never` and `--no-build`. Rollback `up` uses the previous release's
     dir for `-f`/`--project-directory`/`--env-file`. Premigration is run as an argv ending `backup premigration`.
 
+13. **Where a real render is judged** (lead's G3 question): `tests/infra/compose-real.test.ts` (lint job, needs the compose CLI, no daemon). It (a) compares the committed
+    fixtures with real `docker compose config` output for the shipped files, and (b) renders 16 S10/S14 edits of the shipped `staging.yml` with real compose and runs the
+    installed guard on those renders (`fixtures/guard_real.py`). The hand-written guard cases in `test_deploy_guard.py` stay as the unit level.
+
 ## Groups (builder turns them green in order)
 
 - G0 slice 0 (this commit, green against a throwaway stub): V1 refusal.

@@ -301,7 +301,8 @@ describe('T-pre: backup-acl preflight (R12)', () => {
       setup: () => 'GRANT EXECUTE ON FUNCTION public.fdef() TO poly_backup', undo: () => 'REVOKE EXECUTE ON FUNCTION public.fdef() FROM poly_backup' },
     { name: 'TEMPORARY on the database', setup: (db) => `GRANT TEMPORARY ON DATABASE ${db} TO poly_backup`, undo: (db) => `REVOKE TEMPORARY ON DATABASE ${db} FROM poly_backup` },
     { name: 'CONNECT WITH GRANT OPTION on the database', setup: (db) => `GRANT CONNECT ON DATABASE ${db} TO poly_backup WITH GRANT OPTION`, undo: (db) => `REVOKE GRANT OPTION FOR CONNECT ON DATABASE ${db} FROM poly_backup` },
-    { name: 'CONNECT on a different database', setup: (_db, other) => `GRANT CONNECT ON DATABASE ${other} TO poly_backup`, undo: (_db, other) => `REVOKE CONNECT ON DATABASE ${other} FROM poly_backup` },
+    { name: 'TEMPORARY on a sibling database (ruling cc8f5ba6: every database entry must be exactly CONNECT)', setup: (_db, other) => `GRANT TEMPORARY ON DATABASE ${other} TO poly_backup`, undo: (_db, other) => `REVOKE TEMPORARY ON DATABASE ${other} FROM poly_backup` },
+    { name: 'CONNECT WITH GRANT OPTION on a sibling database', setup: (_db, other) => `GRANT CONNECT ON DATABASE ${other} TO poly_backup WITH GRANT OPTION`, undo: (_db, other) => `REVOKE GRANT OPTION FOR CONNECT ON DATABASE ${other} FROM poly_backup` },
     { name: 'ALTER DEFAULT PRIVILEGES ... TO poly_backup', setup: () => 'ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner IN SCHEMA public GRANT SELECT ON TABLES TO poly_backup',
       undo: () => 'ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner IN SCHEMA public REVOKE SELECT ON TABLES FROM poly_backup' },
     { name: 'ALTER TABLE ... OWNER TO poly_backup', objects: 'CREATE TABLE public.town (id int);', setup: () => 'ALTER TABLE public.town OWNER TO poly_backup', undo: () => 'ALTER TABLE public.town OWNER TO poly_owner' },
@@ -342,6 +343,20 @@ describe('T-pre: backup-acl preflight (R12)', () => {
     expect(plan.code, plan.err + plan.out).toBe(3);
     ok(await migrateRun(db, dir));
     expect((await migrateRun(db, dir, ['--plan'])).code).toBe(0);
+  });
+
+  it('exact CONNECT on a sibling database is exempt: a second database with poly_backup CONNECT only passes (ruling cc8f5ba6)', async () => {
+    const db = freshDb();
+    const other = freshDb();
+    must(`GRANT CONNECT ON DATABASE ${other} TO poly_backup`, db);
+    try {
+      const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
+      expect((await migrateRun(db, dir, ['--plan'])).code).toBe(3);
+      ok(await migrateRun(db, dir));
+      expect((await migrateRun(db, dir, ['--plan'])).code).toBe(0);
+    } finally {
+      must(`REVOKE CONNECT ON DATABASE ${other} FROM poly_backup`, db);
+    }
   });
 
   it('CONNECT on the current database alone (roles.sql\'s own grant) passes', async () => {
