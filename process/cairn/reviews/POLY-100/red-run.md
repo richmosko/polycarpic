@@ -218,3 +218,7 @@ once devops-100's fix makes the test green (a test that never went green has no 
 ## F1 built image (tests/infra/image/release-bundle.test.ts), run on the Mac with devops-100's F1 fix
 
 Harness fixes first (test-side): the build needs `--build-arg GIT_COMMIT` (a 40-hex value) and the build artifact `infra/release/images.env` (written by `infra/ci/images-env.sh` with all-zero digests, removed after). Then green, 3 of 3. Mutant: `infra/postgres/gate-check.sh` added to the Dockerfile's `cp` list: green on the first test as written (it let any `infra/postgres/*` through), so the assertion was tightened to the four `.conf` files plus `archive-wal.sh`; with the mutant it is now red, restored it is green.
+
+## S31 on the real tools (tests/infra/render-isolation.test.ts): written, NOT run (macOS has no `unshare`/`setpriv`); CI's lint job (Linux) is its first run
+
+(1) a root-only file through a local `include` fails the render as uid 10020, works as root (control); (2) a 0400 root canary is in no render or error, and is in a root render (control); (3) a remote `oci://127.0.0.1:<port>` include reaches a host listener without `unshare --net` (control) and not within it. In CI a missing tool fails the file; on a developer machine it skips with the reason. Mutants: render as root reds (1) and (2); no `unshare` reds (3). The swapped-between-two-renders case is a unit case (`test_a_second_render_that_differs_from_the_judged_one_is_guard_render`, red until F4); the code-level `-f -` re-render as the render user runs in provision when F4 lands.
