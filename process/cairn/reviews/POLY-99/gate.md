@@ -1,22 +1,24 @@
 # POLY-99 build-green gate (qa-99)
 
-Build under test: `7e4b95d2` (devops-99's last build commit) with my tests at `e77312c9` on top; this file's commit is the record. Machine: this Mac, Docker 29.9.3 (Docker Desktop, arm64), Python 3.15, one suite at a time. Plan and pins: `test-plan.md`; the red run: `red-run.md`.
+**Final tip:** build `4a75ade1` (devops-99's last build commit: F5, F6, F7, DR8, the split `# T17` markers) with my tests at `37445c1f`. An earlier pass of this gate ran on `7e4b95d2` with tests `e77312c9` (kept below as "first pass"). Machine: this Mac, Docker 29.9.3 (Docker Desktop, arm64), Python 3.15, one suite at a time. Plan and pins: `test-plan.md`; the red run: `red-run.md`.
 
 ## Counts per suite (each over what it says)
 
 | Suite (command) | Tests | Pass | Red | Note |
 |---|---|---|---|---|
-| backup container suite (`vitest run -c tests/infra/vitest.backup.config.ts`) | 101 | 101 | 0 | seven files; 301 s wall, 262 s in the files |
+| backup container suite (`vitest run -c tests/infra/vitest.backup.config.ts`) | 111 | 111 | 0 | seven files; 369 s wall (6:09), 326 s in the files; one earlier red in this run, the DR10-deleted mutant, was my assertion and is fixed and green (drill file 10/10) |
 | provision container config (`-c tests/infra/vitest.provision.config.ts`) | 171 | 171 | 0 | checks-db 20, create 42, host 68, ops 23, poly99 18; first run 76 s wall |
 | image container config (`-c tests/infra/vitest.image.config.ts`) | 90 | 88 | 2 | the two POLY-95 secret-mode cases, which cannot fail on Docker Desktop and fail the same on a clean `origin/main` (test-plan.md, control run) |
 | `tests/infra` non-container (`-c tests/infra/vitest.config.ts`) | 390 | 390 | 0 | lint, lint-poly99, backup-wiring, ops and provision wiring |
-| `tests/ci` (`-c tests/ci/vitest.config.ts`) | 587 | 587 | 0 | the 10-key change set (`backup`) |
+| `tests/ci` (`-c tests/ci/vitest.config.ts`) | 587 | 587 | 0 | 21 files; the 10-key change set (`backup`). devops-99's 614 was `vitest run tests/ci tests/infra/backup-wiring.test.ts`: these 587 plus the 27 cases of `backup-wiring.test.ts`, reported as one figure |
 | `tests/layers` | 556 | 556 | 0 | |
 | ops unit tests (`unittest`, one file at a time) | backup 25, cli 11, ctx_getpass 7, dispatcher 19, gate_check 5, install 9, lint 8, list_secrets 7, provision 20, restart 9, set_secret 31, status 50, upload 21 | all | 0 | 222 in total, under 5 s of test time |
 
-## Per-file times, tests/infra/backup (s)
+## Per-file times, tests/infra/backup (s), final tip
 
-backup 54, uploader 61, drill 71, restore 40, roundtrip 17, slice0 13, fake-b2 6 (sum 262; 301 s wall including the globalSetup: images, one stack, three real backups, WAL). Target ≤ 420 s: met. Earlier whole-directory timed run before the F1-F5 cases: 277 s at `a70d290a`. Real scratch restores: roundtrip 3, restore.test.ts 1 (T10 `--before`, which also carries F4's real-Docker kill), drill 2 runs (the fault run has 2 scratch restores of its own): within the ruling's 9.
+backup 54, drill 133, uploader 59, restore 44, roundtrip 17, slice0 13, fake-b2 6 (sum 326; 369 s wall including the globalSetup: images, one stack with the migration chain and a planted session, three real backups, WAL). Target ≤ 420 s: **met, with 51 s to spare**. The figure rose from 277 s (before F1-F5) to 301, 354 and 369 s as the architect's and seceng's verdict-read cases landed.
+
+**The ruling's cap of 9 real scratch restores is exceeded.** The drill file now has six real drill runs (happy, the all-faults run, the BASE-skip mutant, and the three DR8 mutants), each with two scratch restores, plus roundtrip 3 and restore.test.ts 1: 16 in all. Each extra run is a mutant the architect or seceng required (DR8 data-only, deleted handle, dropped tables; F6 BASE-skip). The time target still holds; the cap does not. Ruling needed from the architect whether to consolidate the three DR8 mutants into one run or accept the count.
 
 ## Suite-time delta against a same-day control on `origin/main` (clean worktree, same machine)
 
@@ -25,7 +27,7 @@ backup 54, uploader 61, drill 71, restore 40, roundtrip 17, slice0 13, fake-b2 6
 | image | 92 s, 90 tests (3 red on this Mac) | 96 s, 90 tests (2 red on this Mac) | +4 s |
 | provision | 67 s, 153 tests | 76 s, 171 tests | +9 s (18 new cases) |
 | tests/infra non-container | 13 s, 332 | not timed alone, 390 tests | +58 tests, lint fixtures dominate |
-| tests/ci | 10 s, 579 (6 red on the control checkout, not looked into) | 587 pass | +8 tests |
+| tests/ci | 10 s, 579 (573 pass; the 6 red are `generated-freshness.test.ts` "db-migrations through the real drizzle-kit (V1)": "generator ./node_modules/.bin/drizzle-kit is not available" because the control worktree has no pnpm install; environment, not `main` red) | 587 pass | +8 tests |
 | backup (new) | none | 301 s | new, runs only when the `backup` change key is true |
 
 CI figures are unmeasured (this is a Mac); devops-99 reports the CI image-job figure.
@@ -39,7 +41,7 @@ CI figures are unmeasured (this is a Mac); devops-99 reports the CI image-job fi
 
 ## Every test commit since the red run (`1cd28a70`)
 
-Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **loosened**, with one line of why. Nothing is loosened without a ruling, and the two that are marked loosened say which.
+Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **loosened**, with one line of why. Nothing is loosened without a ruling, and the two that are marked loosened say which (`738c8e87` was accepted by the architect at `3f635dc3`).
 
 | Commit | Mark | Why |
 |---|---|---|
@@ -61,6 +63,9 @@ Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **l
 | `a0938f6b` provision suites | corrected | R10 `r-x` ACLs and R9 root-written state replace the POLY-97 expectations; M1 now asserts read-only for 10005 (stricter on what 10005 may not do); H16 bundle copy; install bundle |
 | `e77312c9` ops.conf wrapper case | corrected | the fake provision.sh kept overwriting the bucket line |
 | `aa4fdd79` control run | record | main control for the Docker Desktop cases |
+| `5ad60203` F2 messages, DR1/DR2 independent, DR8 real tables | stricter | the unknown `--accept-version` case asserts its message (red on the pre-F2 files); the fault run separates DR1 and DR2 with a mutant each; the stack applies the migration chain and plants a session, DR8 has three mutants |
+| `4cfca88f` T17b, T17p, WAL DR2, F6, F7 | stricter | new cases with their mutants; the happy drill's last line is now `DRILL INCOMPLETE: not checked: DR9` (a skipped check is not a pass); a role missing from the dump globals must fail DR6 |
+| `37445c1f` DR10-deleted mutant | corrected | the verdict prints its own `FAIL DR10 … did not run` line; the case asserted no line at all |
 
 ## Not measured here
 
