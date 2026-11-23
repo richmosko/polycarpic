@@ -351,20 +351,41 @@ def _compose(ctx, argv, timeout=600):
         return 124, "", "timeout"
 
 
+GONE = ("No such object", "No such container")
+
+
+def _gone(ctx, name):
+    """G4: gone is exactly `docker inspect` exiting non-zero with `No such object` or `No such container` on stderr. Anything else, a timeout
+    included, is not gone, and it is asked again 5 s apart for 60 s (the locks are held meanwhile)."""
+    for i in range(13):
+        try:
+            code, _, err = ctx.run(["docker", "inspect", name], timeout=30)
+            if code != 0 and any(m in err for m in GONE):
+                return True
+        except (TimeoutError, OSError):
+            pass
+        if i < 12:
+            ctx.sleep(5)
+    return False
+
+
+def _remove_oneoff(ctx, name):
+    try:
+        ctx.run(["docker", "rm", "-f", name], timeout=60)
+    except (TimeoutError, OSError):
+        pass
+    if not _gone(ctx, name):
+        raise Refusal("oneoff-stuck", True)
+
+
 def _oneoff(ctx, project, judged, svc, command, timeout=600):
     """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released."""
     name = stack.oneoff_name(project, svc)
-    ctx.run(["docker", "rm", "-f", name], timeout=60)
-    still, _, _ = ctx.run(["docker", "inspect", name], timeout=30)
-    if still == 0:  # a stale one that will not go: a later run refuses while it exists
-        raise Refusal("oneoff-stuck", True)
+    _remove_oneoff(ctx, name)  # a stale one that will not go: a later run refuses while it exists
     try:
         return ctx.run(stack.run_argv(judged, project, svc, command), timeout=timeout)
     except TimeoutError:
-        ctx.run(["docker", "rm", "-f", name], timeout=60)
-        code, _, _ = ctx.run(["docker", "inspect", name], timeout=30)
-        if code == 0:
-            raise Refusal("oneoff-stuck", True)
+        _remove_oneoff(ctx, name)
         return 124, "", "timeout"
 
 
