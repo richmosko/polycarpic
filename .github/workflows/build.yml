@@ -19,10 +19,141 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/richmosko/polycarpic
+  REGISTRY: ghcr.io/richmosko
 
 jobs:
+  siblings:
+    name: siblings
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      postgres: ${{ steps.postgres.outputs.digest }}
+      tools: ${{ steps.tools.outputs.digest }}
+      caddy: ${{ steps.caddy.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Install Trivy
+        run: bash infra/ci/install-trivy.sh
+
+      - name: Build and push postgres by digest (no cache)
+        id: postgres
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: infra/postgres
+          file: infra/postgres/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/polycarpic-postgres:sha-${{ github.sha }}-${{ github.run_id }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/richmosko/polycarpic
+          no-cache: true
+          pull: true
+          provenance: false
+          sbom: false
+
+      - name: Trivy scan of postgres (fails before anything is signed)
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+          DIGEST: ${{ steps.postgres.outputs.digest }}
+        run: bash infra/ci/image.sh scan "${REGISTRY}/polycarpic-postgres@${DIGEST}"
+
+      - name: Provenance attestation of postgres
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/polycarpic-postgres
+          subject-digest: ${{ steps.postgres.outputs.digest }}
+          push-to-registry: true
+
+      - name: Build and push tools by digest (no cache)
+        id: tools
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: infra/backup
+          file: infra/backup/tools.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/polycarpic-tools:sha-${{ github.sha }}-${{ github.run_id }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/richmosko/polycarpic
+          no-cache: true
+          pull: true
+          provenance: false
+          sbom: false
+
+      - name: Trivy scan of tools (fails before anything is signed)
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+          DIGEST: ${{ steps.tools.outputs.digest }}
+        run: bash infra/ci/image.sh scan "${REGISTRY}/polycarpic-tools@${DIGEST}"
+
+      - name: Provenance attestation of tools
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/polycarpic-tools
+          subject-digest: ${{ steps.tools.outputs.digest }}
+          push-to-registry: true
+
+      - name: Build and push caddy by digest (no cache)
+        id: caddy
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: infra/caddy
+          file: infra/caddy/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/polycarpic-caddy:sha-${{ github.sha }}-${{ github.run_id }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/richmosko/polycarpic
+          no-cache: true
+          pull: true
+          provenance: false
+          sbom: false
+
+      - name: Trivy scan of caddy (fails before anything is signed)
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+          DIGEST: ${{ steps.caddy.outputs.digest }}
+        run: bash infra/ci/image.sh scan "${REGISTRY}/polycarpic-caddy@${DIGEST}"
+
+      - name: Provenance attestation of caddy
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/polycarpic-caddy
+          subject-digest: ${{ steps.caddy.outputs.digest }}
+          push-to-registry: true
+
   build:
     name: build
+    needs: siblings
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -46,6 +177,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+
+      - name: Write the release's sibling image references (the app's attestation covers them)
+        env:
+          POSTGRES: ${{ needs.siblings.outputs.postgres }}
+          TOOLS: ${{ needs.siblings.outputs.tools }}
+          CADDY: ${{ needs.siblings.outputs.caddy }}
+        run: bash infra/ci/images-env.sh "$POSTGRES" "$TOOLS" "$CADDY"
+
+      - name: Compose-policy lint on the release's own images (C-70)
+        env:
+          POLY_BIND_ADDR: 192.0.2.1
+        run: |
+          set -euo pipefail
+          set -a; . infra/release/images.env; set +a
+          export POLY_APP_IMAGE="${IMAGE}@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          node infra/lint/compose-policy.mjs --root .
 
       - name: Build and push by digest (no cache)
         id: build
