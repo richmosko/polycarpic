@@ -1,8 +1,8 @@
 """POLY-100 R13 seam for `polycarpic-ops deploy`. Contract pins: process/cairn/reviews/POLY-100/test-plan.md.
 
 World = the outside of the box, faked: the registry (docker), GitHub (gh), a REAL git origin (git and ssh-keygen run for real, in the temp
-tree; only the github.com URL is redirected to a local repo), a resolver, and scripted `polycarpic-ops backup premigration`. Everything
-reaches the tool through ctx.run / ctx.run_bytes / ctx.resolve; subprocess stays patched to raise (base.OpsTest).
+tree; only the github.com URL is redirected to a local repo), a scripted compose, and scripted `polycarpic-ops backup premigration`. Everything
+reaches the tool through ctx.run / ctx.run_bytes / ctx.https_status / ctx.owner_of / ctx.stdin; subprocess stays patched to raise (base.OpsTest). No resolver: R9 is strict.
 """
 import atexit
 import datetime as dt
@@ -38,6 +38,7 @@ RUN_ID = "45196636649"
 STATE = "/var/lib/polycarpic/state/deploy"
 _TEMPLATE = None
 _KEYS = {}
+STAGING_AUTH_PATHS = ("/etc/polycarpic/secrets/caddy", "/etc/polycarpic/secrets/caddy/staging_basic_auth")
 SYSTEM_PATH = os.environ.get("PATH", "/usr/bin:/bin")
 
 
@@ -86,7 +87,6 @@ class World(object):
         self.runs = []       # build.yml run objects, newest first
         self.releases = []   # release objects, newest first
         self.artifacts = {}  # run id -> digest.txt text
-        self.names = {}      # resolver: name -> list of addresses; missing name raises OSError
         self.premigration = (0, "", "")
         self.gh_down = False  # a network outage: gh exits 1 with a transport error
         self.docker_log, self.unhandled, self.pulled = [], [], []
@@ -409,6 +409,8 @@ class World(object):
 
     def owner_of(self, fd, path):
         """ctx.owner_of(fd, logical path) -> (uid, gid): root:10010 as far as the box is concerned (a unit test cannot own that group)."""
+        if path not in STAGING_AUTH_PATHS:
+            raise AssertionError("ctx.owner_of is for the two staging-auth paths only, got %r" % (path,))
         return self.owners.get(path, (os.getuid(), 10010))
 
     def https_status(self, host, addr, path):
@@ -423,11 +425,6 @@ class World(object):
         if isinstance(v, Exception):
             raise v
         return v
-
-    def resolve(self, name):
-        if name not in self.names:
-            raise OSError("Name or service not known: " + name)
-        return list(self.names[name])
 
 
 class DeployTest(OpsTest):
@@ -489,8 +486,6 @@ class DeployTest(OpsTest):
         w.handler(runner)
         extra = {}
         names = ctx_class().__init__.__code__.co_varnames
-        if ctx_seams and "resolve" in names:
-            extra["resolve"] = w.resolve
         if ctx_seams and "owner_of" in names:
             extra["owner_of"] = w.owner_of
         if ctx_seams and "https_status" in names:
