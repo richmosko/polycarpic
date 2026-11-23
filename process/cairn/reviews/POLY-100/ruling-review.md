@@ -716,3 +716,21 @@ The env_file rule becomes **S27**:
   `current` (`state`). Red on mutants reading before the lock, reading the file alone, and treating a failed `ps` as none.
 
 **Plan gate:** opens when S28 and the R8 wording are in. Nothing else is open in the ruling.
+
+## Draft: `staging-auth` (architect-100, not yet in the ruling)
+
+**Agree, with S29.** Agreed as drafted: hidden prompt only, `htpasswd` on stdin, the one exact line, cost 10 with 16-72 bytes (the
+allowlist is asked first, so only listed addresses can spend CPU or guess), no hash printed, refusal before V1. An
+unaccepted `$2y$` fails closed: nobody signs in, or Caddy does not start.
+
+**S29.**
+- *(a) Every way Caddy reads the file.* Caddy reads it at any start, so the check also runs in `polycarpic-ops restart caddy`
+  (refuse, Caddy untouched) and before rollback's and `rollback edge`'s caddy `up`, where a failure is `rollback-unhealthy`, nothing upped.
+  A restart by Docker cannot be checked; provision-check is what sees that case.
+- *(b) Bytes, whole file.* Read at most 128 bytes without following a link and match with `fullmatch`: Python's `$` also matches before a
+  final newline. Owner `root`, group 10010 and the directory's group are compared with 10010 itself; `set_secret._plan` takes the group
+  from whatever the directory has.
+- *(c) `htpasswd` output.* Its trailing blank line is accepted exactly as printed and nothing else is stripped.
+- *T-sauth adds:* `restart caddy` and both rollbacks with a bad file; a file with two trailing newlines, with `\r\n`, and a 129-byte
+  file; a directory with another group. Red on mutants using `match` with `$`, and checking only in deploys.
+- *SECURITY, mine at the verdict:* the row says "Staging secrets directory"; the file is in `secrets/caddy/`.
