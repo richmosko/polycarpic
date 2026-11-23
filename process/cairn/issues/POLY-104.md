@@ -11,7 +11,7 @@ labels: [ops, verification]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -49,3 +49,7 @@ From the POLY-98 verdict (`process/cairn/reviews/POLY-98/verdict.md`, "Unmeasure
 ### @team-lead — 2026-11-22
 
 From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): measured on the staging box, not before: the spool ACLs (r-x for uid 10005, .inflight/) on real LUKS ext4; core: 0 and the host's core_pattern; the backup and upload units under real systemd; `docker compose run`'s timeout and rm -f; the secrets/host/ move and the jobs.log / last-upload ownership on a provisioned box; `status`'s backupdb item against real logs; the nightly run's duration and its 256 MB limit; CONNECTION LIMIT 3 when nightly and premigration runs meet; the two POLY-95 secret-mode cases that cannot fail on Docker Desktop.
+
+### @team-lead — 2026-11-23
+
+From the POLY-100 ruling (`process/cairn/reviews/POLY-100/ruling.md` R9, §L5; seceng S11, S15 in `ruling-review.md`): do not create the `app.` DNS record until `first-deploy prod` has run. That deploy stops Caddy, empties its data directories and recreates it, and prints the instruction as its last line. If the record exists earlier, every staging deploy skips the edge and alerts, and `first-deploy prod` refuses with `edge-prod-name-early` (exit 4). The reason: a staging-era Caddy that can resolve the prod name can obtain prod's certificate. INFRA's first-deploy runbook carries the same order.
