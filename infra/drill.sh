@@ -170,7 +170,8 @@ else
     fi
   else
     SKIPWHY="not run: a scratch restore failed"
-    skip_rest DR8 DR9
+    res FAIL DR8 "there is no restored dump instance to count sessions in (the dump restore failed; a data-only or partial load leaves nothing to check)"
+    skip_rest DR9
     res FAIL DR7 "no two restores to compare"
   fi
 fi
