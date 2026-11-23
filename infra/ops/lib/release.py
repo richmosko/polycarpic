@@ -27,7 +27,7 @@ SIBLINGS = ("postgres", "tools", "caddy")
 IMAGE_KEYS = ("POLY_POSTGRES_IMAGE", "POLY_TOOLS_IMAGE", "POLY_CADDY_IMAGE")
 LABEL = "org.opencontainers.image.revision"
 EVENTS = ("candidate", "verified", "refused", "transient", "busy", "quarantined", "not-newer", "premigration-set", "migrated", "up", "healthy",
-          "rolled-back", "rollback-unhealthy", "edge-probe-baseline")
+          "rolled-back", "rollback-unhealthy", "edge-probe-baseline", "help")
 
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SHA = re.compile(r"[0-9a-f]{40}")
@@ -45,6 +45,7 @@ class Refusal(Exception):
     def __init__(self, name, quarantine=False, code=1):
         Exception.__init__(self, name)
         self.name, self.quarantine, self.code = name, quarantine, code
+        self.help_lines = None
 
 
 class Transient(Exception):
@@ -88,8 +89,9 @@ def log(ctx, project, event, *fields):
         fh.write(line.rstrip() + "\n")
 
 
-def alert(ctx, project, name):
-    put(ctx, project, "alert", "%s %s\n" % (now_utc(ctx), name))
+def alert(ctx, project, name, text=()):
+    """Line 1 is `<UTC> <name>`; any further lines are the operator text of a guard refusal (R10)."""
+    put(ctx, project, "alert", "%s %s\n" % (now_utc(ctx), name) + "".join(l + "\n" for l in text))
 
 
 def clear_alert(ctx, project):

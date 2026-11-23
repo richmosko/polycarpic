@@ -6,7 +6,7 @@ import fcntl
 import os
 import tempfile
 
-from lib import compose, compose_guard, release as rel, spool, stack, tokenexp
+from lib import compose, compose_guard, guardhelp, release as rel, spool, stack, tokenexp
 from lib.release import Refusal
 
 LOCK = "/run/polycarpic/deploy.lock"
@@ -77,7 +77,7 @@ def _deploy(project, ctx, work, first, existing_data):
         rdir, images = _verify(project, ctx, tok, work, digest, commit)
         keep = False
         try:
-            owner = _gate(project, ctx, rdir, images, cur)
+            owner = _gate(project, ctx, rdir, images, cur, commit, tag)
             rel.log(ctx, project, "verified", digest)
             keep = True
             return _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh)
@@ -95,7 +95,12 @@ def refuse(project, ctx, err, digest="-"):
     rel.log(ctx, project, "refused", err.name, digest)
     if err.quarantine and digest != "-":
         rel.quarantine(ctx, project, digest, err.name)
-    rel.alert(ctx, project, err.name)
+    text = err.help_lines or ()
+    for line in text:
+        rel.log(ctx, project, "help", line)
+    rel.alert(ctx, project, err.name, text)
+    for line in text:
+        ctx.err(line)
     ctx.err("deploy: refused " + err.name)
     return err.code
 
@@ -155,8 +160,17 @@ def _verify(project, ctx, tok, work, digest, commit):
     return rdir, stack.kinds(stack.refs(rdir))
 
 
-def _gate(project, ctx, rdir, images, cur):
-    """V6 (the Postgres major is unchanged) and V7 (the installed guard on the rendered config)."""
+def _gate(project, ctx, rdir, images, cur, commit, tag):
+    """V6 (the Postgres major is unchanged) and V7 (the installed guard on the rendered config). A refusal of the CANDIDATE by the guard
+    carries the operator text (R10); a refusal of `current` or `previous` elsewhere does not."""
+    try:
+        return _gate_checks(project, ctx, rdir, images, cur)
+    except Refusal as err:
+        err.help_lines = guardhelp.lines(ctx, err.name, commit, tag)
+        raise
+
+
+def _gate_checks(project, ctx, rdir, images, cur):
     if cur:
         old = rel.ts.read_text(os.path.join(rel.release_dir(ctx, cur["digest"]), "infra/postgres-major"))
         new = rel.ts.read_text(os.path.join(rdir, "infra/postgres-major"))
