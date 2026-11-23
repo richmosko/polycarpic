@@ -12,7 +12,7 @@ umask 077
 PROG=restore.sh
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-usage() { echo "usage: restore.sh --identity <file> (--premigration --from-box <user@host> [--set <TS>] | --base | --dump) [--read-credential <file> --bucket <name>] [--instance <i>] [--before <UTC>] [--hours <1-24>] [--keep] | restore.sh --cleanup" >&2; exit 2; }
+usage() { echo "usage: restore.sh --identity <file> (--premigration --from-box <user@host> | --base | --dump) [--read-credential <file> --bucket <name>] [--instance <i>] [--before <UTC>] [--set <TS>] [--accept-version <fileId>] [--hours <1-24>] [--plaintext-disk-is-encrypted] [--keep] | restore.sh --cleanup" >&2; exit 2; }
 die() { local code=$1; shift; echo "restore.sh: $*" >&2; exit "$code"; }
 
 [ $# -gt 0 ] || usage
