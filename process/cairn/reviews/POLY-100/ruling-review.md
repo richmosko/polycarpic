@@ -625,3 +625,24 @@ Edge alone leaves prod's `v1.*` rule untouched. Conditions if it is chosen:
 
 **I disagree with the note's fallback.** If the Principal declines a new tag namespace, the fallback is not the exception:
 they chose strict. It is prod first, or staging unserved until GA.
+
+### What a second signed tag namespace adds for an attacker
+
+- **Pushing the tag.** Any account that can write to the repository can push `edge-*`, as with `v1.*` today. A workflow on a tag
+  runs the file **at the tagged commit**, so a writer can also edit `release.yml` there and publish any Release. The same is
+  true now: `release.yml` is a fail-fast mirror and the box decides. Nothing new is reachable.
+- **On the box.** Without a key in `allowed_signers` V4 refuses. The Release body can only name a digest attested at the signed
+  commit (V1), so editing it chooses among builds of that commit.
+- **Replay.** Name binding (S2) stops `edge-5` re-pointed as `v1.0.0` or `edge-9`. `n` must rise, so an old one cannot come back.
+  `edge-deploy <tag>` is typed by the operator and has no timer: an attacker cannot make the box look.
+- **What it truly adds:** one more thing the same key may sign. Signing `edge-n` must never be consent to run the app, hence S22.
+  A stolen signing key reaches Caddy before GA; it already reached all of prod after.
+- **Advisory A14.** A GitHub ruleset limiting who may create `edge-*` and `v1.*` tags. Whether one exists is unmeasured.
+
+Prod first has no second namespace, but makes prod accept `v0.y.z` as well, which widens what prod itself will run.
+
+**Caddy naming `app.` with no record.** No security cost under strict: only a signed Caddy ever holds that key, and with no
+record there is none. It retries and fails. By documentation the CA limits failed validations per name and Caddy backs off,
+so the certificate may lag the record at launch (unmeasured). That is launch timing, for POLY-104's or the GA runbook.
+
+**Recommendation: edge alone,** with S22-S25.
