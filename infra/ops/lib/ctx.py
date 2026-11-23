@@ -4,7 +4,8 @@ The root and the fakes come from the constructor only, never from argv, the envi
 Seams: run(argv, stdin, timeout, env) -> (code, stdout text, stderr text), raising TimeoutError; run_inherit(argv, env) -> code;
 getpass(prompt); isatty(); confirm(prompt); now() -> aware UTC datetime; sleep(seconds); chown(fd_or_path, uid, gid); geteuid();
 tls_probe(host, port) -> {"ok": True, "not_after": datetime} | {"ok": False, "reason": str} (raises OSError when nothing answers);
-statvfs(path) with the host path.
+statvfs(path) with the host path; run_bytes(argv, stdin, timeout, env) -> (code, stdout bytes, stderr text) for a child that prints a tar
+(POLY-100 R4); resolve(name) -> [address], raising OSError when the name does not resolve (POLY-100 R9).
 """
 import datetime
 import getpass as _getpass
@@ -35,6 +36,20 @@ def _real_run(argv, stdin=None, timeout=None, env=None):
     except OSError as err:
         return 127, "", "%s: %s\n" % (argv[0], err.strerror or err.__class__.__name__)
     return p.returncode, p.stdout, p.stderr
+
+
+def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
+    try:
+        p = subprocess.run(argv, input=stdin, capture_output=True, timeout=timeout, env=env, shell=False, check=False)
+    except subprocess.TimeoutExpired:
+        raise TimeoutError(argv[0])
+    except OSError as err:
+        return 127, b"", "%s: %s\n" % (argv[0], err.strerror or err.__class__.__name__)
+    return p.returncode, p.stdout, p.stderr.decode("utf-8", "replace")
+
+
+def _real_resolve(name):
+    return sorted(set(info[4][0] for info in socket.getaddrinfo(name, None)))
 
 
 def _real_run_inherit(argv, env=None, timeout=None):
@@ -101,7 +116,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, resolve=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -118,6 +133,8 @@ class Ctx:
         self.stderr = stderr or sys.stderr
         self.stdout_bytes = stdout_bytes or getattr(sys.stdout, "buffer", None)  # fetch-premigration writes the file's bytes here
         self.trusted_uid = trusted_uid
+        self._run_bytes = run_bytes or _real_run_bytes
+        self._resolve = resolve or _real_resolve
 
     def p(self, logical):
         """A host path under the root: root-prefixed in tests, the path itself in production."""
@@ -134,6 +151,13 @@ class Ctx:
     def run(self, argv, stdin=None, timeout=None, extra_env=None):
         self._check(argv)
         return self._run(list(argv), stdin, timeout, fixed_env(extra_env))
+
+    def run_bytes(self, argv, stdin=None, timeout=None, extra_env=None):
+        self._check(argv)
+        return self._run_bytes(list(argv), stdin, timeout, fixed_env(extra_env))
+
+    def resolve(self, name):
+        return self._resolve(name)
 
     def run_inherit(self, argv, extra_env=None):
         self._check(argv)
