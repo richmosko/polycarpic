@@ -97,6 +97,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.dir_hooks = {}
         self.ps_fails = set()
         self.plan_out, self.psql_result = "", (0, "0\n", "")
         self.origin = self.tmp / "github-origin"
@@ -304,6 +305,9 @@ class World(object):
         hook = self.render_hooks.get((name, raw)) or self.render_hooks.get((name, None))
         if hook:
             d = hook(d) or d
+        for sub, fn in self.dir_hooks.items():  # an edit that applies only to renders of one release directory (a refusal of `current`, not of the candidate)
+            if sub in pd:
+                d = fn(d) or d
         return json.dumps(d)
 
     def _compose(self, argv):
