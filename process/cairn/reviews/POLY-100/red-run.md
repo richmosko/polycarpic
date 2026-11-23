@@ -222,3 +222,23 @@ Harness fixes first (test-side): the build needs `--build-arg GIT_COMMIT` (a 40-
 ## S31 on the real tools (tests/infra/render-isolation.test.ts): written, NOT run (macOS has no `unshare`/`setpriv`); CI's lint job (Linux) is its first run
 
 (1) a root-only file through a local `include` fails the render as uid 10020, works as root (control); (2) a 0400 root canary is in no render or error, and is in a root render (control); (3) a remote `oci://127.0.0.1:<port>` include reaches a host listener without `unshare --net` (control) and not within it. In CI a missing tool fails the file; on a developer machine it skips with the reason. Mutants: render as root reds (1) and (2); no `unshare` reds (3). The swapped-between-two-renders case is a unit case (`test_a_second_render_that_differs_from_the_judged_one_is_guard_render`, red until F4); the code-level `-f -` re-render as the render user runs in provision when F4 lands.
+
+## Mutants on devops-100's F4/F9 build (01326835), one at a time with the Edit tool, restored by `git checkout`, tree clean after each
+
+| Mutant (infra/ops/lib/compose_guard.py) | Test file | Result |
+|---|---|---|
+| F9: `verify` accepts any truthy value | test_deploy_judged.py | red (4 fail, 2 error: another project's, another digest's, changed/linked file, wrong hash; `True` crashes instead of `unjudged`) |
+| F9: no digest compare | test_deploy_judged.py | red: `test_another_digests_judged_is_unjudged` |
+| F9 / F4: no hash re-read | test_deploy_judged.py; test_deploy_render.py | red: changed/missing/linked file, wrong hash; and `test_the_saved_file_changed_between_the_judging_and_the_up_is_refused` |
+| F4: saved 0644 | test_deploy_render.py | red: saved render root 0600; S35 owner and mode under umask 0 |
+| F4: fixed point skipped | test_deploy_render.py | red: `test_a_second_render_that_differs_from_the_judged_one_is_guard_render` |
+| F4: no `unshare` in the render prefix | test_deploy_render.py | red (9: the isolation prefix, a remote include fetched, the second render on stdin, the fixed point…): the argv shape check is the discriminator |
+| F4: render uid 65534 | test_deploy_render.py | red, but LAYERED: `render_user_ok` reads the same constant, so every render refuses `render-user` first; the prefix test also names 10020 |
+| F13: `require_data_mount` never refuses (deployer.py) | test_deploy_state.py | red: `test_an_unmounted_data_volume_refuses_every_command_…` |
+| F11: a refusal of `current` keeps its plain `guard-<rule>` name | test_deploy_state.py | red: `test_a_guard_refusal_of_current_is_current_guard_rule_…` |
+| F8: `owned_safely` always true (release.py) | test_deploy_faults.py | red: `test_each_unsafe_previous_is_refused_and_nothing_is_upped` |
+| F3: `named_by_a_pointer` always false | test_deploy_shared_release.py | GREEN, EQUIVALENT alone: `remove_created` runs only when this run created the directory (`created`) |
+| F3: remove regardless of `created` | test_deploy_shared_release.py | GREEN, layered: the pointer check still saves it |
+| F3: both together (the original bug) | test_deploy_shared_release.py | red: `test_a_guard_refusal_of_prods_run_leaves_stagings_release_directory_alone` |
+
+Still to mutate (not yet done): F2, F5, F6, F7, F10, F12, F14, F15, F16 (covered by the flags lint), S33's fallback to a bundle compose file, S35's saved-secret check (needs a mutant that saves an unredacted env value: none exists in the build), A17 prune of renders, A18's `render-user`.
