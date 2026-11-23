@@ -283,19 +283,22 @@ expired. POLY-103 sends `alert` outward.
 These checks go into `assertRoles`, which runs for both apply and `--plan`, before the lock. A failure is refusal
 `backup-acl`: exit 2, nothing applied.
 
-- **(a)** No `pg_shdepend` row may reference poly_backup (`refclassid = 'pg_authid'::regclass`) in any database, with one
-  exception: the ACL row of the current database. That database's `datacl` item for poly_backup must be exactly CONNECT.
-  This one sweep covers:
-  - ownership (`o`);
-  - every ACL (`a`), column ACLs included;
-  - default privileges;
-  - EXECUTE on a definer function.
+- **(a)** No `pg_shdepend` row may reference poly_backup (`refclassid = 'pg_authid'::regclass`) with `dbid` 0 or the
+  current database's oid, except `pg_database` ACL rows. For **every** database (shared rows), poly_backup's `datacl`
+  entry must be exactly CONNECT without grant option, read with `aclexplode`. That read also catches TEMPORARY, CREATE
+  and WITH GRANT OPTION on the current database, which share the one CONNECT row. Measured by backend-100 on PG17:
+  the sweep records schema, column, table, sequence, function, type and language ACLs, default privileges (`a`, and `o`
+  for FOR ROLE), ownership, and policies `TO poly_backup` (`r`, refused too). It misses settings, attributes and
+  memberships, which (b) and (c) read directly.
+  - Objects in a **sibling** database are not swept, because they cannot be inspected without connecting there.
+  - This loses nothing on the box: `pg_hba.conf` admits poly_backup only to `polycarpic` and replication, and rejects
+    it for `all` other databases (C-79). A grant in another database is unreachable to it.
+  - A cluster-wide sweep would also refuse every runner test, because each `freshDb()` leaves a CONNECT row behind.
 - **(b)** poly_backup's attributes must be exactly roles.sql's: LOGIN, REPLICATION, BYPASSRLS, not
   SUPERUSER/CREATEDB/CREATEROLE, CONNECTION LIMIT 3. Its `pg_db_role_setting` must be exactly
   `{default_transaction_read_only=on}`.
 - **(c)** Memberships, which `pg_shdepend` does not record (S5): poly_backup is a member of exactly `{pg_read_all_data}`,
   without ADMIN, and no role is a member of poly_backup.
-- Whether `pg_shdepend` records every T-pre case is `(unmeasured)`. A case it misses gets an explicit catalog read.
 
 ## R13 — The tests
 
