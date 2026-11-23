@@ -35,7 +35,7 @@ def take_lock(ctx, wait=0):
 
 def require_data_mount(ctx):
     """F13: the data directory must be a mount point; an unmounted volume would start a fresh cluster on the unencrypted root disk."""
-    if not ctx.ismount(ctx.p(DATA)):
+    if not ctx.ismount(DATA):
         raise Refusal("data-mount", code=4)
 
 

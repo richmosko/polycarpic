@@ -13,14 +13,13 @@ COPY . .
 # Workspace links, not `pnpm deploy`: Node will not strip types from files under node_modules, and a workspace symlink
 # resolves to packages/*/src outside it. Dev dependencies stay out.
 RUN pnpm install --frozen-lockfile --prod
-# The release bundle (POLY-100 F1): exactly R4's manifest, assembled at /release/infra, so the box reads `docker cp <cid>:/release/infra -` and
-# /app/infra stays whole for other uses. A file missing from the repository fails the build. infra/ops/lib/release.py holds the same list.
-RUN set -eu; \
-    for f in infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml infra/caddy/Caddyfile infra/postgres-major infra/release/images.env \
-             infra/postgres/postgresql.prod.conf infra/postgres/postgresql.staging.conf infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf; do \
-      install -D -m 0644 "$f" "/release/$f"; \
-    done; \
-    for f in infra/backup/backup.sh infra/backup/upload.sh infra/postgres/archive-wal.sh; do install -D -m 0755 "$f" "/release/$f"; done
+# The release bundle (POLY-100 F1): exactly R4's manifest, assembled apart from the app tree, so the box copies only it and the app tree stays whole
+# for other uses. A file missing from the repository fails the build; the box code holds the same list.
+RUN set -eu; mkdir /release; \
+    cp --parents infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml infra/caddy/Caddyfile infra/postgres-major infra/release/images.env /release/; \
+    cp --parents infra/postgres/*.conf infra/postgres/archive-wal.sh infra/backup/backup.sh infra/backup/upload.sh /release/; \
+    find /release -type f -exec chmod 0644 {} +; \
+    chmod 0755 /release/infra/backup/backup.sh /release/infra/backup/upload.sh /release/infra/postgres/archive-wal.sh
 
 # --- runtime ------------------------------------------------------------------------------------------------------------
 FROM node:26.12.0-slim@sha256:e556a144463cc8dc53afe8de6d2fa0db5c132fd39ffa232c17641bd40df2bf11

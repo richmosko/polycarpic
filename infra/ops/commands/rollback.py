@@ -24,6 +24,11 @@ def run(args, ctx):
         return 4
     try:
         try:
+            deploy.require_data_mount(ctx)  # F13
+        except rel.Refusal as err:
+            ctx.err("rollback: refused %s" % err.name)
+            return err.code
+        try:
             cur, prev = rel.load_pointer(ctx, project, "current"), rel.load_pointer(ctx, project, "previous")
         except rel.Refusal:
             ctx.err("rollback: a state pointer is present but unparsable: stopped (state)")
