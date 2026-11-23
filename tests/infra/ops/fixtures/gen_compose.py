@@ -43,7 +43,7 @@ def render(files, project, env_files, raw, src=None):
             argv += ["-f", str(d / f)]
         for e in envs:
             argv += ["--env-file", str(e)]
-        argv += ["config"] + (["--no-interpolate", "--no-normalize"] if raw else []) + ["--format", "json"]
+        argv += ["--profile", "*", "config"] + (["--no-interpolate", "--no-normalize"] if raw else []) + ["--format", "json"]  # every profile service is judged (F14: operator, migrate, backup, uploader)
         p = subprocess.run(argv, capture_output=True, text=True)
         if p.returncode:
             sys.exit("compose config failed: " + p.stderr)

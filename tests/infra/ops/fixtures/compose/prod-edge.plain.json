@@ -31,12 +31,26 @@
       "name": "polycarpic-edge-staging",
       "ipam": {},
       "external": true
+    },
+    "upload-net": {
+      "name": "polycarpic-prod_upload-net",
+      "ipam": {
+        "config": [
+          {
+            "subnet": "10.201.20.0/29"
+          }
+        ]
+      }
     }
   },
   "secrets": {
     "auth_secret__auth": {
       "name": "polycarpic-prod_auth_secret__auth",
       "file": "/etc/polycarpic/secrets/auth/auth_secret"
+    },
+    "backup_store_credential__uploader": {
+      "name": "polycarpic-prod_backup_store_credential__uploader",
+      "file": "/etc/polycarpic/secrets/uploader/backup_store_credential"
     },
     "credential_keyring__worker": {
       "name": "polycarpic-prod_credential_keyring__worker",
@@ -49,6 +63,18 @@
     "db_password_auth__auth": {
       "name": "polycarpic-prod_db_password_auth__auth",
       "file": "/etc/polycarpic/secrets/auth/db_password_auth"
+    },
+    "db_password_backup__backup": {
+      "name": "polycarpic-prod_db_password_backup__backup",
+      "file": "/etc/polycarpic/secrets/backup/db_password_backup"
+    },
+    "db_password_migrator__migrate": {
+      "name": "polycarpic-prod_db_password_migrator__migrate",
+      "file": "/etc/polycarpic/secrets/migrate/db_password_migrator"
+    },
+    "db_password_operator__operator": {
+      "name": "polycarpic-prod_db_password_operator__operator",
+      "file": "/etc/polycarpic/secrets/operator/db_password_operator"
     },
     "db_password_worker__worker": {
       "name": "polycarpic-prod_db_password_worker__worker",
@@ -144,6 +170,80 @@
         "interval": "30s"
       }
     },
+    "backup": {
+      "profiles": [
+        "backup"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "DB_PASSWORD_FILE": "/run/secrets/db_password_backup"
+      },
+      "image": "ghcr.io/richmosko/polycarpic-postgres@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mem_limit": "268435456",
+      "networks": {
+        "backup-net": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_backup__backup",
+          "target": "db_password_backup"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=1m"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10004:10004",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "@@REL@@/infra/backup/backup.sh",
+          "target": "/usr/local/bin/backup.sh",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/spool/dump",
+          "target": "/spool/dump",
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/spool/premigration",
+          "target": "/spool/premigration",
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/etc/polycarpic/age-recipients.txt",
+          "target": "/etc/backup/age-recipients.txt",
+          "read_only": true,
+          "bind": {}
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "pg_isready",
+          "-h",
+          "postgres"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      }
+    },
     "caddy": {
       "restart": "unless-stopped",
       "cap_drop": [
@@ -215,6 +315,118 @@
           "protocol": "tcp"
         }
       ]
+    },
+    "migrate": {
+      "profiles": [
+        "migrate"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "APP_ENV": "production",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_migrator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_migrator",
+        "PLAID_ENV": "production"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mem_limit": "536870912",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_migrator__migrate",
+          "target": "db_password_migrator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10003:10003",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      }
+    },
+    "operator": {
+      "profiles": [
+        "operator"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": [
+        "/app/bin/polycarpic",
+        "cli"
+      ],
+      "environment": {
+        "APP_ENV": "production",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_operator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_operator",
+        "PLAID_ENV": "production"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "logging": {
+        "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_operator__operator",
+          "target": "db_password_operator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10006:10006",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      }
     },
     "postgres": {
       "restart": "unless-stopped",
@@ -305,6 +517,78 @@
         "interval": "10s",
         "retries": 6,
         "start_period": "30s"
+      }
+    },
+    "uploader": {
+      "profiles": [
+        "uploader"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "image": "ghcr.io/richmosko/polycarpic-tools@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "mem_limit": "134217728",
+      "networks": {
+        "upload-net": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "backup_store_credential__uploader",
+          "target": "backup_store_credential"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp:size=1m"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10005:10005",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "@@REL@@/infra/backup/upload.sh",
+          "target": "/usr/local/bin/upload.sh",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/spool",
+          "target": "/spool",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/etc/polycarpic/ops.conf",
+          "target": "/etc/uploader/ops.conf",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/etc/polycarpic/host.env",
+          "target": "/etc/uploader/host.env",
+          "read_only": true,
+          "bind": {}
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "rclone",
+          "version"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
       }
     },
     "web": {

@@ -34,6 +34,14 @@
       "name": "polycarpic-staging_db_password_auth__auth",
       "file": "/etc/polycarpic/staging-secrets/auth/db_password_auth"
     },
+    "db_password_migrator__migrate": {
+      "name": "polycarpic-staging_db_password_migrator__migrate",
+      "file": "/etc/polycarpic/staging-secrets/migrate/db_password_migrator"
+    },
+    "db_password_operator__operator": {
+      "name": "polycarpic-staging_db_password_operator__operator",
+      "file": "/etc/polycarpic/staging-secrets/operator/db_password_operator"
+    },
     "db_password_worker__worker": {
       "name": "polycarpic-staging_db_password_worker__worker",
       "file": "/etc/polycarpic/staging-secrets/worker/db_password_worker"
@@ -122,6 +130,118 @@
         ],
         "timeout": "5s",
         "interval": "30s"
+      }
+    },
+    "migrate": {
+      "profiles": [
+        "migrate"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_migrator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_migrator",
+        "PLAID_ENV": "sandbox"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mem_limit": "536870912",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_migrator__migrate",
+          "target": "db_password_migrator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10103:10103",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      }
+    },
+    "operator": {
+      "profiles": [
+        "operator"
+      ],
+      "restart": "no",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": [
+        "/app/bin/polycarpic",
+        "cli"
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_operator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_operator",
+        "PLAID_ENV": "sandbox"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "logging": {
+        "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_operator__operator",
+          "target": "db_password_operator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10106:10106",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
       }
     },
     "postgres": {

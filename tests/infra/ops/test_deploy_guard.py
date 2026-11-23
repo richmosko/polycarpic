@@ -95,6 +95,15 @@ CASES = [
     ("external name polycarpic-prod_default behind key default (S14)", both(lambda d: d["networks"].update(default={"name": "polycarpic-prod_default", "external": True}) or d), "network"),
     ("an edge alias naming polycarpic-edge-prod behind the staging edge key (S14)", both(lambda d: d["networks"].update({"edge-staging": {"name": EDGE, "external": True}}) or d), "network"),
     ("a published port on a non-caddy service", both(svc("web", ports=[{"mode": "ingress", "target": 3000, "published": "3000", "protocol": "tcp"}])), ("ports", "key")),
+    # F14 (build review): logging, ulimits, mem_limit and tmpfs values are pinned too (operator's output carries invite links)
+    ("operator logging json-file", both(svc("operator", logging={"driver": "json-file"})), "pinned"),
+    ("operator logging with options", both(svc("operator", logging={"driver": "none", "options": {"x": "y"}})), "pinned"),
+    ("a raised core ulimit", both(svc("operator", ulimits={"core": 1})), "pinned"),
+    ("no core ulimit at all", both(delkey("operator", "ulimits")), "pinned"),
+    ("an extra ulimit", both(svc("web", ulimits={"core": {}, "nofile": 1048576})), "pinned"),
+    ("a raised mem_limit on web", both(svc("web", mem_limit="99999999999")), "pinned"),
+    ("a larger tmpfs on operator", both(svc("operator", tmpfs=["/tmp:size=10g"])), "pinned"),
+    ("an extra tmpfs on web", both(svc("web", tmpfs=["/tmp", "/var/lib/x"])), "pinned"),
     # S27 (ruling-review.md @ d6cb5d6b): the env_file list of each service is exact and ordered; only the raw render keeps it
     ("mail.env on web", raw_only(svc("web", env_file=[S_HOST, S_MAIL])), "env"),
     ("auth missing its mail.env (a subset)", raw_only(svc("auth", env_file=[S_HOST])), "env"),
