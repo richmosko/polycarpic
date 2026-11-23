@@ -846,3 +846,9 @@ contents), and the inlined `host.env`, `mail.env` (staging's own for staging) an
 **(b) Judge and start need the same bytes, not a lossless form.** The correction is applied first, the guard judges the corrected JSON, and the same bytes start (hash re-read). A zero lost between the
 bundle and the render changes what both the guard and Docker see, so nothing unjudged can start. It can change behaviour, which the `create` comparison is there to catch. One thing must be shown, not inferred:
 that a non-zero or unlimited `core` never prints as `{}`, or the correction would turn it into zero. The error would be on the safe side.
+
+## `9476666f` (S34 and F16; replaces `8a4eae45`)
+
+**Accept; this is the form, and my "JSON accepted, S34 as fallback" is superseded.** Both crossed. It is the better of two sound ones: nothing is edited between judging and starting. The limit question
+is answered by measurement (`{}` only for zero). S35 applies to the saved YAML as written, with the `create` comparison now devops-100's YAML result plus the owed three-file run. F16: met,
+`docker`, `gh` and `git` included. **Carry S35 into F4** (owner, mode and readers are there; "never logged, printed or alerted" and the sweep are not).
