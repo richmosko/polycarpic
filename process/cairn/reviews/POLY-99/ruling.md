@@ -481,7 +481,10 @@ drill run, and a backup of 3–4 s per backup case.
 - **(b) A refusal exits before any scratch.** Each refusal case asserts its code before `docker run` of a scratch;
   the fake docker log shows no scratch started. The cases are R7's usage, validation, selection, integrity, C5, C7,
   C8 and C12. They cost under 1 s each.
-- **(c) Real scratch restores: at most 9 in the whole suite.**
+- **(c) Real scratch restores: at most 9 in the whole suite.** *(Correction, from qa's gate @ `bd890bb6`: 16. The
+  added restores are the F6 base-skip mutant and the three DR8 mutants. They are distinct faults, each needs its own
+  run, and a merged run would mask one with another, as in §5 of the verdict read. The 420 s target is what binds:
+  measured at 369 s. Another real restore needs a ruling.)*
   - roundtrip: `--base`, `--dump` and `--premigration`, 3. T11's decoy rides on the `--dump` one, and C6's flags
     are asserted on all three.
   - T10's `--before`: 1.
