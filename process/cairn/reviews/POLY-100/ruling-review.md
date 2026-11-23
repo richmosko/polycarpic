@@ -880,3 +880,9 @@ The render home stays empty and unwritable by 10020. *Tests:* a symlink and a fo
 
 **T-real: I recommend it, with the rollback case.** F1, F16 and G1 share one cause: every fake agreed with the code. *Security limits on it:* it runs last in a job with read-only permissions and never in `build.yml`; the
 `ghcr.io` hosts line and the CA are removed even on failure, and no later step pulls; the fake `gh` is written by the test and is in no shipped path. It does not replace POLY-104.
+
+## `13e43e26..822a05a9` (section G, S36, S37, T-real, budgets)
+
+**Met.** S36 and S37 are whole. T-real carries my limits and stays unruled until the Principal decides; the workflow's permissions are `contents: read`. Budgets: no security objection.
+**One wording:** G1's "provision creates the first three" counts each release tree as the third. It must name `/opt/polycarpic`, `releases` and `state/deploy`. Nothing else is open.
+If T-real is chosen: the `image` job's limit is 20 minutes and the architect's 2.5 to 4 is unmeasured, so measure before it lands.
