@@ -183,3 +183,123 @@ unhomed: the deploy script still changes only by the operator's `install.sh`, wh
   an operator step on every policy change, and the reason is that staging has no human gate after merge.
 - SECURITY passages at the verdict (mine): C-83's check list and tested-by (S1–S4), the host-only row (S8), T-64 gets
   A2' (tag-ref downgrade) with S2, and R-4's controls name S3 as the box-side enforcement.
+
+## Re-review: the ruling replaced whole @ `9b73741f`
+
+Reviewed: `ruling.md` @ `9b73741f`. It supersedes `43af9303`; S1–S9 above are re-ruled here against it.
+
+**Verdict: accepted with conditions.** S1, S2 (box side), S4 and S7 are closed. S5, S6, S8 and S9 carry, narrowed. S3 is
+built as R5 but with gaps I measured (S10). S11–S13 are new. No position is refused. D1(b), D2(a), D3(a): agree.
+
+### Measured here (Docker Compose v5.7.0, this Mac, `config --format json`, no container started)
+
+| # | Input | Rendered output |
+|---|---|---|
+| SM3 | a service with `env_file: <host file>` | the file's keys appear in `environment`; **no `env_file` key and no path survive** |
+| SM4 | top-level `configs: c: file: /etc/hosts`, used by the service | kept: `configs.c.file = /etc/hosts`, a host file mounted into the service |
+| SM5 | `network_mode: "container:other"` | kept verbatim |
+
+So a guard that reads only the render cannot see which host file fed a service's environment (SM3). R5's rules as written
+pass a `configs` host-file mount (SM4) and a join of another container's network namespace (SM5). R5 only refuses
+`network_mode` when it is set to `host`.
+
+### Carried and closed
+
+| Item | Status | Where |
+|---|---|---|
+| S1 source digest, predicate type, siblings same C | **closed** | R3 V1, V5; M6, M7; T1, T2 |
+| S2 tag name = ref = Release | **closed** (box) | R2 Monotonic, T3. The `release.yml` mirror stays advisory A2 |
+| S3 box-side guard from the installed policy | **built as R5**, gaps → S10 | R5, T8, §D3 |
+| S4 edge | **closed** with D2(a), plus S11 | R9, T9 |
+| S5 poly_backup memberships | **open**: R12 still has none | below |
+| S6 token reaches gh only | **mostly closed** (R2, V4's `GIT_CONFIG_*`, T15); child-env test open | below |
+| S7 indirect execution | **closed**: T7's canary script catches `bash releases/…` | T7 |
+| S8 `HOST_ONLY` join | **approved**, with the shape check below | R11 |
+| S9 signers plain form | rule in R11; **test missing** | below |
+
+### Conditions on `9b73741f`
+
+**S5 (carried). R12 (b) reads role membership.** `pg_shdepend` does not record it. poly_backup is a member of exactly
+`{pg_read_all_data}` (roles.sql line 46), without ADMIN, and no role is a member of poly_backup. *T-pre adds:* `GRANT
+poly_owner TO poly_backup`, `GRANT pg_write_all_data TO poly_backup` and `GRANT poly_backup TO poly_app`, each exit 2
+`backup-acl`, nothing applied. Red on R12 as ruled. *Why:* either grant makes the read-all login a writer, and the sweep
+passes both.
+
+**S6 (narrowed).** T15 adds: the fixture token string is absent from the environment of every child except `gh` (fake
+docker and real git record their env). Red on a mutant that exports `GH_TOKEN` into the deploy's own environment.
+
+**S8 (narrowed).** `set-secret github_read_token` refuses any value that is not the fine-grained form (prefix
+`github_pat_` and 82 word characters) with exit 2. That is what makes D1's "a classic PAT is refused" true in code; today
+nothing refuses one. Test: the classic `ghp_` form is refused and nothing is written. The pin test fails on a third
+`HOST_ONLY` name, and `list-secrets` and `09_token.py` print no value (swept). With that, the join is approved:
+`/etc/polycarpic/secrets/host/github_read_token`, `root:root` 0400, `HOST_ONLY` exactly the two names.
+
+**S9 (test).** `allowed-signers install`: a `cert-authority` line, an extra namespace and a non-ed25519 key are each
+refused with exit 2, nothing written.
+
+**S10. R5 is a per-service allowlist of keys and values, and covers env sources.** (SM3–SM5.)
+- **Keys.** Each rendered service's key set is a subset of an installed per-service set. Any other key is refused
+  `guard-key`. That closes, without naming them one by one:
+  - `volumes_from` (another project's volumes);
+  - `network_mode`, `pid`, `ipc`, `uts`, `cgroup` with **any** value: `container:<prod>` and `service:` join another
+    namespace;
+  - `cgroup_parent`, `runtime`, `sysctls`, `extra_hosts`, `group_add`, `links`, `external_links`, `storage_opt`.
+- **Pinned values from the installed policy.** `user` equals the policy's uid:gid for that service. `read_only: true`
+  where the policy says so. `cap_drop` includes `ALL`. `security_opt` exactly the policy's list. Absent `cap_add` is not
+  enough, because Docker's default set (`DAC_OVERRIDE`, `NET_RAW`, …) applies without `cap_drop`. These are C-70's
+  properties, which R-4 rests on.
+- **Mounts.** Only `bind` and `tmpfs` volume types, as the CI lint already requires. A named volume can be a bind of `/`
+  through `driver_opts`. Every top-level `configs` and `secrets` entry's `file` must be one the policy lists for a service
+  that uses it (SM4).
+- **Env sources.** The guard reads each bundle compose file's `env_file` entries **before** rendering. It uses a YAML parse,
+  not a line regex, and the same parse replaces R5 step 1's regex for `include`/`extends`. Each path must be one the
+  policy lists for that project's service; for example, staging may never name `/etc/polycarpic/host.env`. *Why the parse:*
+  `{include: …}` in flow style, `"include":` and `? include` all defeat `^\s*include\s*:`. If PyYAML is not on the host,
+  `docker compose config --no-interpolate --no-normalize` (measure: does it keep `env_file`?) or a fixed bundle rule
+  "`env_file` only as a block-style list of literal paths" with a parse of exactly that form.
+- **T8 adds:** `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind
+  `/`, a `configs` entry with `file: /etc/shadow`, a staging `env_file` of prod's `host.env`, `user: "0"`, a service
+  without `cap_drop: [ALL]`, and `{include: [x.yml]}` in flow style. Each is refused and creates no container of the
+  digest. Plus one positive case: the real bundle passes.
+- *Cost:* the guard grows from a denylist-shaped list to a key and value table; about 40 more lines and 8 cases.
+
+**S11. A staging-era Caddy leaves no key behind.** On a staging-only host (R9's exception), unreleased `main` code runs
+Caddy. If the Caddyfile names the prod hostname, it obtains and holds the private key of prod's certificate, which stays
+valid for up to 90 days after the first prod deploy recreates the container.
+- *Required, either:*
+  - (i) on a host with no prod, the edge serves the staging site block only, and the guard or the render refuses the
+    prod hostname; or
+  - (ii) prod's first deploy removes Caddy's data and config directories before the recreate, so prod gets fresh keys
+    and a new ACME account.
+- I prefer (i), since nothing secret is ever issued to staging-era code.
+- *Test (T9 extended):* the chosen form, red on a mutant without it.
+
+**S12. Until step 8, a prod run uses `current`'s images, not the candidate's, for anything holding data.**
+- **Step 2.** When Postgres is down at a prod deploy (after a reboot or a crash), start it from **`current`'s** bundle and
+  `images.env`, not the candidate's. The candidate's Postgres image would open the live data directory before the
+  premigration backup exists, which is the window A-a closes for credentials. Only `first-deploy`, with no `current`, starts
+  the candidate's.
+- **Step 3.** `backup premigration` runs through `lib/compose.py` from `releases/prod-current`, so the backup and uploader
+  containers are `current`'s tools image, never the candidate's. The ruling implies this through R-b; make it a stated rule.
+- *Test (T12 extended):* every `compose` argv before step 5 names `current`'s directory and image refs.
+
+**S13. Rollback passes the guard.** R8's `up` of `previous`, automatic and manual, runs R5 with the installed policy first.
+A refusal is `rollback-unhealthy`-class: alert, change nothing. *Test:* a `previous` bundle the installed policy now
+refuses; rollback creates nothing.
+
+### Advisory on `9b73741f` (not gating)
+
+- **A7.** V1 refusals are not Q, so a truly bad attestation re-alerts on every poll. POLY-103 should dedupe by digest.
+- **A8.** `first-deploy` skips the premigration backup. If an operator runs it on a box whose state dir was lost while the
+  database survived, real data migrates unbacked. `first-deploy` could refuse when the project's Postgres data directory
+  is non-empty, unless `--no-data` is given.
+
+### For the Principal, on the re-issue
+
+D1 and D2 as above. **D3, the safety check's rules come only from the operator (recommend (a)):**
+- *Mechanism.* The check that stops a new release from giving its containers power over the server takes its rules from
+  what you installed, not from the release.
+- *Attacker's reach under (b).* Under (b) the release supplies its own rules. Then anyone who gets a change merged to
+  `main` can widen them, and staging runs every `main` change automatically on the same server as prod.
+- *Cost of (a).* A release that legitimately needs a new mount or service is refused, loudly, until you run the install
+  step.
