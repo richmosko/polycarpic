@@ -264,7 +264,7 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
   it('T10 RED ON THE FAULT: a mutant without the two-version refusal (the line marked `# T10`) downloads the newest, poisoned version and goes on to the scratch', () => {
     plantA();
     const dump = name(A, 'dump');
-    const v2 = plantObject(fake, s.major, 'dump', dump, B[name(B, 'dump')]!, tsToMs(tsA) + 120_000, { sibling: false });
+    const v2 = plantObject(fake, s.major, 'dump', dump, B[name(B, 'dump')]!, tsToMs(tsA) + 120_000); // with its sibling: the mutant takes the newest dump and the newest sibling, so it reaches the poison
     const m = lap.mutantInfra('backup/restore-lib.sh', /^.*# T10\s*$/m, ':');
     lap.run('restore.sh', REST_BUCKET(), { infra: m, env: NOSCRATCH });
     expect(fake.log().some((l) => l.includes(`b2_download_file_by_id?fileId=${v2.fileId}`))).toBe(true);
