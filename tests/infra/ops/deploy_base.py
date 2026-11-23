@@ -97,6 +97,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.owners = {}
         self.dir_hooks = {}
         self.ps_fails = set()
         self.plan_out, self.psql_result = "", (0, "0\n", "")
@@ -145,6 +146,8 @@ class World(object):
 
     def tag(self, name, commit, kind="signed", key=None, ref=None):
         """kind: signed (ssh), light, gpg (an object carrying a PGP block), tree (ssh-signed tag of a tree). -> the tag object (or commit) sha."""
+        if self.git("tag", "-l", name):
+            self.git("tag", "-d", name)  # a scenario may be run again in one test
         if kind == "light":
             self.git("tag", name, commit)
             return commit
@@ -404,6 +407,10 @@ class World(object):
             return 0, data, ""
         raise AssertionError("FAKE run_bytes: unexpected %r" % (argv,))
 
+    def owner_of(self, fd, path):
+        """ctx.owner_of(fd, logical path) -> (uid, gid): root:10010 as far as the box is concerned (a unit test cannot own that group)."""
+        return self.owners.get(path, (os.getuid(), 10010))
+
     def https_status(self, host, addr, path):
         """A13's seam: by default 200 while the web container runs an image not in `edge_bad`; a digest in `edge_bad` answers its scripted status or raises."""
         self.https_calls.append((host, addr, path))
@@ -438,8 +445,18 @@ class DeployTest(OpsTest):
         allow = REPO / "infra" / "deploy" / "compose-allow.json"
         if allow.exists():
             h.write("/opt/polycarpic/ops/%s/infra/deploy/compose-allow.json" % h.ops_id, allow.read_bytes())
+        self.staging_auth_file()
         self.current_digest = digest("current")
         self.seed("staging", self.current_digest, "-", self.world.commit_a)
+
+    def staging_auth_file(self, text=None, mode=0o440, dir_mode=0o750):
+        """S29/S30: the file the Caddyfile imports as text, in its 0750 directory. Ownership comes from the ctx.owner_of seam (the fake answers root:10010), so a
+        non-root test user needs no patching; world.owners overrides it per logical path to test a wrong owner or group."""
+        h = self.host
+        h.mkdir("/etc/polycarpic/secrets/caddy", dir_mode)
+        if h.p("/etc/polycarpic/secrets/caddy/staging_basic_auth").is_symlink() or h.p("/etc/polycarpic/secrets/caddy/staging_basic_auth").exists():
+            os.unlink(str(h.p("/etc/polycarpic/secrets/caddy/staging_basic_auth")))
+        h.write("/etc/polycarpic/secrets/caddy/staging_basic_auth", text if text is not None else "staging $2y$10$" + "a1B./" * 10 + "xyz" + "\n", mode)
 
     # state files under the project directory
     def sdir(self, project):
@@ -474,6 +491,8 @@ class DeployTest(OpsTest):
         names = ctx_class().__init__.__code__.co_varnames
         if ctx_seams and "resolve" in names:
             extra["resolve"] = w.resolve
+        if ctx_seams and "owner_of" in names:
+            extra["owner_of"] = w.owner_of
         if ctx_seams and "https_status" in names:
             extra["https_status"] = w.https_status
         if ctx_seams and "run_bytes" in names:

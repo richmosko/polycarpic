@@ -14,7 +14,6 @@ CADDY_DIRS = ("/srv/polycarpic/caddy", "/srv/polycarpic/caddy-config")
 class ProdBase(DeployTest):
     def setUp(self):
         super().setUp()
-        self.staging_auth_file()
         w = self.world
         shutil.rmtree(str(self.sdir("staging")), ignore_errors=True)
         self.good, pub = w.keygen("good")
@@ -24,20 +23,6 @@ class ProdBase(DeployTest):
         for d in CADDY_DIRS + ("/srv/polycarpic/pg-prod", "/srv/polycarpic/pg-staging"):
             self.host.mkdir(d)
         self.host.write("/etc/polycarpic/host.env", "PUBLIC_ORIGIN=https://app.example.com\nTLS_MODE=real-domain\n")
-
-    def staging_auth_file(self, text=None, mode=0o440):
-        """S29/S30: the file the Caddyfile imports as text. The check compares the group with 10010 itself; a unit test cannot own that group, so it patches the module's GID."""
-        import sys
-        from base import OPS
-        if str(OPS) not in sys.path:
-            sys.path.insert(0, str(OPS))
-        from unittest import mock
-        from lib import sauth
-        d = self.host.mkdir("/etc/polycarpic/secrets/caddy", 0o750)
-        self.host.write("/etc/polycarpic/secrets/caddy/staging_basic_auth", text if text is not None else "staging $2y$10$" + "a1B./" * 10 + "xyz" + "\n", mode)
-        patcher = mock.patch.object(sauth, "GID", os.stat(str(d)).st_gid)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def release_of(self, version, sibs=None):
         """The next signed prod release: a new commit, an image X with its bundle, three siblings, a Release with the digest line."""
