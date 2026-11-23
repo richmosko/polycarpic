@@ -263,16 +263,16 @@ describe('provision.sh host stage (R5)', () => {
 });
 
 describe('provision-check: positive case and the R4 output contract', () => {
-  it('a complete host box: PASS for every H check, INFO H12b (never a pass), WAIT for D1–D6, the HOST CHECKS PASSED summary, exit 3', () => {
+  it('a complete host box: PASS for every H check, INFO H12b (never a pass), WAIT for D1–D6 and for the two things only the operator can supply (H18 allowed_signers, H22 staging-auth), the HOST CHECKS PASSED summary, exit 3', () => {
     const rr = run(`${b2Fixture({})}\n bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}; echo "rc=$?"`, { image: COMPLETE });
     expect(rr.out).toMatch(/rc=3/);
     for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'H15']) expect(find(rr.out, 'PASS', id), `PASS ${id}`).toBeDefined();
     expect(find(rr.out, 'INFO', 'H12b')?.text).toMatch(/bucket lock: checked off-box by b2-setup\.py/);
     expect(lines(rr.out).some((l) => l.kind === 'PASS' && l.id === 'H12b')).toBe(false);
     const waits = lines(rr.out).filter((l) => l.kind === 'WAIT').map((l) => l.id).sort();
-    expect(waits).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6']);
+    expect(waits).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'H18', 'H22']);
     expect(lines(rr.out).some((l) => l.kind === 'FAIL')).toBe(false);
-    expect(rr.out.split('\n').filter((l) => /rc=/.test(l) === false && l.trim()).pop()).toBe('HOST CHECKS PASSED; 6 checks wait for the first deploy');
+    expect(rr.out.split('\n').filter((l) => /rc=/.test(l) === false && l.trim()).pop()).toBe('HOST CHECKS PASSED; 8 checks wait for the first deploy');
   });
 
   it('is read-only: no file under /etc, /srv or /var/lib/polycarpic changes, and no mutating fake verb is called', () => {
