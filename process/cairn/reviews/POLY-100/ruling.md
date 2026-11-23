@@ -380,6 +380,19 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
 - **`install.sh --commit <40 hex>`** (S21). The operator's own checked-out `install.sh` ships `git archive <C>` and C's `install_box.py`,
   with no checkout. It refuses (exit 2, before any ssh) a C that is not an ancestor of `origin/main`. Without the flag it ships HEAD as
   today. It passes `user@host` as a second argument, which `install_box.py` checks before extraction and writes to `ssh-target`.
+- **`polycarpic-ops staging-auth`** (S29). The Caddyfile imports this file as Caddyfile text, so anything but one exact line could write directives
+  into the process that also serves prod.
+
+| Item | Rule |
+|---|---|
+| Input | `ctx.getpass` twice, hidden; not a terminal, echo that cannot be hidden, or a mismatch → exit 2, nothing written. No argument, option, environment variable or pipe carries the password |
+| Password | 16 to 72 bytes, printable ASCII, no space (bcrypt ignores bytes past 72, so longer is refused). User fixed: `staging` |
+| Hash | `htpasswd -niBC 10 staging` (`apache2-utils`, in `provision.sh`'s packages), password on the child's stdin, `fixed_env`. stdout must `fullmatch` `staging:\$2y\$10\$[./A-Za-z0-9]{53}\n\n` (it prints a trailing blank line, measured), nothing stripped; else exit 1 |
+| Cost 10 | Caddy hashes on every request of the staging site: 0.07 s at 10, 0.25 s at 12 (measured, Apple laptop). The IP allowlist answers first. That Caddy accepts `$2y$` is `(unmeasured)`, POLY-104; an unaccepted prefix fails closed, and the fix is to write `$2a$` |
+| File | `/etc/polycarpic/secrets/caddy/staging_basic_auth`: the whole file is `staging $2y$10$<53>\n`; `root:10010` 0440 in a `root:10010` 0750 directory, both groups compared with 10010 itself; written as `set_secret` writes (no link followed, temp, fsync, rename). caddy (10010) alone reads it |
+| Replace, output | an existing file needs `yes`, else exit 1. Prints name, bytes, mode, owner; never password or hash. Last line: `run: sudo polycarpic-ops restart caddy` when one runs |
+| Check | at most 128 bytes, no link followed, `fullmatch` of the whole file, owner, groups, modes. Runs in `edge-deploy` and every prod run before V1 (`staging-auth`, exit 1, no Q, nothing upped); in `restart caddy` (refuse, caddy untouched); before rollback's and `rollback edge`'s caddy `up` (`rollback-unhealthy`, nothing upped); in provision-check (WAIT before the first edge or prod release), which is what sees a restart by Docker |
+
 - **`first-deploy <project>`.** It runs R6 in the foreground, waiting for the lock. When healthy, it enables
   `polycarpic-deploy@<project>.timer`. For prod, once `/opt/polycarpic/images.env` exists, it also enables
   `polycarpic-backup.timer` and `polycarpic-uploader.timer`.
@@ -462,6 +475,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T-take | `first-deploy prod` from edge's commit and from a descendant succeeds and prunes edge's releases afterwards; from a non-descendant: `edge-older`, nothing upped; failing after caddy is up: caddy back on edge's `current` | mutant without the ancestry check; mutant pruning edge's release before prod is healthy; mutant leaving the failed caddy |
 | T-relyml | Static: `release.yml` triggers exactly `v1.*` and `edge-*`; both full regexes in the first step; name compare; `--latest=false` on edge only; publish still `contents: write` alone. `release-scan`: edge's Caddy with no `v1.*`, the four with one, highest `n` not newest | mutants dropping the regex step, the name compare, the switch-over |
 | T-net | All three compose files declare both edge networks they use as external, by exact name, and no file creates one (red on `d634da53`'s `edge.yml`); `provision.sh` creates exactly the two, reruns with no change, and stops on a different subnet (fake docker, provision job); provision-check fails on a missing network, another subnet, another driver, an edge subnet inside a `pg_hba` allow range, and one inside 10.200.0.0/16 (one case each, with provision-check's expected subnet changed to match, so only the overlap rule can refuse). T-render renders `edge.yml` in the external form | today's files; mutant recreating a network that differs; mutant checking names only; mutant without the overlap check |
+| T-sauth | Written file: grammar, owner, groups, modes; the password in no argv, env, log, output or file (swept). 15 and 73 bytes, a space, non-ASCII, mismatch, no terminal, unhidden echo: exit 2, nothing written. `htpasswd` printing a third line, another cost, a trailing directive, or failing: exit 1, old file unchanged. Replace without `yes`: unchanged. File missing, group-writable, a symlink, a second line `respond "x"`, two trailing newlines, `\r\n`, 129 bytes, or its directory in another group: `edge-deploy`, a prod run, `restart caddy`, auto rollback, `rollback prod` and `rollback edge` refuse as ruled, caddy untouched; a good file passes each | mutants: password as an argument (`-b`); cost 5; grammar unchecked on write; checked only in deploys; `match` with `$`; hash printed; group taken from the directory |
 | T-caddy | `caddy-allow` passes the real file and refuses: `forward_auth` in a site; a second global `log`; `php_fastcgi` on one line with its block; `import other`; an extra site block; a repeated allowed line; `@denied` moved below `basic_auth`; a `command` on caddy; a literal `POLY_TLS` with a newline. provision refuses an `edge.env` value with a newline, and one with `}` (S20) | mutant naming bad directives instead of allowing; mutant comparing counts, not order |
 | T-probe | Baseline 200 then 502: rollback and quarantine; baseline 200 then a certificate failure: the same; baseline failing: healthy, `edge-probe-baseline` logged and alerted, no quarantine; first deploy and staging: no probe | mutant without the probe; mutant without the baseline; mutant skipping verification (real `https_status` against a local self-signed listener) |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped; mutants with `mail.env` on web, missing from worker, or `MAIL_FROM` back in `host.env`; the guard and the lint refuse `mail.env` on web and prod's `mail.env` in staging; S27's cases, with its literal pin test |
@@ -474,7 +488,7 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | Job | May add | Holds |
 |---|---|---|
 | image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
-| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take |
+| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
 | db | ≤ 10 s | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 15 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
@@ -496,7 +510,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | L1 | Criterion 5 says "measured in the restore drill"; drill and timing are POLY-116's. Amend to "the runbook's inputs are proven (T13)", or say otherwise |
 | L2 | `self-update` has no issue; suggest the ops follow-up umbrella |
 | L4 | User steps, in order: the token and its one-call check; the SSH tag-signing key and `RELEASE_SIGNERS` (needed before staging is **served**); `allowed-signers install` on the box with the same key; after the first `build.yml` run, confirm the three new GHCR packages are public `(unmeasured)`; sign and push `edge-1` on a `main` commit built in the last 90 days and wait for its Release |
-| L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and staging's password file, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
+| L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and `staging-auth`, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
 
 ## E — Doc passages (owners, at the verdict)
 
@@ -506,7 +520,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S27 (seceng `ruling-review.md`): met by
+## S1–S29 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -521,5 +535,5 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S19 | R6; T12 | S20, A12 | R11 `caddy-allow`; T-caddy |
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
-| S28 | R9 edge step 2; T-edge | | |
+| S28 | R9 edge step 2; T-edge | S29 | R11 `staging-auth`; T-sauth |
 | A13 | R7; T-probe | | |
