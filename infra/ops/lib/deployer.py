@@ -398,7 +398,12 @@ def link_current(ctx, project, rdir):
 
 def _prune(ctx):
     keep = set()
-    for project in ("prod", "staging", "edge"):
+    try:
+        prod_has_current = bool(rel.load_pointer(ctx, "prod", "current"))
+    except Refusal:
+        prod_has_current = True
+    # edge's current and previous are kept only until prod has a `current` (R4, R9): after that Caddy comes from prod's releases
+    for project in ("prod", "staging") + (() if prod_has_current else ("edge",)):
         for name in ("current", "previous"):
             p = rel.load_pointer(ctx, project, name)
             if p:
