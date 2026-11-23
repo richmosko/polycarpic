@@ -484,7 +484,11 @@ drill run, and a backup of 3–4 s per backup case.
 - **(c) Real scratch restores: at most 9 in the whole suite.** *(Correction, from qa's gate @ `bd890bb6`: 16. The
   added restores are the F6 base-skip mutant and the three DR8 mutants. They are distinct faults, each needs its own
   run, and a merged run would mask one with another, as in §5 of the verdict read. The 420 s target is what binds:
-  measured at 369 s. Another real restore needs a ruling.)*
+  measured at 369 s, with the drill file at 133 s for six runs, about 22 s a run. The F8 case adds one run, so the cap is
+  **18** (17 plus F8's) and the projection about 391 s. If the measured total passes 420 s, the F6 base-skip mutant
+  and the F8 case share one mutated run: each asserts its own id's line (F6 a missing id that FAILs, F8 a non-DR9
+  SKIP that FAILs), so neither can mask the other. The three DR8 mutants never merge. Another real restore beyond
+  this needs a ruling.)*
   - roundtrip: `--base`, `--dump` and `--premigration`, 3. T11's decoy rides on the `--dump` one, and C6's flags
     are asserted on all three.
   - T10's `--before`: 1.
