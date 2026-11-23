@@ -13,7 +13,7 @@ import { type Fake, attachFake } from './uploader.ts';
 
 let s: Stack, fake: Fake, lap: Laptop;
 let setupError: string | null = null;
-let A: Files, B: Files, P: Files;
+let A: Files, B: Files, P: Files, WAL: Files;
 let tsA = '', tsB = '', tsP = '';
 const setTs = (f: Files) => /-(\d{8}T\d{6}Z)\.age$/.exec(Object.keys(f)[0]!)![1]!;
 const name = (f: Files, kind: string) => Object.keys(f).find((n) => n.startsWith(`${kind}-`))!;
@@ -21,7 +21,7 @@ const name = (f: Files, kind: string) => Object.keys(f).find((n) => n.startsWith
 beforeAll(() => {
   try {
     s = attach(); fake = attachFake(); lap = laptop(s, fake);
-    ({ A, B, P } = fixtures());
+    ({ A, B, P, WAL } = fixtures());
     tsA = setTs(A); tsB = setTs(B); tsP = setTs(P);
   } catch (e) { setupError = String((e as Error).message); }
 });
@@ -230,6 +230,13 @@ describe('restore --premigration --from-box (R7, T9, T16, C4, C5): everything up
     expect(r.out + r.err).toMatch(/archive time|replay/i);
     noScratch();
   });
+  it("T17p RED ON THE FAULT: a mutant without the premigration content-time check (the line marked `# T17p`) goes on to the scratch with the same set", () => {
+    const olderP = msToTs(tsToMs(tsP) - 2 * 3600_000);
+    setP(Object.fromEntries(Object.entries(P).map(([n, b]) => [n.replace(tsP, olderP), b])));
+    const m = lap.mutantInfra('restore.sh', /^.*# T17p\s*$/m, ':');
+    lap.run('restore.sh', FROMBOX(), { infra: m, env: NOSCRATCH });
+    expect(scratchRuns()).toHaveLength(1);
+  });
 
   describe('T16/C5: names and text from the box are data', () => {
     const d = () => name(P, 'dump'), g = () => name(P, 'globals');
@@ -413,6 +420,30 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     expect(scratchRuns()).toHaveLength(1); // it went on to the scratch start
     expect(existsSync(join(lap.dir, 'x'))).toBe(false);
     expect(r.err + r.out).not.toContain('junk'); // a stray name is counted, never printed
+  });
+
+  it("T17b: a base whose START TIME is 2 h after its name's <TS> (outside [TS-1 min, TS+10 min]) is refused with exit 4 and no scratch; RED ON THE FAULT: a mutant without the check (`# T17b`) goes on to the scratch", () => {
+    const older = msToTs(tsToMs(tsA) - 2 * 3600_000);
+    for (const [n, b] of Object.entries(A)) plantObject(fake, s.major, 'dump', n.replace(tsA, older), b, tsToMs(tsA) + 60_000);
+    const r = lap.run('restore.sh', REST_BUCKET([], '--base'));
+    expect({ code: r.code }).toEqual({ code: 4 });
+    expect(r.out + r.err).toMatch(/archive time|replay|START TIME/i);
+    noScratch();
+    const m = lap.mutantInfra('backup/restore-lib.sh', /^.*# T17b\s*$/m, ':');
+    lap.run('restore.sh', REST_BUCKET([], '--base'), { infra: m, env: NOSCRATCH });
+    expect(scratchRuns()).toHaveLength(1);
+  });
+  it('DR2 single fault, a WAL segment under --base (architect, seceng): an intact segment whose SIBLING alone is wrong exits 4 with `<segment> does not match its sha256 sibling` and no scratch; RED ON THE FAULT: a mutant without the WAL sibling comparison goes on to the scratch', () => {
+    plantA();
+    const newest = Object.keys(WAL).filter((n) => /^wal-\d+-\d+-[0-9A-F]{24}\.age$/.test(n)).sort().pop()!;
+    for (const [n, b] of Object.entries(WAL)) plantObject(fake, s.major, 'wal', n, b, tsToMs(tsA) + 60_000, { sibling: n === newest ? 'wrong' : true });
+    const r = lap.run('restore.sh', REST_BUCKET([], '--base'));
+    expect(r.code).toBe(4);
+    expect(r.err).toContain(`${newest} does not match its sha256 sibling`);
+    noScratch();
+    const m = lap.mutantInfra('backup/restore-lib.sh', /if \[ "\$\(sha256f "\$WORK\/\$fid"\)" != .*\]; then/, 'if false; then');
+    lap.run('restore.sh', REST_BUCKET([], '--base'), { infra: m, env: NOSCRATCH });
+    expect(scratchRuns()).toHaveLength(1);
   });
 
   describe("C7' set choice and the replay check", () => {

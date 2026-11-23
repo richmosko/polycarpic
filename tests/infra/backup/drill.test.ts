@@ -62,12 +62,12 @@ describe('drill.sh usage and hygiene (R8)', () => {
 });
 
 describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two real runs', () => {
-  it('the happy run: PASS on DR1-DR8, DR10, DR11; SKIP DR9 (no ledger yet) -> `DRILL PASSED WITH SKIPS: DR9`, exit 3; --report writes the markdown the lead files; the probe is the only new object', () => {
+  it('the happy run: PASS on DR1-DR8, DR10, DR11; SKIP DR9 (no ledger yet) -> `DRILL INCOMPLETE: not checked: DR9`, exit 3; --report writes the markdown the lead files; the probe is the only new object', () => {
     plant();
     const report = join(lap.dir, 'drill-report.md');
     const r = lap.run('drill.sh', DRILL(['--report', report]));
     const c = checks(r.out);
-    expect({ code: r.code, last: last(r.out), err: r.err.slice(-300) }).toEqual({ code: 3, last: 'DRILL PASSED WITH SKIPS: DR9', err: expect.any(String) });
+    expect({ code: r.code, last: last(r.out), err: r.err.slice(-300) }).toEqual({ code: 3, last: 'DRILL INCOMPLETE: not checked: DR9', err: expect.any(String) }); // F6(b): a skipped check is not a pass
     for (const id of ['DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'DR7', 'DR8', 'DR10', 'DR11']) expect(c[id]?.kind, `${id}: ${JSON.stringify(c[id])}`).toBe('PASS');
     expect(c.DR9?.kind).toBe('SKIP');
     expect(c.DR8?.text, 'DR8 counts the one session the stack planted').toMatch(/\b1 sessions? counted/);
@@ -95,7 +95,7 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
 
   it('every planted fault at once: DR1 (a second version of the dump plus a hide marker), DR2 (the base sibling lies), DR3 (globals with role passwords), DR10 (a permissive bucket), DR11 (an old dump under a fresh name) -> each FAIL id is in the one output and `DRILL FAILED: …` names them all, exit 1', async () => {
     const f = join(lap.dir, 'globals-with-passwords.age');
-    const mk = sh('bash', ['-c', `docker exec ${PROJECT}-postgres-1 pg_dumpall -U postgres --globals-only | age -r ${s.recipient.trim()} -o '${f}'`]);
+    const mk = sh('bash', ['-c', `docker exec ${PROJECT}-postgres-1 pg_dumpall -U postgres --globals-only | grep -v '^CREATE ROLE poly_graph;' | age -r ${s.recipient.trim()} -o '${f}'`]); // F7: one role of roles.sql missing from the dump's globals
     expect(mk.code, mk.err).toBe(0);
     const wait = tsToMs(TS0()) + 75_000 - Date.now(); // the fresh name's <TS> must be more than a minute after the dump's own archive time (DR11)
     if (wait > 0) await new Promise((res) => setTimeout(res, wait));
@@ -112,6 +112,9 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     const c = checks(r.out);
     for (const id of ['DR1', 'DR2', 'DR3', 'DR10', 'DR11']) expect({ id, kind: c[id]?.kind, out: r.out.slice(-1500) }).toMatchObject({ id, kind: 'FAIL' });
     expect(r.out + r.err).toMatch(/hide/i);
+    // F7: DR6 on the DUMP instance runs BEFORE roles.sql is re-run, so the missing role is seen (or, if the dump instance did not come up, DR6 fails on whichever did)
+    expect(c.DR6?.kind, `DR6: ${JSON.stringify(c.DR6)}`).toBe('FAIL');
+    expect(c.DR6?.text).toMatch(/poly_graph|DUMP|dump|did not|no restored/i);
     // F5: identifiers (fileIds, the bucket, `<instance>/` keys) are for the operator's terminal on stderr; stdout carries only check lines, the scratch name and the verdict
     expect(r.out).not.toMatch(/4_zfake_/);
     expect(r.out).not.toContain('poly-test-bucket');
@@ -186,6 +189,27 @@ describe('DR8 on real tables (architect, ruling R11 correction): the stack appli
   it('a mutant that loads the dump data-only makes DR8 FAIL (INFRA F4: the whole dump, never data-only)', () => {
     const r = run({ file: 'backup/restore-lib.sh', from: /pg_restore -U postgres --create -d postgres/, to: 'pg_restore -U postgres --data-only -d postgres' });
     expect({ kind: checks(r.out).DR8?.kind, out: r.out.slice(-900) }).toMatchObject({ kind: 'FAIL' });
+  }, 600_000);
+});
+
+describe('F6(a): a check that did not run fails the verdict, whichever way it went missing (seceng)', () => {
+  const NOSCRATCH = { POLY99_SCRATCH_FAIL: '1' };
+  it('a mutant that deletes the DR10 block (the probe and its result lines) ends `DRILL FAILED` and names DR10 as not run', () => {
+    plant();
+    const m = lap.mutantInfra('drill.sh', /^if \[ "\$prc" != 0 \]; then[\s\S]*?^fi$/m, ':');
+    const r = lap.run('drill.sh', DRILL(), { infra: m, env: NOSCRATCH });
+    expect(checks(r.out).DR10).toBeUndefined(); // no result at all
+    expect(r.code).toBe(1);
+    expect(last(r.out)).toMatch(/^DRILL FAILED: .*\bDR10\b/);
+    expect(r.out + r.err).toMatch(/DR10 did not run/);
+  }, 300_000);
+  it('a mutant whose DR5/DR6 loop silently skips the BASE instance, while both restores succeed, ends `DRILL FAILED` naming DR5 and DR6 (one result per instance is required)', () => {
+    plant();
+    const m = lap.mutantInfra('drill.sh', /for which in DUMP BASE; do/, 'for which in DUMP; do');
+    const r = lap.run('drill.sh', DRILL(), { infra: m });
+    expect(checks(r.out).DR4?.kind).toBe('PASS'); // the base did recover: only the loop lost an instance
+    expect(r.code).toBe(1);
+    expect(last(r.out)).toMatch(/^DRILL FAILED: (?=.*\bDR5\b)(?=.*\bDR6\b)/);
   }, 600_000);
 });
 
