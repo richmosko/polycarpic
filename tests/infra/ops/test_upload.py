@@ -259,10 +259,10 @@ class Upload(BackupBase):
         import re
         mutant = self.mutant_dispatcher("commands/upload.py", re.compile(r"^(\s*)if .*:\s*# N1\s*$", re.M), r"\1if False:  # N1")
         victim = self.host.write("/etc/polycarpic/ops.conf", "B2_BUCKET=polycarpic-hetzner-backups\n")
-        res, _ = self.go("verified wal ../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()), mutant=mutant)
+        res, _ = self.go("verified wal ../../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()), mutant=mutant)
         self.assertFalse(victim.exists())  # the fault: the uploader steered root's unlink out of the spool
         victim = self.host.write("/etc/polycarpic/ops.conf", "B2_BUCKET=polycarpic-hetzner-backups\n")
-        res, _ = self.go("verified wal ../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()))
+        res, _ = self.go("verified wal ../../../../etc/polycarpic/ops.conf %s\n" % sha(victim.read_bytes()))
         self.assertTrue(victim.exists())
         self.assertEqual(res.rc, 1)
 

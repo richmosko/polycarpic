@@ -139,6 +139,10 @@ class Runner:
         r = self._rec("inherit", argv, None, timeout, env)
         if r["raises"]:
             raise r["raises"]
+        if r["fn"]:  # POLY-99: a child that prints may also have effects (provision.sh writes ops.conf); fn returns (code, out, err)
+            code, out, err = r["fn"](argv, None)
+            self.term.write(out)
+            return code
         self.term.write(r["term"])
         return r["code"]
 
