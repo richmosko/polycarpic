@@ -185,8 +185,8 @@ describe('restore --premigration --from-box (R7, T9, T16, C4, C5): everything up
     const MARK = () => join(lap.dir, 'pwned');
     beforeEach(() => { rmSync(MARK(), { force: true }); }); // the canary of one mutant must not leak into the next case
     const evil = () => ({
-      semicolon: `dump-17-1-${tsP}.age;touch ${MARK()}`, subshell: `dump-17-1-${tsP}.age$(touch ${MARK()})`,
-      newline: `dump-17-1-${tsP}.age\ntouch ${MARK()}`, slash: `../dump-17-1-${tsP}.age`, backtick: `dump-17-1-${tsP}.age\`touch ${MARK()}\``,
+      semicolon: `dump-17-1-${tsP}.age;>${MARK()}`, subshell: `dump-17-1-${tsP}.age$(>${MARK()})`,
+      newline: `dump-17-1-${tsP}.age\ntouch ${MARK()}`, slash: `../dump-17-1-${tsP}.age`, backtick: `dump-17-1-${tsP}.age\`>${MARK()}\``,
     } as Record<string, string>);
     it('a box line whose name carries `;`, `$(…)`, a newline, `/` or a backtick -> exit 5, only the list call was sent, nothing ran on the box, no scratch (one table)', () => {
       for (const k of ['semicolon', 'subshell', 'newline', 'slash', 'backtick']) {
