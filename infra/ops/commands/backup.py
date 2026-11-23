@@ -173,7 +173,7 @@ def _fetch(name, ctx):
         if want is None:
             ctx.err("backup: no spool record for %s" % name)
             return 1
-        if spool.sha_fd(fd) != want:
+        if spool.sha_fd(fd) != want:  # C4
             ctx.err("backup: %s does not match the spool record" % name)
             return 1
         os.lseek(fd, 0, os.SEEK_SET)

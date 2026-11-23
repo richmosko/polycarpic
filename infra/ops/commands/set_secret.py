@@ -75,7 +75,7 @@ def _plan(ctx, targets):
 
 def _write(ctx, dfd, fname, data, fmode=0o440):
     """Temporary file in the directory, 0440 root:<dir gid>, fsync, rename over the target, fsync the directory."""
-    gid = os.fstat(dfd).st_gid
+    gid = 0 if fmode == 0o400 else os.fstat(dfd).st_gid  # host-only files are root:root, whatever the directory says
     tmp = ".%s.tmp-%s" % (fname, _random.token_hex(8))
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, fmode, dir_fd=dfd)
     try:
@@ -148,5 +148,8 @@ def run(args, ctx):
     flag = "--staging " if args.staging else ""
     long_running = [s for s in written if s in compose.LONG_RUNNING]
     tail = "run: sudo polycarpic-ops restart %s%s" % (flag, " ".join(long_running)) if long_running else "the next uploader run reads it"
+    if name in rules.HOST_ONLY:
+        ctx.out("set-secret: %s written; root reads it on the next backup or upload run" % name)
+        return 0
     ctx.out("set-secret: %s written for %s; %s" % (name, ", ".join(written), tail))
     return 0

@@ -7,6 +7,8 @@ LAST = "/var/lib/polycarpic/state/last-upload"
 
 
 def run(ctx):
+    if not ts.root_written(ctx, ctx.p(LAST)):
+        return [Line("RED", "backup", "prod", "last-upload is not root-written")]
     text = ts.read_text(ctx.p(LAST), limit=4096)
     first = (text or "").split("\n", 1)[0].strip()
     if not first:

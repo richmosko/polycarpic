@@ -47,3 +47,14 @@ def read_text(path, limit=1 << 20):
             return fh.read(limit).decode("utf-8", "replace")
     except OSError:
         return None
+
+
+def root_written(ctx, path):
+    """False when the file exists and is not a regular file owned by the trusted uid with no group or other write bit (POLY-99 R9, C10)."""
+    import os
+    import stat
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return True
+    return stat.S_ISREG(st.st_mode) and st.st_uid == ctx.trusted_uid and not st.st_mode & 0o022

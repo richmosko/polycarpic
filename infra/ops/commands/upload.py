@@ -51,7 +51,7 @@ def _parse(out):
         if len(line) > MAX_LINE:
             return None
         m = VERIFIED.fullmatch(line)
-        if not m or spool.parse_name(m.group(1), m.group(2)) is None:
+        if not m or spool.parse_name(m.group(1), m.group(2)) is None:  # N1
             return None
         found.append(m.groups())
     return found
