@@ -2,7 +2,7 @@
 # shellcheck disable=SC2034  # variables consumed by the sourced backup/restore-lib.sh
 set -euo pipefail
 # drill.sh: the INFRA §6.7 restore drill (POLY-99 R8). It runs restore.sh's selection and restore code (backup/restore-lib.sh) for BOTH --base
-# and --dump into two throwaway containers and prints `PASS|FAIL|SKIP <id> <text>` per check, then DRILL PASSED, DRILL PASSED WITH SKIPS: <ids>
+# and --dump into two throwaway containers and prints `PASS|FAIL|SKIP <id> <text>` per check, then DRILL PASSED, DRILL INCOMPLETE: not checked: <ids>
 # or DRILL FAILED: <ids>.
 #   drill.sh --identity <file> --read-credential <file> --bucket <name> --box-credential <file> [--instance <i>] [--before <UTC>] [--report <path>]
 # Exit: 0 passed; 1 failed; 2 usage; 3 passed with skips. The GA gate (POLY-116) accepts exit 0 only.
@@ -118,10 +118,19 @@ else
   fi
   if [ -z "$SC_DUMP" ]; then res FAIL DR7 "the dump did not restore"; fi
 
-  # ---- DR5, DR6: roles.sql is re-run on each instance (the restore keeps what a restore loses)
+  # ---- DR5, DR6: roles.sql is re-run on each instance (the restore keeps what a restore loses). On the DUMP instance the role check (DR6)
+  # runs first, on what the globals file and the dump restored by themselves; on the BASE instance it runs after the re-run.
+  roles_check() { # which container
+    local missing='' role
+    while read -r role; do
+      [ "$(docker exec "$2" psql -U postgres -X -tA -c "select count(*) from pg_roles where rolname = '$role'")" = 1 ] || missing="$missing $role"
+    done < <(grep -oE 'poly_[a-z_]+' "$ROLES_SQL" | sort -u)
+    if [ -z "$missing" ]; then res PASS DR6 "$1 instance: every role in roles.sql exists"; else res FAIL DR6 "$1 instance: missing roles:$missing"; fi
+  }
   for which in DUMP BASE; do
     eval "c=\$SC_$which"
     [ -n "$c" ] || continue
+    if [ "$which" = DUMP ]; then roles_check "$which" "$c"; fi
     docker exec -i "$c" psql -U postgres -X -q -d polycarpic -v ON_ERROR_STOP=1 -f - < "$ROLES_SQL" > /dev/null 2> "$WORK/roles-$which.err" || res FAIL DR6 "roles.sql did not re-run on the $which instance"
     plp=$(docker exec "$c" psql -U postgres -X -d polycarpic -v VERBOSITY=verbose -c 'SET ROLE poly_app' -c 'DO $$BEGIN END$$' 2>&1 || true)
     xml=$(docker exec "$c" psql -U postgres -X -d polycarpic -v VERBOSITY=verbose -c 'SET ROLE poly_app' -c "SELECT query_to_xml('SELECT 1', true, false, '')" 2>&1 || true)
@@ -130,11 +139,7 @@ else
     else
       res FAIL DR5 "$which instance: poly_app is not refused plpgsql or query_to_xml"
     fi
-    missing=''
-    while read -r role; do
-      [ "$(docker exec "$c" psql -U postgres -X -tA -c "select count(*) from pg_roles where rolname = '$role'")" = 1 ] || missing="$missing $role"
-    done < <(grep -oE 'poly_[a-z_]+' "$ROLES_SQL" | sort -u)
-    if [ -z "$missing" ]; then res PASS DR6 "$which instance: every role in roles.sql exists"; else res FAIL DR6 "$which instance: missing roles:$missing"; fi
+    if [ "$which" = BASE ]; then roles_check "$which" "$c"; fi
   done
 
   # ---- DR7: the row count of every FORCE-RLS table is the same in both restores
@@ -151,9 +156,12 @@ else
     else
       res FAIL DR7 "FORCE-RLS row counts differ between the dump and the base restores (or there are none)"
     fi
-    # ---- DR8: no session without its handle (F4)
+  else
+    res FAIL DR7 "no two restores to compare (the $([ -n "$SC_DUMP" ] || echo dump)$([ -z "$SC_DUMP" ] && [ -z "$SC_BASE" ] && echo ' and ')$([ -n "$SC_BASE" ] || echo base) restore failed)"
+  fi
+  if [ -n "$SC_DUMP" ]; then
     c=$SC_DUMP
-    # a check with nothing to check fails: it names the tables that are missing
+    # ---- DR8: no session without its handle (F4); a check with nothing to check fails and names the tables that are missing
     missing=$(psql_in "$c" -c "select concat_ws(', ', case when to_regclass('public.session') is null then 'public.session' end, case when to_regclass('app.session_handle') is null then 'app.session_handle' end)")
     if [ -n "$missing" ]; then
       res FAIL DR8 "the restored database has no $missing, so there is nothing to check (a data-only or partial restore)"
@@ -169,10 +177,9 @@ else
       res FAIL DR9 "a ledger table exists but the ledger checks are not implemented in this drill"
     fi
   else
-    SKIPWHY="not run: a scratch restore failed"
+    SKIPWHY="not run: the dump restore failed"
     res FAIL DR8 "there is no restored dump instance to count sessions in (the dump restore failed; a data-only or partial load leaves nothing to check)"
     skip_rest DR9
-    res FAIL DR7 "no two restores to compare"
   fi
 fi
 
@@ -188,6 +195,14 @@ else
   res PASS DR10 "the box key is refused delete, retention and bucket-default changes, and an overwrite leaves the first version intact"
 fi
 
+# F6: every check must have a result line; DR5 and DR6 one per instance. A check that did not run is a FAIL, never a silent pass.
+for id in DR1 DR2 DR3 DR4 DR5 DR6 DR7 DR8 DR9 DR10 DR11; do
+  need=1
+  case "$id" in DR5 | DR6) need=2 ;; esac
+  have=$(awk -v i="$id" '$2 == i && $1 != "SKIP" { n++ } END { print n + 0 }' "$RESULTS")
+  skipped=$(awk -v i="$id" '$2 == i && $1 == "SKIP" { n++ } END { print n + 0 }' "$RESULTS")
+  if [ "$have" -lt "$need" ] && [ "$skipped" = 0 ]; then res FAIL "$id" "$id did not run"; fi
+done
 fails=$(awk '$1 == "FAIL" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
 skips=$(awk '$1 == "SKIP" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
 if [ -n "$REPORT" ]; then
@@ -209,5 +224,5 @@ if [ -n "$REPORT" ]; then
   } > "$REPORT"
 fi
 if [ -n "$fails" ]; then echo "DRILL FAILED: $fails"; exit 1; fi
-if [ -n "$skips" ]; then echo "DRILL PASSED WITH SKIPS: $skips"; exit 3; fi
+if [ -n "$skips" ]; then echo "DRILL INCOMPLETE: not checked: $skips"; exit 3; fi
 echo "DRILL PASSED"
