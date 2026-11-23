@@ -6,7 +6,7 @@ Every compose argv fixes the project, the file and the env files itself; a relea
 import os
 import re
 
-from lib import compose, release as rel
+from lib import compose, compose_guard, release as rel
 from lib.release import Refusal
 
 HEALTH_WAIT = 120
@@ -16,14 +16,11 @@ PREMIGRATION = re.compile(r"premigration-set [0-9]{8}T[0-9]{6}Z dump-[^ =]+\.age
 APP_SERVICES = ("migrate", "web", "auth", "worker")
 
 
-def base(rdir, project, edge_env="/etc/polycarpic/edge.env"):
-    """The fixed head of every compose call for a release directory. The shared edge project also reads /etc/polycarpic/edge.env."""
-    cdir = "%s/infra/compose" % rdir
-    argv = ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project),
-            "--env-file", "%s/images.env" % rdir]
-    if project == "edge":
-        argv += ["--env-file", edge_env]
-    return argv
+def base(judged, project=None):
+    """The fixed head of every compose call that starts or reads containers: the project and the SAVED, judged render (F4); never a bundle's file.
+    The file's sha256 is re-read first (a changed file is the refusal `unjudged`)."""
+    compose_guard.verify(judged, project)
+    return ["docker", "compose", "-p", "polycarpic-" + judged.project, "-f", judged.path]
 
 
 def refs(rdir):
@@ -44,13 +41,13 @@ def oneoff_name(project, svc):
     return "polycarpic-%s-%s" % (project, svc)
 
 
-def run_argv(rdir, project, svc, command):
+def run_argv(judged, project, svc, command):
     """A one-off run. `compose run` has no --no-build (it has --pull and --build); --pull never keeps it from resolving a tag (T14). Named (F15)."""
-    return base(rdir, project) + ["--profile", "*", "run", "--rm", "--no-deps", "-T", "--pull", "never", "--name", oneoff_name(project, svc)] + [svc] + command
+    return base(judged, project) + ["--profile", "*", "run", "--rm", "--no-deps", "-T", "--pull", "never", "--name", oneoff_name(project, svc)] + [svc] + command
 
 
-def up_argv(rdir, project, services=(), extra=(), edge_env="/etc/polycarpic/edge.env"):
-    return base(rdir, project, edge_env) + ["up", "-d", "--pull", "never", "--no-build"] + list(extra) + list(services)
+def up_argv(judged, project, services=(), extra=()):
+    return base(judged, project) + ["up", "-d", "--pull", "never", "--no-build"] + list(extra) + list(services)
 
 
 def healthy_once(ctx, project, want_refs, services, timeout=30):
@@ -70,7 +67,7 @@ def healthy_once(ctx, project, want_refs, services, timeout=30):
     return True
 
 
-def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True, extra=None):
+def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True, extra=None, judged=None):
     """R7: every long-running service running, healthy and on this release's image; then web answers 200 on its health route.
     `extra`, when given, is one more thing that must be true in the same poll (the probe through Caddy, A13)."""
     env = refs(rdir)
@@ -84,7 +81,7 @@ def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True
             ok = True
             if check_http:
                 try:
-                    code, out, _ = ctx.run(base(rdir, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=child)
+                    code, out, _ = ctx.run(base(judged, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=child)
                     ok = code == 0 and out.strip() == "200"
                 except (TimeoutError, OSError):
                     ok = False

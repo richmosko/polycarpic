@@ -31,10 +31,51 @@ def fail(rule):
     raise Refusal("guard-" + rule, True)
 
 
-def render_argv(rdir, release_root, project, env_files, raw):
-    """R4's exact argv for a render: the project, the file and the env files are fixed by the installed script."""
+import collections
+import hashlib
+
+RENDER_UID = 10020
+ISOLATION = ["unshare", "--net", "--", "setpriv", "--reuid", str(RENDER_UID), "--regid", str(RENDER_UID), "--clear-groups", "--no-new-privs", "--"]
+HOME = "/var/lib/polycarpic/state/deploy/render-home"
+STATE = "/var/lib/polycarpic/state/deploy"
+
+
+class Judged(collections.namedtuple("Judged", "project digest path sha256")):
+    """What the guard judged: the saved render's path and the sha256 of its bytes (F9). `_edge_up` and every `up` and `run` re-read the file against it."""
+    __slots__ = ()
+
+
+def render_user_ok(ctx):
+    """A18: `polycarpic-render`, uid and gid 10020, no shell, no home, in no other group. Anything else is the refusal `render-user` (exit 4)."""
+    try:
+        with open(ctx.p("/etc/passwd"), encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        with open(ctx.p("/etc/group"), encoding="utf-8") as fh:
+            groups = fh.read().splitlines()
+    except OSError:
+        groups = []
+        try:
+            with open(ctx.p("/etc/passwd"), encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            return False
+    rows = [l.split(":") for l in lines if l.startswith("polycarpic-render:")]
+    if len(rows) != 1 or len(rows[0]) != 7:
+        return False
+    _, _, uid, gid, _, home, shell = rows[0]
+    if uid != str(RENDER_UID) or gid != str(RENDER_UID) or home not in ("/nonexistent", "/var/empty", "") or not shell.endswith(("nologin", "false")):
+        return False
+    for g in groups:
+        parts = g.split(":")
+        if len(parts) == 4 and "polycarpic-render" in parts[3].split(","):
+            return False
+    return True
+
+
+def render_argv(rdir, project, env_files, raw):
+    """R4's argv for a render: the project, the file and the env files are fixed by the installed script; it runs isolated (F4 a)."""
     cdir = "%s/infra/compose" % rdir
-    argv = ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project)]
+    argv = ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project)]
     for env in env_files:
         argv += ["--env-file", env]
     argv += ["--profile", "*", "config"]
@@ -42,9 +83,17 @@ def render_argv(rdir, release_root, project, env_files, raw):
     return argv + ["--format", "json"]
 
 
-def _json(ctx, argv):
+def _render_env(ctx):
+    home = ctx.p(HOME)
+    if not os.path.isdir(home):
+        os.makedirs(home, mode=0o755, exist_ok=True)
+    os.chmod(home, 0o755)
+    return {"HOME": home, "XDG_CACHE_HOME": home, "COMPOSE_EXPERIMENTAL_GIT_REMOTE": "0", "COMPOSE_EXPERIMENTAL_OCI_REMOTE": "0"}
+
+
+def _json(ctx, argv, stdin=None):
     try:
-        code, out, _ = ctx.run(argv, timeout=120)
+        code, out, _ = ctx.run(argv, stdin=stdin, timeout=120, extra_env=_render_env(ctx))
         data = json.loads(out)
     except (ValueError, TimeoutError):
         fail("render")
@@ -53,9 +102,93 @@ def _json(ctx, argv):
     return data
 
 
-def renders(ctx, rdir, release_root, project, env_files):
-    return (_json(ctx, render_argv(rdir, release_root, project, env_files[:1], True)),
-            _json(ctx, render_argv(rdir, release_root, project, env_files, False)))
+def renders(ctx, rdir, project, env_files):
+    return (_json(ctx, render_argv(rdir, project, env_files[:1], True)),
+            _json(ctx, render_argv(rdir, project, env_files, False)))
+
+
+def correct(plain, policy, project, strict=True):
+    """`ulimits.core` `{}` is a zero (Compose's JSON drops it): written back as 0 only where the policy pins it at zero; any other empty object where a
+    number belongs is `guard-render` (S31 c)."""
+    out = json.loads(json.dumps(plain))
+    pol = policy["projects"][project]["services"]
+    for name, svc in (out.get("services") or {}).items():
+        lim = svc.get("ulimits")
+        if not isinstance(lim, dict):
+            continue
+        pinned = (pol.get(name, {}).get("pins", {}).get("ulimits") or {})
+        for k, v in list(lim.items()):
+            if v == {}:
+                if pinned.get(k) == 0:
+                    lim[k] = 0
+                elif strict:
+                    fail("render")
+    return out
+
+
+def canonical(doc):
+    return (json.dumps(doc, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def save(ctx, project, digest, data):
+    """root 0600, temp and rename, no link followed, mounted by nothing (S35). -> the path."""
+    d = ctx.p("%s/%s" % (STATE, project))
+    os.makedirs(d, mode=0o755, exist_ok=True)
+    path = os.path.join(d, "render-%s.json" % digest.split(":", 1)[1][:12])
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    try:
+        ctx.chown(fd, 0, 0)
+        os.fchmod(fd, 0o600)
+        os.write(fd, data)
+    finally:
+        os.close(fd)
+    os.replace(tmp, path)
+    return path
+
+
+def sha_of(path):
+    """The sha256 of the saved file, re-read without following a link; None when it cannot be read."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return None
+    try:
+        h = hashlib.sha256()
+        while True:
+            block = os.read(fd, 1 << 20)
+            if not block:
+                break
+            h.update(block)
+        return h.hexdigest()
+    finally:
+        os.close(fd)
+
+
+def verify(judged, project=None, digest=None):
+    """The record is a `Judged`, for this project and digest, and the file still has the judged bytes; else the refusal `unjudged` (F9)."""
+    if not isinstance(judged, Judged) or (project is not None and judged.project != project) or (digest is not None and judged.digest != digest):
+        raise Refusal("unjudged")
+    if sha_of(judged.path) != judged.sha256:
+        raise Refusal("unjudged")
+    return judged
+
+
+def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None):
+    """Render (isolated), correct, judge, save, render the saved bytes once more on stdin and require the same. -> Judged."""
+    if not render_user_ok(ctx):
+        raise Refusal("render-user", code=4)
+    policy = load_policy(ctx)
+    raw, plain = renders(ctx, rdir, project, env_files)
+    corrected = correct(plain, policy, project, strict=False)  # the policy's own refusals come first; a stray empty number is `guard-render` after
+    check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
+    corrected = correct(corrected, policy, project)
+    data = canonical(corrected)
+    path = save(ctx, project, digest, data)
+    again = _json(ctx, ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "-f", "-", "--profile", "*", "config", "--format", "json"], stdin=data.decode("utf-8"))
+    if canonical(correct(again, policy, project)) != data:
+        fail("render")
+    return Judged(project, digest, path, hashlib.sha256(data).hexdigest())
 
 
 def _resolve_source(src, rdir):
@@ -66,7 +199,7 @@ def _norm(path):
     return posixpath.normpath(path) if isinstance(path, str) else path
 
 
-def check(policy, project, raw, plain, images, rdir, bind_addr=None):
+def check(policy, project, raw, plain, images, rdir, bind_addr=None, ctx=None):
     """Raise Refusal when the renders break the project's policy. `images` maps image kind (app, postgres, tools, caddy) to its verified ref."""
     pol = policy["projects"][project]
     for cfg in (raw, plain):
@@ -84,6 +217,7 @@ def check(policy, project, raw, plain, images, rdir, bind_addr=None):
             fail("service")
     for name, svc in services.items():
         _service(pol["services"][name], name, svc, raw_services.get(name) or {}, plain, images, rdir, bind_addr)
+        _env_keys(ctx, svc, raw_services.get(name) or {})
         for k in raw_services.get(name) or {}:
             if k not in pol["services"][name]["keys"]:
                 fail("key")
@@ -123,6 +257,25 @@ def _service(sp, name, svc, raw_svc, plain, images, rdir, bind_addr):
     _ports(sp, svc, bind_addr)
 
 
+def _env_keys(ctx, svc, raw_svc):
+    """S31 b: a service's plain `environment` holds no key outside its raw one plus its listed env files' keys (`guard-env`)."""
+    if ctx is None:
+        return
+    renv = raw_svc.get("environment") or {}
+    allowed = set(renv) if isinstance(renv, dict) else set(str(e).split("=", 1)[0] for e in renv)
+    for e in raw_svc.get("env_file") or []:
+        path = e.get("path") if isinstance(e, dict) else e
+        try:
+            with open(ctx.p(path), encoding="utf-8") as fh:
+                allowed |= set(l.split("=", 1)[0].strip() for l in fh.read().splitlines() if "=" in l and not l.lstrip().startswith("#"))
+        except (OSError, TypeError):
+            continue  # an unreadable file adds no allowed key: any key it would have brought is then outside the raw set
+    penv = svc.get("environment") or {}
+    keys = set(penv) if isinstance(penv, dict) else set(str(e).split("=", 1)[0] for e in penv)
+    if keys - allowed:
+        fail("env")
+
+
 def _mounts(sp, svc, rdir):
     want = [(_norm(_resolve_source(b["source"], rdir)), b["target"], b["read_only"]) for b in sp.get("binds", [])]
     for v in svc.get("volumes") or []:
@@ -130,6 +283,8 @@ def _mounts(sp, svc, rdir):
             fail("mount")
         if v["type"] == "tmpfs":
             continue
+        if v.get("bind"):  # any non-empty bind option block (propagation, selinux, create_host_path) is refused, on the plain render only
+            fail("mount")
         src = _norm(v.get("source"))
         if src in NEVER_SOURCES or "docker.sock" in str(src):
             fail("mount")

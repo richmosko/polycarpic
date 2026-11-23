@@ -6,7 +6,7 @@ import os
 import re
 import tempfile
 
-from lib import compose, deployer, release as rel, sauth, stack
+from lib import compose, compose_guard, deployer, release as rel, sauth, stack
 from lib.release import Refusal
 
 EDGE_TAG = re.compile(r"edge-(0|[1-9][0-9]*)")
@@ -127,27 +127,25 @@ def _run(tag, ctx, work, seen, run):
     keep = False
     try:
         try:
-            deployer.guard("edge", ctx, rdir, images)
+            judged = deployer.guard("edge", ctx, rdir, images)
         except Refusal as err:
             err.help_lines = deployer.guardhelp.lines(ctx, err.name, commit, tag, again="sudo polycarpic-ops edge-deploy " + tag)
             raise
         rel.log(ctx, "edge", "verified", digest)
         keep = True
-        return _up(ctx, rdir, digest, tag, commit, cur, rdir, run)
+        return _up(ctx, rdir, digest, tag, commit, cur, judged, run)
     finally:
         if not keep and created:
             rel.remove_created(ctx, rdir, digest)
 
 
-def _up(ctx, rdir, digest, tag, commit, cur, judged_dir, run):
-    if os.path.normpath(judged_dir) != os.path.normpath(rdir):  # F9: only the directory whose edge render was judged is upped
-        raise Refusal("guard-edge", True)
+def _up(ctx, rdir, digest, tag, commit, cur, judged, run):
+    compose_guard.verify(judged, "edge", digest)  # F9, before anything is marked or started
     rel.put(ctx, "edge", "in-progress", digest + "\n")
     run["up"] = True
-    head = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV))  # only Caddy of this release is started
-    code, _, _ = deployer._compose(ctx, head)
+    code = deployer._edge_up(ctx, judged, digest)  # only Caddy of this release is started
     rel.log(ctx, "edge", "up", digest)
-    ok = code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False)
+    ok = code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, judged=judged)
     if ok:
         _promote(ctx, rdir, digest, tag, commit, cur)
         return 0
@@ -191,13 +189,13 @@ def restore(ctx, ptr, wait_healthy=True):
     if sauth.check(ctx):
         return False
     try:
-        deployer.guard("edge", ctx, rdir, stack.kinds(stack.refs(rdir)))
+        judged = deployer.guard("edge", ctx, rdir, stack.kinds(stack.refs(rdir)))  # rendered, judged and saved afresh
+        code = deployer._edge_up(ctx, judged, ptr["digest"])
     except Refusal:
         return False
-    code, _, _ = deployer._compose(ctx, stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV)))
     if code != 0:
         return False
-    return stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False) if wait_healthy else True
+    return stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, judged=judged) if wait_healthy else True
 
 
 def rollback(ctx):

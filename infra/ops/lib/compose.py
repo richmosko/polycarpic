@@ -22,11 +22,19 @@ def release_current(ctx, project):
 
 
 def compose_source(ctx, project, fname, bundle_path):
-    """-> (file path, extra compose args): the current release's file and images.env when one is deployed, else the ops bundle's file."""
-    link = release_current(ctx, project)
-    if link:
-        return "%s/infra/compose/%s" % (link, fname), ["--env-file", link + "/images.env"]
-    return bundle_path, []
+    """-> (file path, extra compose args). With a `current` the file is that release's saved, judged render (F4, S33), never a bundle's compose file:
+    a render that is missing or unreadable is `ComposeError("state")`. With no `current` at all, the ops bundle's file."""
+    from lib import compose_guard, release
+    try:
+        cur = release.load_pointer(ctx, project, "current")
+    except release.Refusal:
+        raise ComposeError("state")
+    if not cur:
+        return bundle_path, []
+    path = ctx.p("%s/%s/render-%s.json" % (compose_guard.STATE, project, cur["digest"].split(":", 1)[1][:12]))
+    if compose_guard.sha_of(path) is None:
+        raise ComposeError("state")
+    return path, []
 
 
 def parse_secrets(ctx, project):

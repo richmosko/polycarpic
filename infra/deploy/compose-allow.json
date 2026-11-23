@@ -161,7 +161,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -227,7 +227,7 @@
        "/tmp:size=1m"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -272,7 +272,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -321,7 +321,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -396,7 +396,7 @@
        "/var/run/postgresql:uid=999,gid=999,mode=0755"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -459,7 +459,7 @@
        "/tmp:size=1m"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -506,7 +506,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -552,7 +552,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -623,7 +623,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -670,7 +670,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -719,7 +719,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -778,7 +778,7 @@
        "/var/run/postgresql:uid=999,gid=999,mode=0755"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -825,7 +825,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,
@@ -871,7 +871,7 @@
        "/tmp"
       ],
       "ulimits": {
-       "core": {}
+       "core": 0
       }
      },
      "read_only": true,

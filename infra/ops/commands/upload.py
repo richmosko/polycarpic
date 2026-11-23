@@ -73,7 +73,11 @@ def _locked(ctx):
         ctx.err("upload: /opt/polycarpic/images.env missing or malformed")
         return 3
     ctx.run(["docker", "rm", "-f", CONTAINER], timeout=60)
-    cfile, cenv = compose.compose_source(ctx, "prod", "prod.yml", BUNDLE_COMPOSE)
+    try:
+        cfile, cenv = compose.compose_source(ctx, "prod", "prod.yml", BUNDLE_COMPOSE)
+    except compose.ComposeError:
+        ctx.err("upload: refused state (no saved render of current)")
+        return 1
     argv = ["docker", "compose", "-p", PROJECT, "-f", cfile] + cenv + ["--profile", "uploader", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "uploader", "/usr/local/bin/upload.sh"]
     ok, out = True, ""

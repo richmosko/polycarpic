@@ -4,6 +4,7 @@ Exit codes: 0 done, nothing to do, busy or a transient outage (the timer); 1 ref
 """
 import fcntl
 import os
+import re
 import tempfile
 
 from lib import compose, compose_guard, guardhelp, release as rel, sauth, spool, stack, tokenexp
@@ -309,12 +310,9 @@ def _gate_checks(project, ctx, rdir, images, cur, commit):
         if old is None or old.strip() != (new or "").strip():
             raise Refusal("postgres-major", True)
     owner = project == "prod"  # R9 strict: edge is prod's alone; a staging run never renders or ups it
-    judged = {}
-    guard(project, ctx, rdir, images)
-    judged[project] = rdir
+    judged = {project: guard(project, ctx, rdir, images)}
     if owner:
-        guard("edge", ctx, rdir, images)
-        judged["edge"] = rdir
+        judged["edge"] = guard("edge", ctx, rdir, images)
     return owner, judged
 
 
@@ -326,11 +324,15 @@ def bind_addr(ctx):
     return None
 
 
+def digest_of(rdir):
+    return "sha256:" + os.path.basename(os.path.normpath(rdir))[len("sha256-"):]
+
+
 def guard(project, ctx, rdir, images):
-    policy = compose_guard.load_policy(ctx)
+    """F4: the isolated render of the release's compose file is corrected, judged, saved and rendered once more; -> the Judged record that every
+    `up` and `run` of this release then names (never a bundle's file)."""
     env_files = ["%s/images.env" % rdir] + ([ctx.p(EDGE_ENV)] if project == "edge" else [])
-    raw, plain = compose_guard.renders(ctx, rdir, rel.RELEASES, project, env_files)
-    compose_guard.check(policy, project, raw, plain, images, rdir, bind_addr(ctx))
+    return compose_guard.judge(ctx, rdir, project, env_files, images, digest_of(rdir), bind_addr(ctx))
 
 
 def edge_domain(ctx):
@@ -349,7 +351,7 @@ def _compose(ctx, argv, timeout=600):
         return 124, "", "timeout"
 
 
-def _oneoff(ctx, project, rdir, svc, command, timeout=600):
+def _oneoff(ctx, project, judged, svc, command, timeout=600):
     """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released."""
     name = stack.oneoff_name(project, svc)
     ctx.run(["docker", "rm", "-f", name], timeout=60)
@@ -357,7 +359,7 @@ def _oneoff(ctx, project, rdir, svc, command, timeout=600):
     if still == 0:  # a stale one that will not go: a later run refuses while it exists
         raise Refusal("oneoff-stuck", True)
     try:
-        return ctx.run(stack.run_argv(rdir, project, svc, command), timeout=timeout)
+        return ctx.run(stack.run_argv(judged, project, svc, command), timeout=timeout)
     except TimeoutError:
         ctx.run(["docker", "rm", "-f", name], timeout=60)
         code, _, _ = ctx.run(["docker", "inspect", name], timeout=30)
@@ -368,11 +370,12 @@ def _oneoff(ctx, project, rdir, svc, command, timeout=600):
 
 def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh, judged, run):
     cdir = rel.release_dir(ctx, cur["digest"]) if cur else rdir  # only a first deploy, with no `current`, starts the candidate's Postgres
-    if cur:  # current's bundle is judged by the installed guard before any container of it is started (S3, S12)
+    pj = judged[project]  # the judged render Postgres starts from: the candidate's on a first deploy
+    if cur and not compose.running(compose.ps(ctx, "polycarpic-" + project), "postgres"):  # current's bundle is judged before any container of it is started (S3, S12)
         if not rel.owned_safely(ctx, cdir):
             raise Refusal("release-tree")
         try:
-            guard(project, ctx, cdir, stack.kinds(stack.refs(cdir)))
+            pj = guard(project, ctx, cdir, stack.kinds(stack.refs(cdir)))
         except Refusal as err:  # F11: current's fault is not the candidate's: alert, no Q, the name only
             if err.name.startswith("guard-"):
                 raise Refusal("current-" + err.name)
@@ -380,9 +383,9 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
     rerun = first and not cur and not existing_data and rel.read(ctx, project, "first-attempt") is not None  # an earlier attempt of this project
     if fresh:  # an empty data directory and no `current`: a rerun after `roles-missing` may proceed without --existing-data
         rel.put(ctx, project, "first-attempt", rel.now_utc(ctx) + "\n")
-    _start_postgres(project, ctx, cdir)
+    _start_postgres(project, ctx, pj, cdir)
     # S19: a rerun skips the backup only when its own earlier attempt left an empty database; a table, or a failed or unparsable read, requires it
-    backup_needed = bool(cur or existing_data or (rerun and not _database_empty(project, ctx, cdir)))
+    backup_needed = bool(cur or existing_data or (rerun and not _database_empty(project, ctx, pj)))
     if project == "prod" and backup_needed:
         try:
             _premigration(project, ctx)
@@ -402,12 +405,12 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
             os.close(backup_fd)
 
 
-def _start_postgres(project, ctx, cdir):
+def _start_postgres(project, ctx, pj, cdir):
     rows = compose.ps(ctx, "polycarpic-" + project)
     if compose.running(rows, "postgres"):
         return
-    code, _, _ = _compose(ctx, stack.up_argv(cdir, project, ["postgres"], ["--no-deps"]))
-    if code != 0 or not stack.wait_healthy(ctx, project, cdir, ["postgres"], check_http=False):
+    code, _, _ = _compose(ctx, stack.up_argv(pj, project, ["postgres"], ["--no-deps"]))
+    if code != 0 or not stack.wait_healthy(ctx, project, cdir, ["postgres"], check_http=False, judged=pj):
         raise Refusal("postgres-start")
 
 
@@ -416,9 +419,9 @@ SQL_TABLES = ("SET default_transaction_read_only = on;\n"
               "WHERE c.relkind IN ('r','p','f','m') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_toast';\n")
 
 
-def _database_empty(project, ctx, cdir):
+def _database_empty(project, ctx, pj):
     """True only when the project's database holds no table outside the system schemas, read over the container's local socket."""
-    argv = stack.base(cdir, project) + ["exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic", "-XAtq", "-v", "ON_ERROR_STOP=1"]
+    argv = stack.base(pj, project) + ["exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic", "-XAtq", "-v", "ON_ERROR_STOP=1"]
     try:
         code, out, _ = ctx.run(argv, stdin=SQL_TABLES, timeout=30)
     except TimeoutError:
@@ -442,15 +445,15 @@ def _premigration(project, ctx):
 
 def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, run):
     for svc in stack.APP_SERVICES:
-        code, _, _ = _oneoff(ctx, project, rdir, svc, [svc, "check-config"])
+        code, _, _ = _oneoff(ctx, project, judged[project], svc, [svc, "check-config"])
         if code != 0:
             raise Refusal("check-config", True)
-    code, out, err = _oneoff(ctx, project, rdir, "migrate", ["migrate", "--plan"])
+    code, out, err = _oneoff(ctx, project, judged[project], "migrate", ["migrate", "--plan"])
     if code == 2 and first and "roles-missing" in out + err:
         ctx.err("run: sudo polycarpic-ops provision --stage database --project " + project)
         raise Refusal("roles-missing", code=4)
     if code == 3:
-        code, _, _ = _oneoff(ctx, project, rdir, "migrate", ["migrate"], timeout=MIGRATE_TIMEOUT)
+        code, _, _ = _oneoff(ctx, project, judged[project], "migrate", ["migrate"], timeout=MIGRATE_TIMEOUT)
         if code == 124:
             raise Refusal("migrate-timeout", True)
         if code == 4:
@@ -469,14 +472,14 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, r
     rel.put(ctx, project, "in-progress", digest + "\n")  # marks the candidate's first `up` (F2)
     run["up"] = True
     if owns:
-        code = _edge_up(project, ctx, rdir, judged.get("edge"))
+        code = _edge_up(ctx, judged.get("edge"), digest)
         if code != 0:
             return _rollback_auto(project, ctx, digest, cur, owns, live_probe)
-    code, _, _ = _compose(ctx, stack.up_argv(rdir, project))
+    code, _, _ = _compose(ctx, stack.up_argv(judged[project], project))
     rel.log(ctx, project, "up", digest)
-    up_ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=live_probe)
+    up_ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=live_probe, judged=judged[project])
     if up_ok and owns:
-        up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=live_probe)
+        up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=live_probe, judged=judged["edge"])
     if up_ok:
         code = _healthy(project, ctx, rdir, digest, tag, commit, cur)
         if probe and not baseline_ok:  # A13: the probe was not required, and the alert says so even when healthy
@@ -511,12 +514,11 @@ def _probe_baseline(project, ctx, first):
     return probe, ok
 
 
-def _edge_up(project, ctx, rdir, judged_dir=None):
-    """R9: bring the shared Caddy up from this prod release. F9: it takes the directory whose edge render was judged and refuses any other."""
-    if project != "prod" or judged_dir is None or os.path.normpath(judged_dir) != os.path.normpath(rdir):
-        raise Refusal("guard-edge", True)
-    argv = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV))
-    code, _, _ = _compose(ctx, argv)
+def _edge_up(ctx, judged, digest):
+    """R9: bring the shared Caddy up from the judged edge render. F9: it takes the guard's Judged record and the digest it is about to start, and checks
+    the type, the project, the digest and the file's sha256 (re-read) before any compose call; a miss is the refusal `unjudged`."""
+    compose_guard.verify(judged, "edge", digest)
+    code, _, _ = _compose(ctx, stack.up_argv(judged, "edge", ["caddy"]))
     return code
 
 
@@ -563,6 +565,18 @@ def _prune(ctx):
     for name in os.listdir(root):
         if name.startswith("sha256-") and name not in keep:
             rel.remove_tree(os.path.join(root, name))
+    kept = set(n[len("sha256-"):][:12] for n in keep)
+    for project in ("prod", "staging", "edge"):  # A17: a saved render goes with its release, and no other is touched
+        sdir = ctx.p("%s/%s" % (compose_guard.STATE, project))
+        if not os.path.isdir(sdir):
+            continue
+        for name in os.listdir(sdir):
+            m = re.fullmatch(r"render-([0-9a-f]{12})\.json", name)
+            if m and m.group(1) not in kept:
+                try:
+                    os.unlink(os.path.join(sdir, name))
+                except OSError:
+                    pass
 
 
 def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None):
@@ -605,14 +619,16 @@ def restore(project, ctx, ptr, owns=None, probe=None):
         return False
     try:
         images = stack.kinds(stack.refs(rdir))
-        guard(project, ctx, rdir, images)
-        if owner:
-            guard("edge", ctx, rdir, images)  # both renders are judged before either `up`
+        pj = guard(project, ctx, rdir, images)  # rollback renders, judges and writes afresh
+        ej = guard("edge", ctx, rdir, images) if owner else None  # both renders are judged before either `up`
     except Refusal:
         return False
-    code, _, _ = _compose(ctx, stack.up_argv(rdir, project))
-    ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=probe)
+    code, _, _ = _compose(ctx, stack.up_argv(pj, project))
+    ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=probe, judged=pj)
     if owner:
-        code, _, _ = _compose(ctx, stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV)))
-        ok = ok and code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=probe)
+        try:
+            code = _edge_up(ctx, ej, ptr["digest"])
+        except Refusal:
+            return False
+        ok = ok and code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=probe, judged=ej)
     return ok
