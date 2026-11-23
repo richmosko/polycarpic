@@ -200,10 +200,11 @@ class Prod(DeployTest):
         self.assertEqual(r0.rc, 0, r0.err)
         caddy_before = self.caddy_images()
         self.staging_next(caddyfile=b"# changed by a main merge\n:80 { respond 418 }\n")
+        mark = len(self.world.compose_log)
         r = self.deploy("staging")
         self.assertEqual(r.rc, 0, r.err)
         self.assertEqual(self.caddy_images(), caddy_before)
-        for c in r.world.compose_log:
+        for c in r.world.compose_log[mark:]:
             self.assertNotIn("edge.yml", " ".join(c["argv"]), c["argv"])
             self.assertNotIn("caddy", [a for a in c["rest"] if not a.startswith("-")], c["argv"])
             self.assertNotIn("polycarpic-edge", " ".join(c["argv"]))

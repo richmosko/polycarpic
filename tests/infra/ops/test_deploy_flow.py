@@ -65,7 +65,7 @@ class Flow(DeployTest):
         return r.world.compose_log[self.mark:]
 
     def ups(self, r):
-        return [c for c in self.since(r) if c["cmd"] == "up"]
+        return [c for c in self.since(r) if c["cmd"] == "up" and c["project"] != "polycarpic-edge"]  # a staging-only host owns edge (R9): its up is its own project
 
     def images_of(self, project=STAGING):
         return {s: c["image"] for s, c in self.world.containers.get(project, {}).items()}
@@ -94,6 +94,8 @@ class Flow(DeployTest):
             self.assertIn("--no-build", a)
             for i, tok in enumerate(a):
                 if tok in ("-f", "--env-file", "--project-directory"):
+                    if a[i + 1].endswith("/etc/polycarpic/edge.env"):
+                        continue  # R4: the edge calls name the host's edge.env
                     self.assertIn("/opt/polycarpic/releases/sha256-", a[i + 1])
 
     # --- T7: the bundle is data; nothing it carries runs or replaces anything ---

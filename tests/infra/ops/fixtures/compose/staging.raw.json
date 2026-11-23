@@ -75,6 +75,7 @@
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
         "DATABASE_USER": "poly_auth",
+        "PLAID_ENV": "sandbox",
         "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
       },
       "healthcheck": {
@@ -141,7 +142,8 @@
         "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_migrator",
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
-        "DATABASE_USER": "poly_migrator"
+        "DATABASE_USER": "poly_migrator",
+        "PLAID_ENV": "sandbox"
       },
       "healthcheck": {
         "interval": "60s",
@@ -201,7 +203,8 @@
         "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_operator",
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
-        "DATABASE_USER": "poly_operator"
+        "DATABASE_USER": "poly_operator",
+        "PLAID_ENV": "sandbox"
       },
       "healthcheck": {
         "interval": "60s",
@@ -335,7 +338,8 @@
         "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_app",
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
-        "DATABASE_USER": "poly_app"
+        "DATABASE_USER": "poly_app",
+        "PLAID_ENV": "sandbox"
       },
       "healthcheck": {
         "interval": "30s",
@@ -398,6 +402,7 @@
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
         "DATABASE_USER": "poly_worker",
+        "PLAID_ENV": "sandbox",
         "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
       },
       "healthcheck": {

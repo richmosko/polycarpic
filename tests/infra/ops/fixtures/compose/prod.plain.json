@@ -86,6 +86,7 @@
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
         "DATABASE_USER": "poly_auth",
+        "PLAID_ENV": "production",
         "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
       },
       "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -239,7 +240,8 @@
         "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_app",
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
-        "DATABASE_USER": "poly_app"
+        "DATABASE_USER": "poly_app",
+        "PLAID_ENV": "production"
       },
       "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "mem_limit": "805306368",
@@ -298,6 +300,7 @@
         "DATABASE_PORT": "5432",
         "DATABASE_SSLMODE": "disable",
         "DATABASE_USER": "poly_worker",
+        "PLAID_ENV": "production",
         "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
       },
       "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
