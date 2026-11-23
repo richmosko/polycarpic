@@ -71,3 +71,28 @@ describe('installed policy and signers (R5, R11)', () => {
     for (const n of ['compose-allow.json', 'allowed_signers', 'edge.env']) expect(c).toContain(n);
   });
 });
+
+// T-net (ruling dac66f0a, static part): all three compose files declare the edge networks they use as external, by exact name, and none creates one.
+// provision.sh creates exactly the two (the provision job's box tests); this file holds what a read of the YAML can show.
+describe('T-net: edge networks are external in every compose file', () => {
+  const NAMES: Record<string, string> = { 'edge-prod': 'polycarpic-edge-prod', 'edge-staging': 'polycarpic-edge-staging' };
+  for (const f of ['prod', 'staging', 'edge']) {
+    it(`${f}.yml: every edge network it declares is external with the exact name, and carries no ipam, driver or options`, () => {
+      const y = parse(read(`infra/compose/${f}.yml`));
+      const declared = Object.keys(y.networks ?? {}).filter((k) => k.startsWith('edge-'));
+      expect(declared.length, `${f} uses at least one edge network`).toBeGreaterThan(0);
+      for (const k of declared) {
+        expect(y.networks[k], `${f} ${k}`).toEqual({ name: NAMES[k], external: true });
+      }
+    });
+  }
+  it('prod and staging join only their own edge network, and edge.yml both', () => {
+    const own = { prod: 'edge-prod', staging: 'edge-staging' } as const;
+    for (const p of ['prod', 'staging'] as const) {
+      const y = parse(read(`infra/compose/${p}.yml`));
+      expect(Object.keys(y.networks).filter((k) => k.startsWith('edge-'))).toEqual([own[p]]);
+    }
+    const e = parse(read('infra/compose/edge.yml'));
+    expect(Object.keys(e.networks).filter((k) => k.startsWith('edge-')).sort()).toEqual(['edge-prod', 'edge-staging']);
+  });
+});
