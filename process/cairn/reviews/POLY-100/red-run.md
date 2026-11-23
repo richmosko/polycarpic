@@ -130,3 +130,16 @@ unit `test_t8_each_unsafe_render…` (the S14 subtests) and real-render cases "e
 - `_prune` keeps edge's `current` and `previous` forever; R4 and R9 keep them only until prod has a `current` (T-take prune cases red).
 - `release.yml`'s first step does not hold the full `v1` and `edge` regexes or refuse other tags (T-relyml red).
 - The lint judges only `edge.yml` for external edge networks; `prod.yml` / `staging.yml` declaring one with an ipam or without `external: true` passes (two lint.test.ts rows red).
+
+## Mutants owed earlier, now run
+
+| Test | Mutant | Red |
+|---|---|---|
+| T5 siblings | `verify_image`: V1 skipped for siblings / its result ignored | `test_t5_a_sibling_attested_at_another_commit…`, `…_failing_v1_stops…`, (first mutant also) `…_each_sibling_is_verified_with_the_same_flags_and_c` |
+| T11 | migrate failure quarantines instead of refusing (the run goes on to `up`) | `test_t11_a_failing_migrate_never_touches_the_running_containers`, `test_t11_migrate_exit_2…` |
+| T-lock (db) | `LOCK_SQL` → `SELECT 1` | `T-lock: both exit 0 … Lock/advisory` (fails with `CREATE SCHEMA IF NOT EXISTS "drizzle"` racing) |
+| T-sauth gate (`test_deploy_sauth_gate.py`) | `check_staging_auth` removed from `edge.deploy`; from the prod run; `sauth.check` removed from edge restore, from the prod rollback path, from `restart.py` | one test red each (`…refuses_a_bad_file_and_ups_nothing`, `test_restart_caddy_refuses_a_bad_file`) |
+| T-sauth input and file check (`test_staging_auth.py`) | input check off; any cost; `re.search(… $)`; the file's own group not compared | each red (see the section above) |
+| T13 (`test_deploy_t13.py`) | the logged set cut to its first field; the shape check off | `test_the_logged_set_is_what_list_premigration…`, `test_a_line_restore_would_refuse…` |
+
+Not run: mutants for the provision-job T-net cases ("names only", "no overlap check") and the box half of T-sauth (`owner_of` returning constants): the container slot is spent; both need a mutated copy of `provision.sh` / `ctx.py` inside the box.
