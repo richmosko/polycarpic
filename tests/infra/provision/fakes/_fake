@@ -95,7 +95,12 @@ case "$name" in
               one=$(echo "$nets" | jq -r --arg n "${names[0]}" '[.[] | select(.Name == $n)] | .[0] // empty | "\(.Driver // "bridge") \([.IPAM.Config[]?.Subnet] | map(. + " ") | join(""))"')
               [ -n "$one" ] || { echo "Error response from daemon: network ${names[0]} not found" >&2; exit 1; }
               echo "$one"
-            elif [ ${#names[@]} -eq 0 ]; then echo "$nets"; else echo "$nets" | jq -c --args '[.[] | select(.Name as $n | $ARGS.positional | index($n))]' "${names[@]}"; fi ;;
+            elif [ ${#names[@]} -eq 0 ]; then echo "$nets"; else
+              res=$(echo "$nets" | jq -c --args '[.[] | select(.Name as $n | $ARGS.positional | index($n))]' "${names[@]}")
+              # real docker: an unknown name prints `[]`, writes `Error: No such network: <name>` and exits 1
+              [ "$res" != "[]" ] || { echo "[]"; echo "Error: No such network: ${names[0]}" >&2; exit 1; }
+              echo "$res"
+            fi ;;
           create)
             shift 2; drv=bridge; sub=""; nm=""
             while [ $# -gt 0 ]; do case "$1" in --driver) drv=$2; shift ;; --subnet) sub=$2; shift ;; -*) ;; *) nm=$1 ;; esac; shift; done
