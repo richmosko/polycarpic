@@ -317,23 +317,24 @@ describe('T-pre: backup-acl preflight (R12)', () => {
     { name: 'NOBYPASSRLS', setup: () => 'ALTER ROLE poly_backup NOBYPASSRLS', undo: () => 'ALTER ROLE poly_backup BYPASSRLS' },
     { name: 'CREATEDB', setup: () => 'ALTER ROLE poly_backup CREATEDB', undo: () => 'ALTER ROLE poly_backup NOCREATEDB' },
   ];
+  // One database per fault serves both modes: a refused run applies nothing, so --plan sees the same database (suite time, ruling R13's db budget).
   for (const f of faults) {
-    for (const args of [[], ['--plan']]) {
-      it(`${f.name}: ${args.join(' ') || 'apply'} exits 2 refused (backup-acl), nothing applied`, async () => {
-        const db = freshDb();
-        const other = freshDb();
-        const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
-        if (f.objects) must(f.objects, db);
-        must(f.setup(db, other), db);
-        try {
+    it(`${f.name}: apply and --plan each exit 2 refused (backup-acl), nothing applied`, async () => {
+      const db = freshDb();
+      const other = /\bother\b|_other/.test(f.setup.toString()) ? freshDb() : db; // only the sibling-database cases take a second database
+      const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
+      if (f.objects) must(f.objects, db);
+      must(f.setup(db, other), db);
+      try {
+        for (const args of [[], ['--plan']]) {
           refused(await migrateRun(db, dir, args), BA);
-          expect(tableExists(db, 'public.ta')).toBe(false);
+          expect(tableExists(db, 'public.ta'), args.join(' ') || 'apply').toBe(false);
           expect(must(`SELECT to_regclass('drizzle.__drizzle_migrations') IS NULL`, db).rows[0][0]).toBe('t');
-        } finally {
-          must(f.undo(db, other), db);
         }
-      });
-    }
+      } finally {
+        must(f.undo(db, other), db);
+      }
+    });
   }
 
   it('roles.sql\'s own state passes: apply exits 0, --plan exits 3 (pending) and then 0', async () => {
