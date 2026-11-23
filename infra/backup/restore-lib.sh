@@ -45,7 +45,7 @@ list_versions() { # key
   local fid act ms iso
   awk -v k="$1" '$3 == k { print $4, $5, $6, $7 }' "$VERS" | while read -r fid act ms iso; do
     if [ "$act" = hide ]; then echo "version $fid $iso $1 sibling no hide marker"; else echo "version $fid $iso $1 sibling $(version_sibling "$1" "$fid")"; fi
-  done | clean
+  done | clean >&2
 }
 # accepted_version <key>: one of the --accept-version fileIds belongs to this key's versions -> ACCEPTED_FID
 accepted_version() {
@@ -94,7 +94,7 @@ bucket_select() { # nightly set -> SET_TS SET_SYS SET_M; VERS; RECS
   now=$(date -u +%s)
   out=$(b2 choose --now "$now" ${BEFORE:+--before "$BEFORE"} ${SETTS:+--set "$SETTS"} < "$RECS") || rc=$?
   if [ "$rc" != 0 ]; then
-    printf '%s\n' "$out" | clean
+    printf '%s\n' "$out" | clean >&2
     [ "$rc" != 3 ] || err "selection refused"
     return "$rc"
   fi

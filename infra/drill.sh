@@ -87,7 +87,7 @@ else
 fi
 set -e
 if [ -n "$FAILED_ID" ]; then
-  res FAIL "$FAILED_ID" "selection, download or verification refused (exit $rc); the lines above say which object"
+  res FAIL "$FAILED_ID" "selection, download or verification refused (exit $rc); the lines on stderr say which object"
   SKIPWHY="not run: $FAILED_ID failed"
   for id in DR1 DR2 DR11; do
     [ "$id" = "$FAILED_ID" ] || res SKIP "$id" "$SKIPWHY"
@@ -96,7 +96,7 @@ if [ -n "$FAILED_ID" ]; then
 else
   # shellcheck disable=SC2153
   if [ "${STRAY_N:-0}" != 0 ]; then res FAIL DR1 "$STRAY_N stray objects in the bucket (names that are not <instance>/<major>/<dir>/<name>: the put-only key wrote them)"
-  elif [ "$DR1_BAD" = 1 ]; then res FAIL DR1 "a chosen object has a second version or a hide marker (the versions are listed above; a hide marker after a checksum mismatch is the usual cause)"; else res PASS DR1 "every chosen object has one version and no hide marker (set $SET_TS, $(awk 'END { print NR }' "$VERS") versions listed)"; fi
+  elif [ "$DR1_BAD" = 1 ]; then res FAIL DR1 "a chosen object has a second version or a hide marker (the versions are listed on stderr; a hide marker after a checksum mismatch is the usual cause)"; else res PASS DR1 "every chosen object has one version and no hide marker (set $SET_TS, $(awk 'END { print NR }' "$VERS") versions listed)"; fi
   if [ "$DR2_BAD" = 1 ]; then res FAIL DR2 "a download does not match its sha256 sibling"; else res PASS DR2 "every download matches its sha256 sibling"; fi
   if [ "$DR11_BAD" = 1 ]; then res FAIL DR11 "the time inside an archive does not match its name's TS (a replayed file?)"; else res PASS DR11 "the time inside each archive matches its name's TS (replay check)"; fi
   if plain_stream "$GLOBALS_PLAIN" | grep -aqE 'PASSWORD|SCRAM-SHA-256\$'; then res FAIL DR3 "the globals file carries a role password or hash"; else res PASS DR3 "the globals file carries no PASSWORD and no SCRAM-SHA-256\$"; fi
