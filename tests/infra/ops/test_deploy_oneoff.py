@@ -98,7 +98,9 @@ class F15(DeployTest):
             state = {}
 
             def probe(cmd, argv):
-                if cmd == "ps" or cmd == "run":
+                if cmd == "run":
+                    state["in_run"] = True  # step 4 (backup.lock) is taken before the first one-off run
+                if state.get("in_run") and cmd in ("ps", "run", "exec"):
                     fd = os.open(str(p.host.p("/run/polycarpic/backup.lock")), os.O_RDWR | os.O_CREAT, 0o600)
                     try:
                         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
