@@ -4,12 +4,15 @@ World = the outside of the box, faked: the registry (docker), GitHub (gh), a REA
 tree; only the github.com URL is redirected to a local repo), a resolver, and scripted `polycarpic-ops backup premigration`. Everything
 reaches the tool through ctx.run / ctx.run_bytes / ctx.resolve; subprocess stays patched to raise (base.OpsTest).
 """
+import atexit
 import datetime as dt
 import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 import tarfile
 from pathlib import Path
 
@@ -33,6 +36,8 @@ REGISTRY = "ghcr.io/" + SLUG
 BUILD_PATH = ".github/workflows/build.yml"
 RUN_ID = "45196636649"
 STATE = "/var/lib/polycarpic/state/deploy"
+_TEMPLATE = None
+_KEYS = {}
 SYSTEM_PATH = os.environ.get("PATH", "/usr/bin:/bin")
 
 
@@ -92,17 +97,31 @@ class World(object):
         return p.stdout.strip()
 
     def _git_origin(self):
-        self.origin.mkdir()
-        self.git("init", "-q", "-b", "main")
-        for k, v in (("uploadpack.allowFilter", "true"), ("uploadpack.allowAnySHA1InWant", "true"), ("commit.gpgsign", "false")):
-            self.git("config", k, v)
-        self.commit_a = self.commit("a")
-        self.commit_b = self.commit("b")
+        global _TEMPLATE
+        if _TEMPLATE is None:  # built once per process, copied per test (an init and two commits cost ~0.2 s each time)
+            base = Path(tempfile.mkdtemp(prefix="poly100-origin-"))
+            atexit.register(shutil.rmtree, str(base), True)
+            self.origin = base / "github-origin"
+            self.origin.mkdir()
+            self.git("init", "-q", "-b", "main")
+            for k, v in (("uploadpack.allowFilter", "true"), ("uploadpack.allowAnySHA1InWant", "true"), ("commit.gpgsign", "false")):
+                self.git("config", k, v)
+            _TEMPLATE = (self.origin, self.commit("a"), self.commit("b"))
+        src, self.commit_a, self.commit_b = _TEMPLATE
+        self.origin = self.tmp / "github-origin"
+        shutil.copytree(str(src), str(self.origin), symlinks=True)
 
     def keygen(self, name):
         """-> (private key path, `ssh-ed25519 <base64>`)."""
         priv = self.tmp / ("key-" + name)
-        REAL_RUN(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", str(priv)])
+        if name not in _KEYS:  # one real keypair per name per process, copied into each test's tree
+            d = Path(tempfile.mkdtemp(prefix="poly100-key-"))
+            atexit.register(shutil.rmtree, str(d), True)
+            REAL_RUN(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", str(d / "k")])
+            _KEYS[name] = ((d / "k").read_bytes(), (d / "k.pub").read_bytes())
+        priv.write_bytes(_KEYS[name][0])
+        os.chmod(str(priv), 0o600)
+        (self.tmp / ("key-%s.pub" % name)).write_bytes(_KEYS[name][1])
         return str(priv), " ".join((self.tmp / ("key-%s.pub" % name)).read_text().split()[:2])
 
     def tag(self, name, commit, kind="signed", key=None, ref=None):
