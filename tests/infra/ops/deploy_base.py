@@ -42,6 +42,61 @@ STAGING_AUTH_PATHS = ("/etc/polycarpic/secrets/caddy", "/etc/polycarpic/secrets/
 SYSTEM_PATH = os.environ.get("PATH", "/usr/bin:/bin")
 
 
+_FLAGS = json.loads((Path(__file__).parent / "fixtures" / "flags.json").read_text())
+_VALUED = {"-p", "-f", "--env-file", "--project-directory", "--profile", "--name", "--pull", "--timeout", "-t", "-e", "--entrypoint", "-u", "--user", "-w", "--workdir", "-v", "--volume",
+           "-l", "--label", "--format", "--scale", "--repo", "--signer-workflow", "--source-ref", "--source-digest", "--predicate-type", "-D", "--dir", "-n", "--name", "-H", "--header",
+           "--jq", "-q", "-X", "--method", "-F", "--field", "-R", "--hostname"}
+_SHORT_GLOBAL = {"-p", "-f"}
+
+
+def bad_options(argv):
+    """F16: the options of a docker / docker compose / gh argv that the real subcommand does not have (from the tool's own --help, fixtures/flags.json). [] when all are real."""
+    tool = argv[0]
+    toks = list(argv[1:])
+    bad, i = [], 0
+
+    def scan(key, allow_extra=(), stop=True):
+        nonlocal i
+        known = set(_FLAGS.get(key, [])) | set(allow_extra) | {"--help", "-h"}
+        while i < len(toks):
+            t = toks[i]
+            if t == "--":
+                i += 1
+                return "--"
+            if t.startswith("-") and len(t) > 1:
+                name = t.split("=", 1)[0]
+                if name not in known:
+                    bad.append((key, name))
+                i += 2 if (name in _VALUED and "=" not in t) else 1
+                continue
+            if not stop:
+                i += 1
+                continue
+            return t
+        return None
+    if tool == "docker":
+        first = scan("docker")
+        if first == "compose":
+            i += 1
+            sub = scan("docker compose")
+            if sub in ("config", "up", "run", "exec", "ps", "restart", "stop", "rm"):
+                i += 1
+                scan("docker compose " + sub)  # run/exec: the first positional is the service; what follows is the container's command, not options
+        elif first in ("pull", "create", "cp", "rm", "inspect"):
+            i += 1
+            scan("docker " + first)
+        elif first == "image" and toks[i + 1:i + 2] == ["inspect"]:
+            i += 2
+            scan("docker image inspect")
+    elif tool == "gh":
+        first = toks[0] if toks else ""
+        key = {"api": "gh api", "run": "gh run " + (toks[1] if len(toks) > 1 else ""), "attestation": "gh attestation " + (toks[1] if len(toks) > 1 else "")}.get(first)
+        if key in _FLAGS:
+            i = 1 if first == "api" else 2
+            scan(key, stop=False)
+    return bad
+
+
 def hexd(seed):
     return hashlib.sha256(seed.encode()).hexdigest()
 
@@ -97,6 +152,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.bad_flags = []
         self.run_hang, self.run_names, self.stuck_oneoff = set(), [], set()
         self.hang, self.raise_cmd, self.hang_from = set(), {}, 10 ** 9
         self.config_wrapped = []
@@ -219,6 +275,10 @@ class World(object):
 
     def _gh(self, argv, stdin):
         env = self._last_env(argv) or {}
+        bad = bad_options(argv)
+        if bad:
+            self.bad_flags.append((list(argv), bad))
+            return 1, "", "unknown flag: %s\n" % bad[0][1]
         if self.gh_down:
             return 1, "", "error connecting to api.github.com\n"
         if "GH_TOKEN" not in env:
@@ -267,6 +327,10 @@ class World(object):
 
     def _docker(self, argv, stdin):
         self.docker_log.append(list(argv))
+        bad = bad_options(argv)
+        if bad:
+            self.bad_flags.append((list(argv), bad))
+            return 1, "", "unknown flag: %s\n" % bad[0][1]
         sub = argv[1]
         if sub == "pull":
             if argv[2] in self.registry:
