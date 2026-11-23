@@ -4,7 +4,6 @@ Exit codes: 0 done, nothing to do, busy or a transient outage; 1 refused or fail
 """
 import fcntl
 import os
-import socket
 import tempfile
 
 from lib import compose, compose_guard, release as rel, spool, stack, tokenexp
@@ -31,10 +30,6 @@ def take_lock(ctx, wait=0):
 
 
 def locked(project, ctx, first, wait=0, existing_data=False):
-    if first:
-        early = early_precheck(project, ctx)
-        if early:
-            return early
     fd = take_lock(ctx, wait)
     if fd is None:
         if first:
@@ -64,6 +59,11 @@ def _deploy(project, ctx, work, first, existing_data):
         tokenexp.refresh(ctx, tok, work)
         cur = rel.load_pointer(ctx, project, "current")
         rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)
+        if cur:  # a leftover first-attempt file beside `current` has no effect and is removed (S19)
+            try:
+                os.unlink(os.path.join(rel.sdir(ctx, project), "first-attempt"))
+            except FileNotFoundError:
+                pass
         if first and cur:
             raise Refusal("already-deployed", code=4)
         if not first and not cur:
@@ -162,9 +162,9 @@ def _gate(project, ctx, rdir, images, cur):
         new = rel.ts.read_text(os.path.join(rdir, "infra/postgres-major"))
         if old is None or old.strip() != (new or "").strip():
             raise Refusal("postgres-major", True)
-    owner = edge_decision(project, ctx)  # S16: the one ownership decision of this run, made once, before V7
+    owner = project == "prod"  # R9 strict: edge is prod's alone; a staging run never renders or ups it
     guard(project, ctx, rdir, images)
-    if owner in ("prod", "staging"):
+    if owner:
         guard("edge", ctx, rdir, images)
     return owner
 
@@ -192,59 +192,6 @@ def edge_domain(ctx):
     return None
 
 
-def name_resolves(ctx):
-    """R9, fail closed: only "no such name" (EAI_NONAME, EAI_NODATA) is not resolving; any other error, or no POLY_DOMAIN, counts as resolving."""
-    dom = edge_domain(ctx)
-    if not dom:
-        return True
-    try:
-        return bool(ctx.resolve("app." + dom))
-    except socket.gaierror as err:
-        return err.errno not in (socket.EAI_NONAME, socket.EAI_NODATA)
-    except OSError:
-        return True
-
-
-def caddy_rows(ctx):
-    """caddy rows `compose ps` lists for the edge project; None when ps fails."""
-    rows = compose.ps(ctx, "polycarpic-edge")
-    return None if rows is None else [r for r in rows if r.get("Service") == "caddy"]
-
-
-def edge_exists(ctx):
-    """A caddy container exists in the shared edge project (a staging-era or prod one). A failing `ps` counts as existing."""
-    rows = caddy_rows(ctx)
-    return rows is None or bool(rows)
-
-
-def edge_decision(project, ctx):
-    """R9, no side effects: who may touch edge in this run. -> "prod" | "staging" | "name" (skipped, raise edge-prod-name) | None.
-    A staging-only host's staging run owns it unless app.<domain> resolves; a failing `ps` counts as "prod exists"."""
-    if project == "prod":
-        return "prod"
-    prod_rows = compose.ps(ctx, "polycarpic-prod")
-    try:
-        prod_current = rel.load_pointer(ctx, "prod", "current")
-    except Refusal:
-        prod_current = True  # S17: an unparsable prod `current` is not absent
-    if prod_current or prod_rows is None or prod_rows:
-        return None
-    if name_resolves(ctx):
-        return "name"
-    return "staging"
-
-
-def early_precheck(project, ctx):
-    """S15, before anything is touched: the first prod deploy refuses while app.<domain> resolves and a staging-era caddy exists."""
-    try:
-        has_current = bool(rel.load_pointer(ctx, "prod", "current"))
-    except Refusal:
-        has_current = True
-    if project == "prod" and not has_current and edge_exists(ctx) and name_resolves(ctx):
-        ctx.err("deploy: refused edge-prod-name-early")
-        return 4
-    return None
-
 
 # ---- R6 steps 2-9 ----
 def _compose(ctx, argv, timeout=600):
@@ -258,11 +205,19 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
     cdir = rel.release_dir(ctx, cur["digest"]) if cur else rdir  # only a first deploy, with no `current`, starts the candidate's Postgres
     if cur:  # current's bundle is judged by the installed guard before any container of it is started (S3, S12)
         guard(project, ctx, cdir, stack.kinds(stack.refs(cdir)))
+    rerun = first and not cur and not existing_data and rel.read(ctx, project, "first-attempt") is not None  # an earlier attempt of this project
     if fresh:  # an empty data directory and no `current`: a rerun after `roles-missing` may proceed without --existing-data
         rel.put(ctx, project, "first-attempt", rel.now_utc(ctx) + "\n")
     _start_postgres(project, ctx, cdir)
-    if project == "prod" and (cur or existing_data):
-        _premigration(project, ctx)
+    # S19: a rerun skips the backup only when its own earlier attempt left an empty database; a table, or a failed or unparsable read, requires it
+    backup_needed = bool(cur or existing_data or (rerun and not _database_empty(project, ctx, cdir)))
+    if project == "prod" and backup_needed:
+        try:
+            _premigration(project, ctx)
+        except Refusal:
+            if rerun:
+                ctx.err("run: sudo polycarpic-ops provision --stage database --project " + project)
+            raise
     backup_fd = None
     if project == "prod":
         backup_fd = spool.lock(ctx, "backup.lock", wait=30 * 60)
@@ -282,6 +237,22 @@ def _start_postgres(project, ctx, cdir):
     code, _, _ = _compose(ctx, stack.up_argv(cdir, project, ["postgres"], ["--no-deps"]))
     if code != 0 or not stack.wait_healthy(ctx, project, cdir, ["postgres"], check_http=False):
         raise Refusal("postgres-start")
+
+
+SQL_TABLES = ("SET default_transaction_read_only = on;\n"
+              "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+              "WHERE c.relkind IN ('r','p','f','m') AND n.nspname NOT IN ('pg_catalog','information_schema') AND n.nspname !~ '^pg_toast';\n")
+
+
+def _database_empty(project, ctx, cdir):
+    """True only when the project's database holds no table outside the system schemas, read over the container's local socket."""
+    argv = stack.base(cdir, project) + ["exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic", "-XAtq", "-v", "ON_ERROR_STOP=1"]
+    try:
+        code, out, _ = ctx.run(argv, stdin=SQL_TABLES, timeout=30)
+    except TimeoutError:
+        return False
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    return code == 0 and bool(lines) and lines[-1] == "0"
 
 
 def _premigration(project, ctx):
@@ -317,12 +288,10 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner):
         raise Refusal("plan-diverged", True)
     elif code != 0:
         raise Refusal("plan-error")
-    # S16: the one ownership decision of this run was made before V7; nothing here adds to it
-    skipped = owner == "name"
-    owns = owner in ("prod", "staging")
+    owns = bool(owner)  # edge is prod's alone (R9 strict)
     probe, baseline_ok = _probe_baseline(project, ctx, first)
     if owns:
-        code = _edge_up(project, ctx, rdir, first and project == "prod", judged=True)
+        code = _edge_up(project, ctx, rdir, judged=True)
         if code != 0:
             return _rollback_auto(project, ctx, digest, cur, owns, probe)
     code, _, _ = _compose(ctx, stack.up_argv(rdir, project))
@@ -333,9 +302,6 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner):
         up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=extra)
     if up_ok:
         code = _healthy(project, ctx, rdir, digest, tag, commit, cur)
-        if skipped:  # the alert stays while the name resolves: this run left caddy as it was
-            rel.log(ctx, project, "refused", "edge-prod-name", "-")
-            rel.alert(ctx, project, "edge-prod-name")
         if probe and not baseline_ok:  # A13: the probe was not required, and the alert says so even when healthy
             rel.alert(ctx, project, "edge-probe-baseline")
         return code
@@ -368,35 +334,11 @@ def _probe_baseline(project, ctx, first):
     return probe, ok
 
 
-def _wipe(path):
-    for name in os.listdir(path):
-        full = os.path.join(path, name)
-        if os.path.isdir(full) and not os.path.islink(full):
-            rel.remove_tree(full)
-        else:
-            os.unlink(full)
-
-
-def _edge_up(project, ctx, rdir, first_prod, judged=False):
-    """R9: bring the shared Caddy up from this release. The first prod deploy stops a staging-era Caddy, empties its state and recreates it.
-    Refuses an edge render this run has not judged (S16)."""
-    if not judged:
+def _edge_up(project, ctx, rdir, judged=False):
+    """R9: bring the shared Caddy up from this prod release. Refuses an edge render this run has not judged."""
+    if not judged or project != "prod":
         raise Refusal("guard-edge", True)
-    if first_prod:
-        # every caddy container `ps` lists for the edge project is stopped and removed, with or without a staging `current`;
-        # the data directories are emptied only when a second `ps` shows none (R9: fail closed, `edge-wipe`)
-        head = stack.base(rdir, "edge", ctx.p("/etc/polycarpic/edge.env"))
-        if caddy_rows(ctx) != []:
-            _compose(ctx, head + ["stop", "caddy"])
-            _compose(ctx, head + ["rm", "-f", "caddy"])
-            if caddy_rows(ctx) != []:
-                raise Refusal("edge-wipe")
-        for d in ("/srv/polycarpic/caddy", "/srv/polycarpic/caddy-config"):
-            if os.path.isdir(ctx.p(d)):
-                _wipe(ctx.p(d))
-        if name_resolves(ctx):  # A11: the name may have appeared since the early check; stop before the recreate
-            raise Refusal("edge-prod-name-early", code=4)
-    argv = stack.up_argv(rdir, "edge", ["caddy"], ["--force-recreate"] if first_prod else [], ctx.p("/etc/polycarpic/edge.env"))
+    argv = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p("/etc/polycarpic/edge.env"))
     code, _, _ = _compose(ctx, argv)
     return code
 
@@ -454,11 +396,11 @@ def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None):
 
 def restore(project, ctx, ptr, owns=None, probe=None):
     """Bring a recorded release back up: tree-hash re-check, the guard on its render, `up`, health. -> True when healthy.
-    `owns` is the run's own edge decision (S16); a manual rollback, which has none, decides once here."""
+    Edge is prod's alone (R9 strict): a prod rollback restores Caddy too, a staging one never names it."""
     rdir = rel.release_dir(ctx, ptr["digest"])
     if not os.path.isdir(rdir) or stack.tree(rdir) != ptr["tree"]:
         return False
-    owner = owns if owns is not None else edge_decision(project, ctx) in ("prod", "staging")  # a failed release may have changed Caddy too
+    owner = project == "prod"
     try:
         images = stack.kinds(stack.refs(rdir))
         guard(project, ctx, rdir, images)

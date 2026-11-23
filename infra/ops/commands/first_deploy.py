@@ -33,6 +33,4 @@ def run(args, ctx):
         if c != 0:
             ctx.err("first-deploy: could not enable " + unit)
             return 1
-    if project == "prod":
-        ctx.out("first-deploy: now create the app. A/AAAA record for the prod domain; no earlier (INFRA 7.1)")
     return 0

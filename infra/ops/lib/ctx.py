@@ -5,7 +5,7 @@ Seams: run(argv, stdin, timeout, env) -> (code, stdout text, stderr text), raisi
 getpass(prompt); isatty(); confirm(prompt); now() -> aware UTC datetime; sleep(seconds); chown(fd_or_path, uid, gid); geteuid();
 tls_probe(host, port) -> {"ok": True, "not_after": datetime} | {"ok": False, "reason": str} (raises OSError when nothing answers);
 statvfs(path) with the host path; run_bytes(argv, stdin, timeout, env) -> (code, stdout bytes, stderr text) for a child that prints a tar
-(POLY-100 R4); resolve(name) -> [address], raising OSError when the name does not resolve (POLY-100 R9).
+(POLY-100 R4); https_status(host, addr, path) -> HTTP status of GET https://<host><path> at <addr>, raising OSError (POLY-100 A13).
 """
 import datetime
 import getpass as _getpass
@@ -91,10 +91,6 @@ def _real_https_status(host, addr, path):
     return int(parts[1])
 
 
-def _real_resolve(name):
-    return sorted(set(info[4][0] for info in socket.getaddrinfo(name, None)))
-
-
 def _real_run_inherit(argv, env=None, timeout=None):
     try:
         return subprocess.run(argv, env=env, shell=False, check=False, timeout=timeout).returncode
@@ -159,7 +155,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, resolve=None, stdin=None, https_status=None):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, stdin=None, https_status=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -178,7 +174,6 @@ class Ctx:
         self.trusted_uid = trusted_uid
         self.stdin = stdin or sys.stdin
         self._run_bytes = run_bytes or _real_run_bytes
-        self._resolve = resolve or _real_resolve
         self._https_status = https_status or _real_https_status
 
     def p(self, logical):
@@ -200,9 +195,6 @@ class Ctx:
     def run_bytes(self, argv, stdin=None, timeout=None, extra_env=None):
         self._check(argv)
         return self._run_bytes(list(argv), stdin, timeout, fixed_env(extra_env))
-
-    def resolve(self, name):
-        return self._resolve(name)
 
     def https_status(self, host, addr, path):
         return self._https_status(host, addr, path)
