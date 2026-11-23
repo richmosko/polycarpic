@@ -22,7 +22,8 @@ def render(files, project, env_files, raw, src=None):
         rel = tmp / "rel"
         d = rel / "infra" / "compose"
         d.mkdir(parents=True)
-        hosts = {"/etc/polycarpic/host.env": tmp / "prod-host.env", "/etc/polycarpic/staging-host.env": tmp / "staging-host.env"}
+        hosts = {"/etc/polycarpic/host.env": tmp / "prod-host.env", "/etc/polycarpic/staging-host.env": tmp / "staging-host.env",
+                 "/etc/polycarpic/mail.env": tmp / "mail.env", "/etc/polycarpic/staging-mail.env": tmp / "staging-mail.env"}
         for h in hosts.values():
             h.write_text("")
         src_dir = Path(src) if src else REPO / "infra" / "compose"

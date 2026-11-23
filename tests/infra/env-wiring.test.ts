@@ -17,17 +17,23 @@ function hostEnv(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of body[1].replace(/\\"/g, '"').split('\n')) {
     const m = /^([A-Z_]+)=(.*)$/.exec(line);
-    if (m) out[m[1]] = m[2].replace(/\$origin/, 'https://app.example.com').replace(/\$instance/, 'polycarpic-x').replace(/^"\$from"$/, '"Polycarpic <no-reply@mail.example.com>"').replace(/^"|"$/g, '');
+    if (m) out[m[1]] = m[2].replace(/\$origin/, 'https://app.example.com').replace(/\$instance/, 'polycarpic-x').replace(/^"|"$/g, '');
   }
   return out;
 }
 
 const FAULTS_THAT_MEAN_WIRING = new Set(['not_set', 'mismatch', 'invalid', 'forbidden', 'secret_in_env']); // not: a secret file that is absent on the runner
-export function notSet(cfg: any, svc: Service): string[] {
+/** S27: a mail file holds exactly one key, MAIL_FROM; the host file does not hold it (provision-check asserts both on the box). */
+const MAIL_ENV = { MAIL_FROM: 'Polycarpic <no-reply@mail.example.com>' };
+export function notSet(cfg: any, svc: Service, hostExtra: Record<string, string> = {}): string[] {
   const s = cfg.services[svc];
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(s.environment ?? {})) env[k] = String(v);
-  for (const f of s.env_file ?? []) if ((typeof f === 'string' ? f : f.path).includes('host.env')) Object.assign(env, hostEnv());
+  for (const f of s.env_file ?? []) { // later files override earlier ones, as Compose does
+    const path = typeof f === 'string' ? f : f.path;
+    if (path.endsWith('mail.env')) Object.assign(env, MAIL_ENV);
+    else if (path.endsWith('host.env')) Object.assign(env, hostEnv(), hostExtra);
+  }
   return checkConfig(svc, env).filter((p) => FAULTS_THAT_MEAN_WIRING.has(p.fault)).map((p) => `${p.var}:${p.fault}`);
 }
 
@@ -39,8 +45,22 @@ describe('T-env: every app service is wired for check-config', () => {
       });
     }
   }
-  it('the host env file carries the keys provision.sh promises', () => {
-    expect(Object.keys(hostEnv()).sort()).toEqual(expect.arrayContaining(['MAIL_FROM', 'PUBLIC_ORIGIN', 'TLS_MODE']));
+  it('the host env file carries the keys provision.sh promises and not MAIL_FROM (S27: mail.env holds it)', () => {
+    const keys = Object.keys(hostEnv());
+    expect(keys).toEqual(expect.arrayContaining(['PUBLIC_ORIGIN', 'TLS_MODE']));
+    expect(keys).not.toContain('MAIL_FROM');
+  });
+  it('the detector is live (S27): mail.env on web is reported, mail.env missing from worker is reported, MAIL_FROM back in host.env is reported', () => {
+    for (const project of ['staging', 'prod']) {
+      const mail = project === 'prod' ? '/etc/polycarpic/mail.env' : '/etc/polycarpic/staging-mail.env';
+      const onWeb = render(project);
+      onWeb.services.web.env_file.push(mail);
+      expect(notSet(onWeb, 'web'), `${project} web with mail.env`).toContain('MAIL_FROM:forbidden');
+      const noMail = render(project);
+      noMail.services.worker.env_file = noMail.services.worker.env_file.filter((f: any) => !(typeof f === 'string' ? f : f.path).endsWith('mail.env'));
+      expect(notSet(noMail, 'worker'), `${project} worker without mail.env`).toContain('MAIL_FROM:not_set');
+      expect(notSet(render(project), 'web', { MAIL_FROM: 'Polycarpic <no-reply@mail.example.com>' }), `${project} web with MAIL_FROM in host.env`).toContain('MAIL_FROM:forbidden');
+    }
   });
   it('the detector is live: renaming DATABASE_PASSWORD_FILE to DB_PASSWORD_FILE (the pre-R11 shape) is reported', () => {
     const cfg = render('staging');

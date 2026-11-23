@@ -5,6 +5,8 @@ from deploy_base import DeployTest, digest
 from test_deploy_bundle import good_files, make_tar, sibling_digests
 
 EDGE = "polycarpic-edge-prod"
+S_HOST = "/etc/polycarpic/staging-host.env"
+S_MAIL = "/etc/polycarpic/staging-mail.env"
 
 
 def both(fn):
@@ -93,6 +95,18 @@ CASES = [
     ("external name polycarpic-prod_default behind key default (S14)", both(lambda d: d["networks"].update(default={"name": "polycarpic-prod_default", "external": True}) or d), "network"),
     ("an edge alias naming polycarpic-edge-prod behind the staging edge key (S14)", both(lambda d: d["networks"].update({"edge-staging": {"name": EDGE, "external": True}}) or d), "network"),
     ("a published port on a non-caddy service", both(svc("web", ports=[{"mode": "ingress", "target": 3000, "published": "3000", "protocol": "tcp"}])), ("ports", "key")),
+    # S27 (ruling-review.md @ d6cb5d6b): the env_file list of each service is exact and ordered; only the raw render keeps it
+    ("mail.env on web", raw_only(svc("web", env_file=[S_HOST, S_MAIL])), "env"),
+    ("auth missing its mail.env (a subset)", raw_only(svc("auth", env_file=[S_HOST])), "env"),
+    ("auth with the two files swapped", raw_only(svc("auth", env_file=[S_MAIL, S_HOST])), "env"),
+    ("auth naming prod's mail.env in staging", raw_only(svc("auth", env_file=[S_HOST, "/etc/polycarpic/mail.env"])), "env"),
+    ("a third file on worker", raw_only(svc("worker", env_file=[S_HOST, S_MAIL, "/etc/polycarpic/extra.env"])), "env"),
+    ("a duplicate on auth", raw_only(svc("auth", env_file=[S_HOST, S_HOST, S_MAIL])), "env"),
+    ("required: false on web", raw_only(svc("web", env_file=[{"path": S_HOST, "required": False}])), "env"),
+    ("a relative path on web", raw_only(svc("web", env_file=["staging-host.env"])), "env"),
+    ("a .. path resolving to the allowed one", raw_only(svc("web", env_file=["/etc/polycarpic/../polycarpic/staging-host.env"])), "env"),
+    ("web with no list at all", raw_only(delkey("web", "env_file")), "env"),
+    ("postgres with a list", raw_only(svc("postgres", env_file=[S_HOST])), ("env", "key")),
 ]
 
 

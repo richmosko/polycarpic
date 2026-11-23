@@ -46,6 +46,10 @@ describe('guard on real compose renders (POLY-100 R5, S10, S14)', () => {
     ['privileged: true', (y) => { web(y).privileged = true; }, ['guard-key']],
     ['network_mode: container:polycarpic-prod-web-1 (S10)', (y) => { web(y).network_mode = 'container:polycarpic-prod-web-1'; }, ['guard-key', 'RENDER']], // real compose may refuse to render it at all: either way the box refuses (guard-render)
     ['a staging env_file of the prod host env (S10: only the raw render keeps env_file)', (y) => { web(y).env_file = ['/etc/polycarpic/host.env']; }, ['guard-env']],
+    ['S27: mail.env on web', (y) => { web(y).env_file = ['/etc/polycarpic/staging-host.env', '/etc/polycarpic/staging-mail.env']; }, ['guard-env']],
+    ['S27: web with no env_file list at all', (y) => { delete web(y).env_file; }, ['guard-env']],
+    ['S27: auth with the host and mail files swapped', (y) => { y.services.auth.env_file = ['/etc/polycarpic/staging-mail.env', '/etc/polycarpic/staging-host.env']; }, ['guard-env']],
+    ['S27: auth naming prod\'s mail file in staging', (y) => { y.services.auth.env_file = ['/etc/polycarpic/staging-host.env', '/etc/polycarpic/mail.env']; }, ['guard-env']],
     ['user: "0"', (y) => { web(y).user = '0'; }, ['guard-pinned']],
     ['cap_drop removed', (y) => { web(y).cap_drop = []; }, ['guard-pinned']],
     ['a bind of / on postgres', (y) => { y.services.postgres.volumes = [...(y.services.postgres.volumes ?? []), '/:/host']; }, ['guard-mount']],
