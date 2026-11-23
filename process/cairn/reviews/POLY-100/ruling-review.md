@@ -450,3 +450,9 @@ when `aclexplode` gives poly_backup exactly CONNECT without grant option, on eve
 - **Test, carried from above:** T-pre adds TEMPORARY granted to poly_backup on a **sibling** database. It must be
   refused through the shared `pg_database` row, and go red on a mutant that exempts every `pg_database` row. The diff
   does not add it yet.
+
+### R12(a) edits @ `cc8f5ba6`
+
+**Met.** The `pg-hba-prod` rule names R12(a), with devops building the lint edit. T-pre carries TEMPORARY on a sibling
+database, refused through the shared `pg_database` row, red on a mutant exempting every `pg_database` row. The file name
+is corrected. Nothing else in `ruling.md` changed (`580be11e..cc8f5ba6`). The plan gate stays open.
