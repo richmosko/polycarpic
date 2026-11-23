@@ -581,3 +581,24 @@ and it alerts. S19 is not in this diff and stays open.
   refuses an `edge.env` value with whitespace other than the single spaces `POLY_STAGING_ALLOW` needs, or with a brace.
 - *T-caddy adds:* `@denied` moved below `basic_auth`; a literal `POLY_TLS` value with a newline; a `command` on caddy; an
   `edge.env` value with a newline and one with `}`. Red on a mutant comparing counts only.
+
+## Draft: what a guard refusal tells the operator (architect-100, not yet in the ruling)
+
+**Agree to the shape, with S21. Not as worded.** Sources, closed templates, no command for `current`, review before
+install, the unsigned wording, and T-help: agree.
+
+**S21.**
+- *(a) No checkout of C.* `git switch --detach <C>` is itself a run of C: this repository sets `core.hooksPath` to the tracked
+  `.githooks`, so a `post-checkout` in C runs on the laptop with the SSH key loaded (read from the git config; not run).
+  The review covers `infra` and `packages/db/sql`, so it never shows that file, or `.claude/settings.json`, whose hooks run
+  when a session next starts there. *Required:* `install.sh` gains `--commit <40 hex>`; the operator's already trusted
+  `install.sh` ships `git archive <C>`, refuses a commit that is not an ancestor of `origin/main`, and needs no checkout.
+- *(b) The diff shows what is shipped, unhidden.* `git diff --text --no-ext-diff --no-textconv <base> <C> -- infra packages/db/sql`
+  plus `':(glob)**/.gitattributes'`: `git archive` reads attributes from C, and `export-ignore` can drop a file.
+- *(c) Same commit.* Review and install name the same full C, never a branch. Prod's step 1 also runs `git verify-tag <tag>` on the
+  laptop, so prod's signature is checked somewhere the box cannot lie.
+- *(d) Not by email.* POLY-103 sends line 1 only. A command to run as root must not arrive in a message anyone can imitate.
+- *Wording:* "Nothing of it ran" becomes "None of its containers was started".
+- *T-help adds:* the text holds no `switch`, `checkout` or `pull`; `install.sh --commit` ships C while HEAD is elsewhere; a
+  commit not on `origin/main` is refused, exit 2, before any ssh; a `post-checkout` hook planted in C leaves no canary.
+- *Limit:* root on the box (A6) can print any text. The runbook says to compare the command with INFRA before running it.
