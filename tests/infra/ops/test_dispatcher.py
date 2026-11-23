@@ -80,9 +80,9 @@ class Dispatcher(OpsTest):
         self.assertTrue(want)
         self.assertEqual(got, want)
 
-    def test_the_thirteen_subcommands_exist(self):
+    def test_the_fifteen_subcommands_exist(self):
         self.assertEqual(sorted(modules()), sorted(["set_secret", "list_secrets", "status", "gate_check", "provision", "provision_check", "restart", "cli", "backup", "upload",
-                                                    "deploy", "first_deploy", "rollback", "allowed_signers"]))  # POLY-99 adds backup and upload; POLY-100 adds the four deploy commands
+                                                    "deploy", "first_deploy", "rollback", "allowed_signers", "edge_deploy", "staging_auth"]))  # POLY-99 adds backup and upload; POLY-100 adds six: deploy, first-deploy, rollback, allowed-signers, edge-deploy, staging-auth
 
     def _copy_tree(self):
         need(OPS)

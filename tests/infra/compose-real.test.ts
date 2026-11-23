@@ -36,7 +36,19 @@ describe('guard on real compose renders (POLY-100 R5, S10, S14)', () => {
     expect(g.status, g.stderr).toBe(0);
     const names = readdirSync(join(FX, 'compose')).sort();
     expect(readdirSync(d).sort()).toEqual(names);
-    for (const n of names) expect(readFileSync(join(d, n), 'utf8'), n).toBe(readFileSync(join(FX, 'compose', n), 'utf8'));
+    // Key order is a compose-version detail (CI's compose prints `healthcheck` and `restart` in another place than a laptop's): compare parsed, key-sorted JSON. A difference in content still fails.
+    const canon = (v: any): any => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+    for (const n of names) expect(canon(JSON.parse(readFileSync(join(d, n), 'utf8'))), n).toEqual(canon(JSON.parse(readFileSync(join(FX, 'compose', n), 'utf8'))));
+  });
+
+  it('the fixture comparison ignores key order and nothing else (a one-value change in a regenerated render is a difference)', () => {
+    const canon = (v: any): any => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+    const a = JSON.parse(readFileSync(join(FX, 'compose', 'edge.plain.json'), 'utf8'));
+    const reordered = Object.fromEntries(Object.entries(a).reverse());
+    expect(JSON.stringify(canon(reordered))).toBe(JSON.stringify(canon(a)));
+    const changed = JSON.parse(JSON.stringify(a));
+    changed.services.caddy.restart = 'no';
+    expect(JSON.stringify(canon(changed))).not.toBe(JSON.stringify(canon(a)));
   });
 
   it('the shipped staging.yml passes the installed policy', () => expect(judge(() => {})).toBe('PASS'));

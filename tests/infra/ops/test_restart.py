@@ -1,16 +1,23 @@
 """POLY-98 R9: restart, then poll health for up to 120 s (fake clock)."""
+import os
 import unittest
 
 from base import FIXED_ENV, OpsTest, Runner, ps_json
 
 
 class Restart(OpsTest):
+    def setUp(self):
+        super().setUp()
+        # POLY-100 S30: `restart caddy` reads the staging basic-auth file first; a good one in its 0750 directory, owned root:10010 as far as the ctx.owner_of seam says
+        self.host.mkdir("/etc/polycarpic/secrets/caddy", 0o750)
+        self.host.write("/etc/polycarpic/secrets/caddy/staging_basic_auth", "staging $2y$10$" + "a1B./" * 10 + "xyz" + "\n", 0o440)
+
     def go(self, argv, ps_after, project="prod"):
         runner = Runner(None)
         state = {"restarted": False}
         runner.on(("restart",), fn=lambda argv, stdin: (state.__setitem__("restarted", True) or (0, "", "")))
         runner.on(lambda a: "ps" in a, fn=lambda argv, stdin: (0, ps_json(ps_after), ""))
-        return self.host.go("restart", *argv, runner=runner)
+        return self.host.go("restart", *argv, runner=runner, ctx_extra={"owner_of": lambda fd, path: (os.getuid(), 10010)})
 
     def test_unknown_service_exits_2_listing_the_valid_names_and_runs_nothing(self):
         r = self.go(["frobnicate"], {})
