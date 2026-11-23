@@ -395,6 +395,58 @@ On DR2: if qa confirms that the existing case prints `FAIL DR2` on the real buil
 mutant, that is the red proof. I then withdraw the single-fault case as a requirement. It remains a suggestion for the
 WAL copy of the comparison, which the existing case may not reach.
 
+### DR8 when no scratch exists @ `a929a3fb` (`git diff a937f9a5..a929a3fb -- infra`: `drill.sh`, 2 lines)
+
+**Accepted.** On the branch where the two restores did not both come up, DR8 now prints FAIL instead of SKIP. The
+branch is entered when either restore is missing, not only the dump, so the message's "there is no restored dump
+instance" is inaccurate when only the base failed. The verdict is FAIL either way. Text advisory only.
+
+### Every SKIP in `drill.sh`, and every check that can go unprinted
+
+The verdict is: FAIL lines → `DRILL FAILED` (exit 1); otherwise SKIP lines → `DRILL PASSED WITH SKIPS` (exit 3);
+otherwise `DRILL PASSED` (exit 0). The GA gate accepts exit 0 only.
+
+| Where | When | Can the verdict pass with the thing unexamined? |
+|---|---|---|
+| line 93, `res SKIP` for DR1/DR2/DR11 | selection or download refused | No: the `res FAIL <FAILED_ID>` just before makes it `DRILL FAILED`. |
+| line 95, `skip_rest DR3`–`DR9` | the same | No, for the same reason. |
+| line 167, DR9 SKIP | no ledger table under the pinned names | **Exit: no** (3, never 0). **Text: yes**, it says "PASSED". See F6(b). |
+| line 174, `skip_rest DR9` | a restore missing | No: DR7 and DR8 FAIL there. |
+| **DR5/DR6 loop, `[ -n "$c" ] \|\| continue`** | an instance missing | **Prints nothing for that instance, neither SKIP nor FAIL.** Today a FAIL from DR4 or DR7 always accompanies it, but only by coincidence of the code's shape. See F6(a). |
+| **DR6 itself** | always | **Vacuous.** It checks that each `roles.sql` role exists **after** `roles.sql` has just been re-run, and `roles.sql` creates any that are missing. So DR6 cannot fail unless `roles.sql` itself failed, and it never examines what it is for: that the **globals file** carried the roles (C-73, INFRA §6.7). See F7. |
+
+**F6. The drill passes only on positive evidence.**
+- **(a) Every check must be present.**
+  - The verdict reads the expected set DR1–DR11.
+  - Any id with no line at all is a FAIL (`<id> did not run`).
+  - An id needs a PASS on **each** instance it covers: DR5 and DR6 on both, the rest once.
+  - *Test:* a mutant that deletes DR10's block, and one that turns the DR5/DR6 loop's `continue` into a silent skip
+    for BASE while both restores succeed. Both must give `DRILL FAILED: DR10` and `DRILL FAILED: DR5, DR6`. Today both
+    print `DRILL PASSED WITH SKIPS: DR9`.
+- **(b) A skip never reads as a pass.**
+  - The exit-3 line becomes `DRILL INCOMPLETE: not checked: <ids>`, replacing `DRILL PASSED WITH SKIPS`. The exit
+    code is unchanged.
+  - R8's text and the tests follow it.
+  - *Why:* DR9 (trial balance, hash chain, newest entry) is the ledger's integrity check. While it is skipped, a drill
+    has not shown the ledger restores intact, and the record must not say "passed". The GA gate is unchanged (exit 0
+    only).
+  - *Test:* the happy run (no ledger) ends `DRILL INCOMPLETE: not checked: DR9`, with exit 3.
+
+**F7. DR6 examines the globals file, not `roles.sql`'s own work.**
+- On the **dump** instance, check that each `poly_*` role named in `roles.sql` exists **before** `roles.sql` is
+  re-run, right after the globals and the dump are restored.
+- Then re-run `roles.sql` for DR5 as now.
+- The base instance carries the cluster's own roles, so DR6 on base keeps the present check, before or after alike.
+- *Test:* a globals fixture with one `CREATE ROLE poly_…` line removed, for a role chosen so that the dump still
+  restores. If none is, the test asserts that DR6 FAILs on whichever instance came up, together with F6(a).
+- Expect `FAIL DR6 DUMP instance: missing roles: poly_…`.
+- Red: today's order, which prints PASS DR6.
+- *Note:* most missing roles are also caught indirectly, because `pg_restore` errors on an ALTER OWNER or a GRANT to
+  a role that does not exist, so the dump restore fails. F7 makes the named check true, rather than leaving it to
+  that accident.
+
+**My PASS is withheld at `a929a3fb`** until F6 and F7 land. After that I re-check `drill.sh` and their tests only.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
