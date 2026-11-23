@@ -348,11 +348,13 @@ if [ ! -f /var/lib/polycarpic/state/deploy/edge/current ] && [ ! -f /var/lib/pol
   wait_ H22 "staging-auth" "waits for: polycarpic-ops staging-auth (before the first edge or prod release)"
 else
   h22=''
+  # shellcheck disable=SC2016 # the single quotes are intended: grep must see a literal $, not an expansion
+  sa_re='staging \$2y\$10\$[./A-Za-z0-9]{53}'
   if [ -L "$sa" ] || [ ! -f "$sa" ]; then h22=" $sa is missing or a link;"
   else
     [ "$(stat -c '%a %u:%g' "$sa")" = "440 0:10010" ] || h22="$h22 file is $(stat -c '%a %u:%g' "$sa") (want 440 0:10010);"
     [ "$(stat -c '%a %u:%g' "$(dirname "$sa")")" = "750 0:10010" ] || h22="$h22 directory is $(stat -c '%a %u:%g' "$(dirname "$sa")") (want 750 0:10010);"
-    { [ "$(stat -c %s "$sa")" -le 128 ] && [ "$(LC_ALL=C grep -cxE 'staging \$2y\$10\$[./A-Za-z0-9]{53}' "$sa")" = 1 ] && [ "$(wc -l < "$sa")" -eq 1 ] && [ "$(stat -c %s "$sa")" = 69 ]; } || h22="$h22 content is not the one exact line;"
+    { [ "$(stat -c %s "$sa")" -le 128 ] && [ "$(LC_ALL=C grep -cxE "$sa_re" "$sa")" = 1 ] && [ "$(wc -l < "$sa")" -eq 1 ] && [ "$(stat -c %s "$sa")" = 69 ]; } || h22="$h22 content is not the one exact line;"
   fi
   report H22 "staging-auth" "$h22" "sudo polycarpic-ops staging-auth (paste the htpasswd -nBC 10 staging line), then sudo polycarpic-ops restart caddy"
 fi
