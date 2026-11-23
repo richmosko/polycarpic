@@ -1,7 +1,7 @@
 ---
 id: POLY-99e
 title: Backup verdict
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-99
 blocked_by: [POLY-99d]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-99.md, process/cairn/reviews/POLY-99/**, proce
 stage: review
 estimate.cost_usd: "6.00"
 estimate.gate_cycles: 3
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: null
 labels: [ops, backup]
 priority: null
 pr: null
