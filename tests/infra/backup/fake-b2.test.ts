@@ -49,6 +49,14 @@ describe('fake-b2 S3 half', () => {
     fake.mode('permissive');
     expect(client(`curl -s --cacert /ca.crt -o /dev/null -w "%{http_code}" -X DELETE ${URL}/o1`).out).toBe('204');
   });
+  it('DR10 verbs: PutObjectRetention and PutObjectLockConfiguration are 403, a conditional PUT over an existing name (If-None-Match: *) is 412; permissive allows them', () => {
+    client(put('o/exists'));
+    const c = 'curl -s --cacert /ca.crt -o /dev/null -w "%{http_code} " -X PUT --data-binary x';
+    const codes = () => client(`${c} "${URL}/o/exists?retention"; ${c} "${URL}/o/exists?object-lock"; ${c} -H "If-None-Match: *" ${URL}/o/exists; ${c} -H "If-None-Match: *" ${URL}/o/fresh`).out.trim();
+    expect(codes()).toBe('403 403 412 200'.replace(/ 200$/, ' 400')); // the last PUT carries no Content-MD5 here: a new name is not refused by the condition
+    fake.mode('permissive');
+    expect(codes().split(' ').slice(0, 3)).toEqual(['200', '200', '400']);
+  });
   it('a client without the test CA is refused by TLS (the real CA bundle is not what the fake presents)', () => {
     expect(client(`curl -s -o /dev/null -w "%{http_code}" ${URL}/o`).out).not.toBe('403');
   });

@@ -82,8 +82,16 @@ class S3(Base):
 
     def do_PUT(self):
         data = self.body()
-        log("PUT", self.who(), urlparse(self.path).path)
+        u = urlparse(self.path)
+        qs = parse_qs(u.query, keep_blank_values=True)
+        log("PUT", self.who(), u.path + ("?" + u.query if u.query else ""))
         mode = STATE["mode"]
+        if "retention" in qs or "object-lock" in qs:  # PutObjectRetention / PutObjectLockConfiguration: a writeFiles key may do neither
+            return self.send(200) if mode == "permissive" else self.deny()
+        _parts = u.path.lstrip("/").split("/", 1)
+        _name = unquote(_parts[1]) if len(_parts) == 2 else ""
+        if self.headers.get("If-None-Match") == "*" and STORE.get(_name) and mode != "permissive":
+            return self.send(412, "<Error><Code>PreconditionFailed</Code></Error>")
         if mode == "refuse":
             return self.deny()
         if mode == "5xx":
