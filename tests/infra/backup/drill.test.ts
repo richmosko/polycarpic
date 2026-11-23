@@ -1,48 +1,48 @@
-// POLY-99 R8 (infra/drill.sh): the §6.7 assertions DR1-DR11, the last line and exit code per outcome, --report. The drill runs restore.sh's
-// selection and restore code for BOTH --base and --dump into two scratch containers, so each run is slow; the cases are few and each one
-// shows a different check red. The set is REAL (backup.sh, archive-wal.sh, the real uploader) and re-planted into fake-b2 per case.
+// POLY-99 R8 (infra/drill.sh): the §6.7 assertions DR1-DR11, the last line and exit code per outcome, --report. SUITE DESIGN (ruling Guards @ 2bf5a6ba): two real
+// drill runs only (each restores --base and --dump into two scratch containers): one happy, and one carrying EVERY planted fault at once, whose single output
+// asserts each FAIL id. The set is the globalSetup's real one (backup.sh, archive-wal.sh), planted into fake-b2 per run.
 //
-// Pins 34-37 (test-plan.md): output lines are `PASS|FAIL|SKIP <id> <text>`; the last line `DRILL PASSED` (0), `DRILL PASSED WITH SKIPS: <ids>`
-// (3), `DRILL FAILED: <ids>` (1); usage 2. Today's schema has no ledger, so DR9 is SKIP and the happy run is exit 3. DR8 is PASS when
-// neither public.session nor app.session_handle exists (nothing to check). DR10 (architect, POLY-99.md @ e585d393) runs on a probe object `<instance>/drill/probe-<UTC TS>` the drill uploads with the box key, never on a backup
-// object: DELETE, `PUT ?retention` and `PUT ?object-lock` must be refused; a plain PUT over the probe's name passes only if the ORIGINAL version (by fileId) still
-// downloads with its original sha256.
-import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+// Pins 34-35 (test-plan.md): output lines are `PASS|FAIL|SKIP <id> <text>`; the last line `DRILL PASSED` (0), `DRILL PASSED WITH SKIPS: <ids>` (3) or
+// `DRILL FAILED: <ids>` (1); usage 2. Today's schema has no ledger, so DR9 is SKIP and the happy run is exit 3. DR8 is PASS when neither public.session nor
+// app.session_handle exists. DR10 (architect, POLY-99.md @ e585d393) runs on a probe object `<instance>/drill/probe-<UTC TS>` the drill uploads with the box
+// key, never on a backup object: DELETE, `PUT ?retention` and `PUT ?object-lock` must be refused; a plain PUT over the probe's name passes only if the ORIGINAL
+// version (by fileId) still downloads with its original sha256. The drill must continue past a failed check so one run reports every FAIL id.
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { type Files, collect, plantObject, plantVersion } from './artifacts.ts';
+import { type Files, fixtures, msToTs, plantObject, plantVersion, tsToMs } from './artifacts.ts';
 import { type Laptop, laptop } from './laptop.ts';
-import { APP_KEY, INSTANCE, KEY_ID, PROJECT, type Stack, sh, teardown, up } from './stack.ts';
-import { type Fake, runUploader, startFake } from './uploader.ts';
+import { APP_KEY, INSTANCE, KEY_ID, PROJECT, type Stack, attach, sh } from './stack.ts';
+import { type Fake, attachFake } from './uploader.ts';
 
 let s: Stack, fake: Fake, lap: Laptop;
 let setupError: string | null = null;
-let SET: Files = {}, WAL: Files = {};
+let SET: Files = {}, WAL: Files = {}, B: Files = {};
 let boxCred = '';
 
 beforeAll(() => {
   try {
-    s = up({ uploader: true }); fake = startFake(s); lap = laptop(s, fake);
-    expect(s.runBackup(['/usr/local/bin/backup.sh', 'nightly']).res.code).toBe(0);
-    s.superSql('SELECT pg_switch_wal()');
-    for (let i = 0; i < 60; i++) { if (s.ls('wal').some((n) => /^wal-\d+-\d+-[0-9A-F]{24}\.age$/.test(n))) { sh('sleep', ['3']); break; } sh('sleep', ['2']); }
-    SET = collect(s, 'dump'); WAL = collect(s, 'wal');
+    s = attach(); fake = attachFake(); lap = laptop(s, fake);
+    ({ A: SET, WAL, B } = fixtures());
     boxCred = join(lap.dir, 'box-credential');
     writeFileSync(boxCred, `${KEY_ID}\n${APP_KEY}\n`); chmodSync(boxCred, 0o600);
-    expect(runUploader(s).code).toBe(0);
-  } catch (e) { setupError = String((e as Error).message); teardown(); }
-}, 900_000);
-afterAll(() => { if (lap) lap.cleanup(); if (fake) fake.stop(); if (s) s.down(); });
-beforeEach(() => { if (setupError) throw new Error(setupError); lap.setFdesetup(0); });
+  } catch (e) { setupError = String((e as Error).message); }
+});
+afterAll(() => { if (lap) lap.cleanup(); if (fake) fake.reset(); });
+beforeEach(() => { if (setupError) throw new Error(setupError); lap.setFdesetup(0); fake.reset(); });
 
 const tsOf = (n: string) => /-(\d{8}T\d{6}Z)\.age$/.exec(n)![1]!;
-const tsMs = (ts: string) => Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts.slice(6, 8), +ts.slice(9, 11), +ts.slice(11, 13), +ts.slice(13, 15));
-const plant = (o: { replace?: Record<string, Buffer>; sibling?: 'wrong'; hideDump?: boolean } = {}) => {
-  fake.reset();
-  const up_ = tsMs(tsOf(Object.keys(SET)[0]!)) + 60_000;
-  for (const [n, b] of Object.entries(SET)) plantObject(fake, s.major, 'dump', n, o.replace?.[n.split('-')[0]!] ?? b, up_, { sibling: o.sibling === 'wrong' && n.startsWith('dump-') ? 'wrong' : true });
-  for (const [n, b] of Object.entries(WAL)) plantObject(fake, s.major, 'wal', n, b, up_);
-};
+const TS0 = () => tsOf(Object.keys(SET)[0]!);
+/** plant the set (as the uploader leaves it) and the WAL; `rename` maps each set name, `replace` swaps the bytes of one kind, `siblingWrong` names kinds whose sibling lies */
+function plant(o: { rename?: (n: string) => string; replace?: Record<string, Buffer>; siblingWrong?: string[]; uploadedMs?: number } = {}) {
+  const up = o.uploadedMs ?? tsToMs(TS0()) + 60_000;
+  const rn = o.rename ?? ((n: string) => n);
+  for (const [n, b] of Object.entries(SET)) {
+    const kind = n.split('-')[0]!;
+    plantObject(fake, s.major, 'dump', rn(n), o.replace?.[kind] ?? b, up, { sibling: o.siblingWrong?.includes(kind) ? 'wrong' : true });
+  }
+  for (const [n, b] of Object.entries(WAL)) plantObject(fake, s.major, 'wal', n, b, up);
+}
 const DRILL = (extra: string[] = []) => ['--identity', lap.identity, '--read-credential', lap.credential, '--bucket', 'poly-test-bucket', '--box-credential', boxCred, '--instance', INSTANCE, ...extra];
 const checks = (out: string) => Object.fromEntries(out.split('\n').flatMap((l) => { const m = /^(PASS|FAIL|SKIP) (DR\d+) ?(.*)$/.exec(l); return m ? [[m[2]!, { kind: m[1]!, text: m[3]! }]] : []; }));
 const last = (out: string) => out.trim().split('\n').pop() ?? '';
@@ -60,8 +60,8 @@ describe('drill.sh usage and hygiene (R8)', () => {
   });
 });
 
-describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report)', () => {
-  it('the happy run: PASS on DR1-DR8, DR10, DR11; SKIP DR9 (no ledger yet) -> `DRILL PASSED WITH SKIPS: DR9`, exit 3; --report writes the markdown the lead files', () => {
+describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two real runs', () => {
+  it('the happy run: PASS on DR1-DR8, DR10, DR11; SKIP DR9 (no ledger yet) -> `DRILL PASSED WITH SKIPS: DR9`, exit 3; --report writes the markdown the lead files; the probe is the only new object', () => {
     plant();
     const report = join(lap.dir, 'drill-report.md');
     const r = lap.run('drill.sh', DRILL(['--report', report]));
@@ -77,43 +77,30 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report)', () 
     for (const id of ['DR1', 'DR10', 'DR11']) expect(md).toContain(id);
     expect(lap.scratches()).toEqual([]); // scratch containers are removed on exit
     const st = fake.store();
-    const probes = Object.keys(st).filter((n) => n.startsWith(`${INSTANCE}/drill/probe-`));
-    expect(probes.length).toBeGreaterThanOrEqual(1); // DR10 ran against a probe, and every backup object still has exactly one version (DR1 on the next run)
-    for (const n of Object.keys(st).filter((k) => !k.startsWith(`${INSTANCE}/drill/`))) expect(st[n], n).toHaveLength(1);
+    expect(Object.keys(st).filter((n) => n.startsWith(`${INSTANCE}/drill/probe-`)).length).toBeGreaterThanOrEqual(1); // DR10 ran against a probe
+    for (const n of Object.keys(st).filter((k) => !k.startsWith(`${INSTANCE}/drill/`))) expect(st[n], n).toHaveLength(1); // every backup object still has one version (DR1 next time)
     expect(r.out + r.err).not.toContain(APP_KEY);
     expect(r.out + r.err).not.toContain(readFileSync(lap.identity, 'utf8').split('\n').find((l) => l.startsWith('AGE-SECRET-KEY-'))!);
+    expect(lap.dockerCalls().join('\n')).not.toContain(lap.identity);
   }, 600_000);
 
-  it('DR3: a globals file that carries role passwords is FAIL -> the last line names DR3, exit 1', () => {
+  it('every planted fault at once: DR1 (a second version of the dump plus a hide marker), DR2 (the base sibling lies), DR3 (globals with role passwords), DR10 (a permissive bucket), DR11 (an old dump under a fresh name) -> each FAIL id is in the one output and `DRILL FAILED: …` names them all, exit 1', async () => {
     const f = join(lap.dir, 'globals-with-passwords.age');
-    const rcpt = s.recipient.trim();
-    const mk = sh('bash', ['-c', `docker exec ${PROJECT}-postgres-1 pg_dumpall -U postgres --globals-only | age -r ${rcpt} -o '${f}'`]);
+    const mk = sh('bash', ['-c', `docker exec ${PROJECT}-postgres-1 pg_dumpall -U postgres --globals-only | age -r ${s.recipient.trim()} -o '${f}'`]);
     expect(mk.code, mk.err).toBe(0);
-    plant({ replace: { globals: readFileSync(f) } });
-    const r = lap.run('drill.sh', DRILL());
-    const c = checks(r.out);
-    expect(c.DR3?.kind, r.out.slice(-800)).toBe('FAIL');
-    expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR3\b/) });
-  }, 600_000);
-
-  it('DR10: a bucket that lets the box key delete, overwrite a version in place or change retention (fake-b2 permissive) is FAIL -> the last line names DR10, exit 1', () => {
-    plant();
+    const wait = tsToMs(TS0()) + 75_000 - Date.now(); // the fresh name's <TS> must be more than a minute after the dump's own archive time (DR11)
+    if (wait > 0) await new Promise((res) => setTimeout(res, wait));
+    const fresh = msToTs(Date.now() - 5_000);
+    plant({ rename: (n) => n.replace(TS0(), fresh), replace: { globals: readFileSync(f) }, siblingWrong: ['base'], uploadedMs: Date.now() - 1_000 });
+    const dumpName = Object.keys(SET).find((n) => n.startsWith('dump-'))!.replace(TS0(), fresh);
+    plantObject(fake, s.major, 'dump', dumpName, B[Object.keys(B).find((n) => n.startsWith('dump-'))!]!, Date.now(), { sibling: false }); // DR1: a newer second version
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/${dumpName}`, Buffer.from(''), Date.now() + 1_000, 'hide'); // and a hide marker after it
     fake.mode('permissive');
     const r = lap.run('drill.sh', DRILL());
-    expect(checks(r.out).DR10?.kind, r.out.slice(-800)).toBe('FAIL');
-    expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR10\b/) });
-  }, 600_000);
-
-  it('DR1: a hide marker on a chosen object is FAIL and lists it; DR2: a download that differs from its sibling is FAIL', () => {
-    plant();
-    plantVersion(fake, `${INSTANCE}/${s.major}/dump/${Object.keys(SET).find((n) => n.startsWith('dump-'))!}`, Buffer.from(''), tsMs(tsOf(Object.keys(SET)[0]!)) + 120_000, 'hide');
-    const r1 = lap.run('drill.sh', DRILL());
-    expect(checks(r1.out).DR1?.kind, r1.out.slice(-800)).toBe('FAIL');
-    expect(r1.out).toMatch(/hide/i);
-    expect({ code: r1.code, last: last(r1.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR1\b/) });
-    plant({ sibling: 'wrong' });
-    const r2 = lap.run('drill.sh', DRILL());
-    expect(checks(r2.out).DR2?.kind, r2.out.slice(-800)).toBe('FAIL');
-    expect({ code: r2.code, last: last(r2.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR2\b/) });
+    const c = checks(r.out);
+    for (const id of ['DR1', 'DR2', 'DR3', 'DR10', 'DR11']) expect({ id, kind: c[id]?.kind, out: r.out.slice(-1500) }).toMatchObject({ id, kind: 'FAIL' });
+    expect(r.out).toMatch(/hide/i);
+    expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: (?=.*\bDR1\b)(?=.*\bDR2\b)(?=.*\bDR3\b)(?=.*\bDR10\b)(?=.*\bDR11\b)/) });
+    expect(lap.scratches()).toEqual([]);
   }, 900_000);
 });

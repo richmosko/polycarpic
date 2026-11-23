@@ -6,7 +6,7 @@
 //  - ops.conf (`B2_BUCKET=`, `B2_S3_ENDPOINT=`) at /etc/uploader/ops.conf and host.env (`POLY_INSTANCE=`) at /etc/uploader/host.env.
 //  - The credential is /run/secrets/backup_store_credential: line 1 the key id, line 2 the application key.
 import { spawn } from 'node:child_process';
-import { chmodSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { INSTANCE, PROJECT, ROOT, S3_HOST, TOOLS, sh, type Res, type Stack } from './stack.ts';
 
@@ -33,13 +33,18 @@ export function startFake(s: Stack): Fake {
     '--entrypoint', 'python3', TOOLS, '/harness/fake_b2.py', '/pki/srv.crt', '/pki/srv.key']);
   if (r.code !== 0) throw new Error(`fake-b2 start failed: ${r.err}`);
   const port = sh('docker', ['port', name, '8080/tcp']).out.trim().split('\n')[0]!.split(':').pop()!;
+  const f = makeFake(name, `http://127.0.0.1:${port}`);
+  for (let i = 0; i < 40; i++) { if (f.ctl('log').startsWith('[')) break; sh('sleep', ['0.5']); if (i === 39) throw new Error(`fake-b2 not ready: ${sh('docker', ['logs', name]).err.slice(-400)}`); }
+  return f;
+}
+
+function makeFake(name: string, nativeUrl: string): Fake {
   const ctl: Fake['ctl'] = (path, o = {}) => {
     const args = ['exec', name, 'curl', '-s', '--max-time', '20', ...(o.post ? ['-X', 'POST'] : []), ...(o.file ? ['--data-binary', `@${o.file}`] : []), `http://127.0.0.1:8080/_fake/${path}`];
     return sh('docker', args).out;
   };
-  for (let i = 0; i < 40; i++) { if (ctl('log').startsWith('[')) break; sh('sleep', ['0.5']); if (i === 39) throw new Error(`fake-b2 not ready: ${sh('docker', ['logs', name]).err.slice(-400)}`); }
   return {
-    name, nativeUrl: `http://127.0.0.1:${port}`, ctl,
+    name, nativeUrl, ctl,
     mode: (m, delay = 0) => { ctl(`mode?v=${m}&delay=${delay}`); },
     log: () => JSON.parse(ctl('log')) as string[],
     store: () => JSON.parse(ctl('store')),
@@ -99,3 +104,9 @@ export async function uploaderDuring(s: Stack, during: (exec: (...argv: string[]
 }
 const composeFiles = (s: Stack) => ['-f', join(ROOT, 'infra', 'compose', 'prod.yml'), '-f', join(s.dir, 'override.yml')];
 export { INSTANCE };
+
+/** Attach to the fake-b2 the globalSetup started (POLY99_FAKE names its container and native URL). */
+export function attachFake(): Fake {
+  const { name, nativeUrl } = JSON.parse(readFileSync(process.env.POLY99_FAKE!, 'utf8')) as { name: string; nativeUrl: string };
+  return makeFake(name, nativeUrl);
+}

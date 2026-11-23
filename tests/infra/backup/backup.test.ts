@@ -3,15 +3,14 @@
 // "red on the fault" tests assert that the fault is observable, so a check that passes with and without the fix cannot hide here.
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BACKUP_SH, type Res, type Stack, execText, mutate, pgContainer, recipientsPath, sh, teardown, up } from './stack.ts';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { BACKUP_SH, type Res, type Stack, attach, execText, mutate, pgContainer, recipientsPath, sh } from './stack.ts';
 
 let s: Stack;
 let setupError: string | null = null;
 beforeAll(() => {
-  try { s = up(); } catch (e) { setupError = String((e as Error).message); teardown(); }
-}, 900_000);
-afterAll(() => { if (s) s.down(); });
+  try { s = attach(); } catch (e) { setupError = String((e as Error).message); }
+});
 const need = () => { if (setupError) throw new Error(setupError); };
 const REAL = '/usr/local/bin/backup.sh';
 const text = () => readFileSync(BACKUP_SH, 'utf8');
@@ -49,54 +48,49 @@ function effective10005(path: string): string {
   return m[2] ?? m[1]!;
 }
 
-describe('backup.sh usage and preconditions (R1): exit code, exact stderr, nothing on stdout, nothing written', () => {
-  const cases: Array<[string, string[], Record<string, string>, number, string]> = [
-    ['no mode', [], {}, 2, 'usage: backup.sh nightly|premigration'],
-    ['unknown mode', ['weekly'], {}, 2, 'usage: backup.sh nightly|premigration'],
-    ['a mode with extra text', ['nightly; id'], {}, 2, 'usage: backup.sh nightly|premigration'],
-    ['server major differs from the image major', ['nightly'], { PG_MAJOR: '16' }, 3, 'backup.sh: server major 17 does not match image major 16'],
-  ];
-  for (const [label, args, env, code, msg] of cases) {
-    it(`${label} -> exit ${code} \`${msg}\``, () => {
-      need();
-      const r = run(args, { env });
-      expect({ code: r.res.code, last: lastLine(r.res.err), out: r.res.out }).toEqual({ code, last: msg, out: '' });
-      expect(nothingPublished()).toEqual(EMPTY);
-    });
-  }
-
-  const rcpt = recipientsPath;
+describe('backup.sh usage and preconditions (R1): exit code, exact stderr, nothing on stdout, nothing written -- ONE container for the whole table', () => {
   const good = () => s.recipient.trim();
-  const rcases: Array<[string, () => string]> = [
-    ['two recipients', () => `${good()}\n${good()}\n`],
-    ['no recipient (empty file)', () => ''],
-    ['a line that is not an age1 recipient', () => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample\n'],
-    ['an age1 recipient with trailing text', () => `${good()} extra\n`],
-  ];
-  for (const [label, content] of rcases) {
-    it(`recipients file with ${label} -> exit 3 \`backup.sh: recipients file must hold exactly one age1 recipient\`, nothing written`, () => {
-      need();
-      writeFileSync(rcpt(s.dir), content());
+  const RC = 'backup.sh: recipients file must hold exactly one age1 recipient';
+  it('every bad invocation or precondition exits with its code and exact message, prints nothing on stdout and publishes nothing; the empty-password case writes no passfile; the positive twin then exits 0', () => {
+    need();
+    s.clearSpool();
+    const name = s.startBackupContainer();
+    const exec = (args: string[], env: Record<string, string> = {}) => {
+      const e = Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]);
+      return sh('docker', ['exec', ...e, name, REAL, ...args]);
+    };
+    try {
+      sh('docker', ['exec', name, 'bash', '-c', ': > /tmp/empty']);
+      const pw = exec(['nightly'], { DB_PASSWORD_FILE: '/tmp/empty' });
+      expect({ code: pw.code, last: lastLine(pw.err), out: pw.out }).toEqual({ code: 3, last: 'backup.sh: db password file is empty', out: '' });
+      expect(sh('docker', ['exec', name, 'bash', '-c', 'test ! -e /tmp/pgpass && echo none']).out.trim()).toBe('none'); // the passfile is not written before the check passes
+      const table: Array<[string, string[], Record<string, string>, number, string]> = [
+        ['no mode', [], {}, 2, 'usage: backup.sh nightly|premigration'],
+        ['unknown mode', ['weekly'], {}, 2, 'usage: backup.sh nightly|premigration'],
+        ['a mode with extra text', ['nightly; id'], {}, 2, 'usage: backup.sh nightly|premigration'],
+        ['server major differs from the image major', ['nightly'], { PG_MAJOR: '16' }, 3, 'backup.sh: server major 17 does not match image major 16'],
+      ];
+      for (const [label, args, env, code, msg] of table) {
+        const r = exec(args, env);
+        expect({ label, code: r.code, last: lastLine(r.err), out: r.out }).toEqual({ label, code, last: msg, out: '' });
+      }
+      const rcases: Array<[string, string]> = [
+        ['two recipients', `${good()}\n${good()}\n`],
+        ['no recipient (empty file)', ''],
+        ['a line that is not an age1 recipient', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexample\n'],
+        ['an age1 recipient with trailing text', `${good()} extra\n`],
+      ];
       try {
-        const r = run(['nightly']);
-        expect({ code: r.res.code, last: lastLine(r.res.err), out: r.res.out }).toEqual({ code: 3, last: 'backup.sh: recipients file must hold exactly one age1 recipient', out: '' });
-        expect(nothingPublished()).toEqual(EMPTY);
-      } finally { writeFileSync(rcpt(s.dir), s.recipient); }
-    });
-  }
-
-  it('an empty password file -> exit 3 `backup.sh: db password file is empty`, nothing written, no passfile in /tmp', () => {
-    need();
-    const r = run(['nightly'], { env: { DB_PASSWORD_FILE: '/tmp/empty' }, pre: ': > /tmp/empty' });
-    expect({ code: r.res.code, last: lastLine(r.res.err), out: r.res.out }).toEqual({ code: 3, last: 'backup.sh: db password file is empty', out: '' });
-    expect(nothingPublished()).toEqual(EMPTY);
-    expect(r.events.filter((l) => /\/pgpass$/.test(l))).toEqual([]); // the passfile is not written before the check passes
-  });
-
-  it('the positive twin: the same invocation with the good recipient, password and major exits 0', () => {
-    need();
-    const r = run(['nightly']);
-    expect({ code: r.res.code, err: r.res.err.slice(-200) }).toEqual({ code: 0, err: expect.any(String) });
+        for (const [label, content] of rcases) {
+          writeFileSync(recipientsPath(s.dir), content);
+          const r = exec(['nightly']);
+          expect({ label, code: r.code, last: lastLine(r.err), out: r.out }).toEqual({ label, code: 3, last: RC, out: '' });
+        }
+      } finally { writeFileSync(recipientsPath(s.dir), s.recipient); }
+      expect(nothingPublished()).toEqual(EMPTY);
+      const ok = exec(['nightly']);
+      expect({ code: ok.code, err: ok.err.slice(-200) }).toEqual({ code: 0, err: expect.any(String) });
+    } finally { sh('docker', ['rm', '-f', name]); s.clearSpool(); }
   });
 });
 

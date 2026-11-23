@@ -39,7 +39,9 @@ export function laptop(s: Stack, fake?: Fake): Laptop {
   const realDocker = sh('bash', ['-c', 'command -v docker']).out.trim();
   const realAge = sh('bash', ['-c', 'command -v age']).out.trim();
   // age is a logging wrapper; the scratch containers get a --label so a test can find and remove its own
-  w(join(bin, 'docker'), `#!/bin/bash\nprintf '%s\\n' "$*" >> '${dockerLog}'\nexec '${realDocker}' "$@"\n`);
+  // POLY99_SCRATCH_FAIL=1 makes `docker run` (the scratch start) fail at once after it is logged: a case that only needs to see whether the script GOT to the
+  // scratch (a refusal exits before it; a mutant without the check reaches it) never pays for a real restore (ruling Guards @ 2bf5a6ba).
+  w(join(bin, 'docker'), `#!/bin/bash\nprintf '%s\\n' "$*" >> '${dockerLog}'\nif [ "$1" = run ] && [ -n "\${POLY99_SCRATCH_FAIL:-}" ]; then echo "docker: scratch start refused by the test shim" >&2; exit 125; fi\nexec '${realDocker}' "$@"\n`);
   w(join(bin, 'age'), `#!/bin/bash\nprintf '%s\\n' "$*" >> '${ageLog}'\nexec '${realAge}' "$@"\n`);
   w(join(bin, 'fdesetup'), `#!/bin/bash\nexit "$(cat '${join(dir, 'fde')}')"\n`);
   w(join(bin, 'uname'), `#!/bin/bash\nif [ "$1" = "-s" ] || [ $# = 0 ]; then echo Darwin; else exec /usr/bin/uname "$@"; fi\n`);

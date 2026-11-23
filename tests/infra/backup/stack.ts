@@ -20,7 +20,8 @@ import { stringify } from 'yaml';
 export const ROOT = join(dirname(new URL(import.meta.url).pathname), '..', '..', '..');
 export const IMG = 'poly99-pg:test';
 export const TOOLS = 'poly99-tools:test';
-export const PROJECT = `poly99qa${process.pid}`;
+// One stack for the whole suite (architect, ruling Guards @ 2bf5a6ba): the globalSetup brings it up and exports its name; every file attaches.
+export const PROJECT = process.env.POLY99_PROJECT ?? `poly99qa${process.pid}`;
 
 export type Res = { code: number; out: string; err: string };
 export function sh(cmd: string, args: string[], o: { input?: string; env?: Record<string, string>; timeout?: number } = {}): Res {
@@ -34,7 +35,7 @@ export const R2_DUMP = /^(base|dump|globals)-([0-9]{2})-([0-9]{1,20})-([0-9]{8}T
 export const AGE_HEADER = 'age-encryption.org/v1';
 
 export type Stack = {
-  dir: string; env: Record<string, string>; cfg: any; canary: string; sys: string; major: string; identity: string; recipient: string;
+  dir: string; env: Record<string, string>; cfg: any; canary: string; sys: string; major: string; identity: string; recipient: string; info: StackInfo;
   vol: (d: Dir) => string;
   compose: (...a: string[]) => Res;
   superSql: (sql: string, db?: string) => string;
@@ -161,30 +162,13 @@ export function up(opts: UpOpts = {}): Stack {
   writeFileSync(ovFile, ovText);
   rootRun(['chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv', ...chowns].join(' && '));
 
-  const tools = (script: string, o: { rw?: boolean; input?: string } = {}) =>
-    sh('docker', ['run', '--rm', '-i', ...DIRS.flatMap((d) => ['-v', `${vol(d)}:/s/${d}${o.rw === false ? ':ro' : ''}`]), '--entrypoint', 'bash', TOOLS, '-c', script], { input: o.input });
-  // The spool as POLY-99 provisions it (R10, C3). 10004 owns dump/ and premigration/; 10005 has r-x, never write.
-  const spoolSetup = [
-    'set -e',
-    'chown 999:999 /s/wal && chmod 0700 /s/wal && setfacl -m u:10005:r-x /s/wal && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/wal',
-    'for d in dump premigration; do',
-    '  chown 10004:10004 /s/$d && chmod 0700 /s/$d',
-    '  setfacl -m u:10005:r-x /s/$d && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/$d',
-    '  mkdir -p /s/$d/.inflight && chown 10004:10004 /s/$d/.inflight && chmod 0700 /s/$d/.inflight',
-    '  setfacl -x u:10005 /s/$d/.inflight && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-- /s/$d/.inflight',
-    'done',
-  ].join('\n');
-  const sp = tools(spoolSetup);
+  const info: StackInfo = { dir, env, cfg, identity, recipient, canary: '', sys: '', major: '' };
+  const s = makeStack(info, true);
+  const sp = s.tools(SPOOL_SETUP);
   if (sp.code !== 0) throw new Error(`spool setup failed: ${sp.err}`);
-
-  const compose = (...a: string[]) => sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, ...a], { env });
-  const u = compose('up', '-d', '--wait', '--wait-timeout', '120', 'postgres');
+  const u = s.compose('up', '-d', '--wait', '--wait-timeout', '120', 'postgres');
   if (u.code !== 0) throw new Error(`compose up postgres failed: ${u.err.slice(-800)}`);
-  const superSql = (sql: string, db = 'polycarpic') => {
-    const r = compose('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', db, '-X', '-tA', '-v', 'ON_ERROR_STOP=1', '-c', sql);
-    if (r.code !== 0) throw new Error(r.err || r.out);
-    return r.out.trim();
-  };
+  const superSql = s.superSql;
   superSql('CREATE DATABASE polycarpic', 'postgres');
   const rr = sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, 'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'polycarpic', '-X', '-v', 'ON_ERROR_STOP=1', '-f', '-'],
     { env, input: readFileSync(join(ROOT, 'packages', 'db', 'sql', 'roles.sql'), 'utf8') });
@@ -195,9 +179,47 @@ export function up(opts: UpOpts = {}): Stack {
   superSql(`CREATE TABLE public.canary_t (v text); ALTER TABLE public.canary_t ENABLE ROW LEVEL SECURITY; ALTER TABLE public.canary_t FORCE ROW LEVEL SECURITY; CREATE POLICY p ON public.canary_t USING (true); INSERT INTO public.canary_t VALUES ('${canary}'); GRANT SELECT ON public.canary_t TO poly_backup`);
   // C1: the scratch dump must exceed 1 MiB (the backup container's /tmp cap) or a /tmp detour would fit and stay invisible: 6 MiB of random hex
   superSql("CREATE TABLE public.pad_t (g int, v text); INSERT INTO public.pad_t SELECT g, string_agg(md5(random()::text || g || i), '') FROM generate_series(1, 6) g, generate_series(1, 32768) i GROUP BY g; GRANT SELECT ON public.pad_t TO poly_backup");
-  const sys = superSql('SELECT system_identifier FROM pg_control_system()');
-  const major = superSql("SELECT current_setting('server_version_num')::int / 10000");
+  info.canary = canary;
+  info.sys = superSql('SELECT system_identifier FROM pg_control_system()');
+  info.major = superSql("SELECT current_setting('server_version_num')::int / 10000");
+  s.canary = info.canary; s.sys = info.sys; s.major = info.major;
+  return s;
+}
 
+export type StackInfo = { dir: string; env: Record<string, string>; cfg: any; identity: string; recipient: string; canary: string; sys: string; major: string };
+
+/** The spool as POLY-99 provisions it (R10, C3). 10004 owns dump/ and premigration/; 10005 has r-x, never write. */
+const SPOOL_SETUP = [
+  'set -e',
+  'chown 999:999 /s/wal && chmod 0700 /s/wal && setfacl -m u:10005:r-x /s/wal && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/wal',
+  'for d in dump premigration; do',
+  '  chown 10004:10004 /s/$d && chmod 0700 /s/$d',
+  '  setfacl -m u:10005:r-x /s/$d && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/$d',
+  '  mkdir -p /s/$d/.inflight && chown 10004:10004 /s/$d/.inflight && chmod 0700 /s/$d/.inflight',
+  '  setfacl -x u:10005 /s/$d/.inflight && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-- /s/$d/.inflight',
+  'done',
+].join('\n');
+
+/** Attach to the stack the globalSetup brought up (its facts are in the file named by POLY99_INFO). `down` leaves the stack to the globalSetup. */
+export function attach(): Stack {
+  const info = JSON.parse(readFileSync(process.env.POLY99_INFO!, 'utf8')) as StackInfo;
+  return makeStack(info, false);
+}
+
+function makeStack(info: StackInfo, owner: boolean): Stack {
+  const { dir, env, cfg, identity, recipient } = info;
+  const base = join(ROOT, 'infra', 'compose', 'prod.yml');
+  const ovFile = join(dir, 'override.yml');
+  const vol = (d: Dir) => `${PROJECT}-${d}`;
+  const rootRun = (script: string) => sh('docker', ['run', '--rm', '-v', `${dir}:/w`, '--entrypoint', 'sh', IMG, '-c', script]);
+  const tools = (script: string, o: { rw?: boolean; input?: string } = {}) =>
+    sh('docker', ['run', '--rm', '-i', ...DIRS.flatMap((d) => ['-v', `${vol(d)}:/s/${d}${o.rw === false ? ':ro' : ''}`]), '--entrypoint', 'bash', TOOLS, '-c', script], { input: o.input });
+  const compose = (...a: string[]) => sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, ...a], { env });
+  const superSql = (sql: string, db = 'polycarpic') => {
+    const r = compose('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', db, '-X', '-tA', '-v', 'ON_ERROR_STOP=1', '-c', sql);
+    if (r.code !== 0) throw new Error(r.err || r.out);
+    return r.out.trim();
+  };
   const ls = (d: Dir, hidden = false) => {
     const r = tools(`ls -A /s/${d}${hidden ? '/.inflight' : ''}`, { rw: false });
     return r.out.split('\n').map((x) => x.trim()).filter((x) => x && (hidden || x !== '.inflight'));
@@ -214,7 +236,7 @@ export function up(opts: UpOpts = {}): Stack {
   const watch = (backupName = BK) => {
     const W = `${PROJECT}-watch`;
     sh('docker', ['rm', '-f', W]);
-    const r = sh('docker', ['run', '-d', '--name', W, '--pid', `container:${backupName}`, '--cap-add', 'SYS_PTRACE', '--security-opt', 'apparmor=unconfined', '-e', `CANARY=${canary}`,
+    const r = sh('docker', ['run', '-d', '--name', W, '--pid', `container:${backupName}`, '--cap-add', 'SYS_PTRACE', '--security-opt', 'apparmor=unconfined', '-e', `CANARY=${info.canary}`,
       ...DIRS.flatMap((d) => ['-v', `${vol(d)}:/spool/${d}:ro`]), '--entrypoint', '/harness/watcher.sh', TOOLS, '/spool/wal', '/spool/dump', '/spool/premigration', '/proc/1/root/tmp']);
     if (r.code !== 0) throw new Error(`watcher start failed: ${r.err}`);
     for (let i = 0; i < 60; i++) {
@@ -242,9 +264,10 @@ export function up(opts: UpOpts = {}): Stack {
   };
 
   return {
-    dir, env, cfg, canary, sys, major, identity, recipient, vol, compose, superSql, tools, ls, clearSpool, runBackup, startBackupContainer, watch,
+    dir, env, cfg, canary: info.canary, sys: info.sys, major: info.major, identity, recipient, info, vol, compose, superSql, tools, ls, clearSpool, runBackup, startBackupContainer, watch,
     down: () => {
       sh('docker', ['rm', '-f', BK, `${PROJECT}-watch`]);
+      if (!owner) return; // the globalSetup owns the stack
       compose('--profile', '*', 'down', '-v', '--remove-orphans');
       rootRun('rm -rf /w/* 2>/dev/null; true');
       for (const d of DIRS) sh('docker', ['volume', 'rm', '-f', vol(d)]);

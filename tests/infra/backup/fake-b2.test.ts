@@ -1,16 +1,15 @@
 // POLY-99 R11 harness self-test: fake-b2 behaves the way the ruling and the measurements (M-U1..M-U6) say B2's S3 and native halves do,
 // reached the way the uploader reaches it (TLS, a network alias, a test CA). No script under test here.
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { PROJECT, S3_HOST, TOOLS, sh, teardown, up, type Stack } from './stack.ts';
-import { type Fake, startFake } from './uploader.ts';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PROJECT, S3_HOST, TOOLS, attach, sh, type Stack } from './stack.ts';
+import { type Fake, attachFake } from './uploader.ts';
 
 let s: Stack;
 let fake: Fake;
 let setupError: string | null = null;
 beforeAll(() => {
-  try { s = up({ uploader: 'stub' }); fake = startFake(s); } catch (e) { setupError = String((e as Error).message); teardown(); }
-}, 900_000);
-afterAll(() => { if (fake) fake.stop(); if (s) s.down(); });
+  try { s = attach(); fake = attachFake(); } catch (e) { setupError = String((e as Error).message); }
+});
 beforeEach(() => { if (setupError) throw new Error(setupError); fake.reset(); });
 
 // a client on upload-net with the test CA as its only trust, like the uploader

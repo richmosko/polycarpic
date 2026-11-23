@@ -50,3 +50,10 @@ export function plantObject(fake: Fake, major: string, dir: Dir, name: string, d
   }
   return v;
 }
+
+/** The real sets the globalSetup took (A nightly, B later poisoned nightly, P premigration, WAL) and the poison string. Read-only fixture files. */
+export function fixtures(): { A: Files; B: Files; P: Files; WAL: Files; poison: string } {
+  const root = process.env.POLY99_FIXTURES!;
+  const load = (d: string): Files => Object.fromEntries(readdirSync(join(root, d)).map((n) => [n, readFileSync(join(root, d, n))]));
+  return { A: load('A'), B: load('B'), P: load('P'), WAL: load('WAL'), poison: readFileSync(join(root, 'poison'), 'utf8') };
+}

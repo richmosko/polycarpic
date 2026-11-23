@@ -1,17 +1,16 @@
 // POLY-99 R4 and T3-T8, T14 (the uploader). The rendered `uploader` service against fake-b2 (R11). Each security-bearing behaviour has a
 // mutant copy of upload.sh, or a variant mount, that the same check flags (the RED ON THE FAULT tests).
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { APP_KEY, BUCKET, INSTANCE, KEY_ID, PROJECT, TOOLS, mutate, sh, teardown, up, type Stack } from './stack.ts';
-import { type Fake, UP, plantSpool, runUploader, setName, sha256Of, startFake, uploaderDuring, verifiedLines, walName, writeConf } from './uploader.ts';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { APP_KEY, BUCKET, INSTANCE, KEY_ID, PROJECT, TOOLS, attach, mutate, sh, type Stack } from './stack.ts';
+import { type Fake, UP, attachFake, plantSpool, runUploader, setName, sha256Of, uploaderDuring, verifiedLines, walName, writeConf } from './uploader.ts';
 
 let s: Stack;
 let fake: Fake;
 let setupError: string | null = null;
 beforeAll(() => {
-  try { s = up({ uploader: true }); fake = startFake(s); } catch (e) { setupError = String((e as Error).message); teardown(); }
-}, 900_000);
-afterAll(() => { if (fake) fake.stop(); if (s) s.down(); });
+  try { s = attach(); fake = attachFake(); } catch (e) { setupError = String((e as Error).message); }
+});
 beforeEach(() => {
   if (setupError) throw new Error(setupError);
   fake.reset(); s.clearSpool();
@@ -88,15 +87,9 @@ describe('R4 the run: order, verified lines, objects, siblings; the spool is unt
   });
 });
 
-describe('R2 grammar through the uploader: good names are shipped, bad names are strays (T8)', () => {
+describe('R2 grammar through the uploader: good names are shipped, bad names are strays (T8) -- ONE run for the whole table', () => {
   const seg = '000000010000000000000042';
   const goodWal = [`${seg}`, `${seg}.00000028.backup`, `${seg}.partial`, '00000002.history'];
-  it('every WAL form Postgres hands archive_command is shipped: segment, .backup, .partial, .history', () => {
-    for (const f of goodWal) plantSpool(s, 'wal', walName(s, f));
-    const r = runUploader(s);
-    expect({ code: r.code, err: r.err.slice(-200) }).toEqual({ code: 0, err: expect.any(String) });
-    expect(verifiedLines(r.out).map((l) => l[2]).sort()).toEqual(goodWal.map((f) => walName(s, f)).sort());
-  });
   const bad: Array<[string, 'wal' | 'dump' | 'premigration', string]> = [
     ['a wal- name in dump/', 'dump', `wal-17-123-${seg}.age`],
     ['a dump- name in wal/', 'wal', `dump-17-123-${TS}.age`],
@@ -109,16 +102,17 @@ describe('R2 grammar through the uploader: good names are shipped, bad names are
     ['a timestamp without Z', 'dump', `dump-17-123-20261122T021500.age`],
     ['a name with a space', 'dump', `dump-17-123-${TS} .age`],
   ];
-  for (const [label, dir, name] of bad) {
-    it(`${label} -> stray: exit 2, \`upload.sh: stray file ${'<dir>/<name>'}\` on stderr, no PUT`, () => {
-      plantSpool(s, dir, name);
-      const r = runUploader(s);
-      expect(r.code).toBe(2);
-      expect(r.err).toContain(`upload.sh: stray file ${dir}/${name}`);
-      expect(fake.log()).toEqual([]);
-      expect(r.out).toBe('');
-    });
-  }
+  it('every WAL form Postgres hands archive_command (segment, .backup, .partial, .history) is shipped and reported; every bad name gets its own `upload.sh: stray file <dir>/<name>` line, no PUT; exit 2', () => {
+    for (const f of goodWal) plantSpool(s, 'wal', walName(s, f));
+    for (const [, dir, name] of bad) plantSpool(s, dir, name);
+    const r = runUploader(s);
+    expect(r.code).toBe(2);
+    expect(verifiedLines(r.out).map((l) => l[2]).sort()).toEqual(goodWal.map((f) => walName(s, f)).sort());
+    for (const [label, dir, name] of bad) expect(r.err, label).toContain(`upload.sh: stray file ${dir}/${name}`);
+    const keys = puts().map(key);
+    for (const [label, , name] of bad) expect(keys.some((k) => k.endsWith(name) || k.endsWith(`${name}.sha256`)), label).toBe(false);
+    expect(keys).toHaveLength(goodWal.length * 2);
+  });
 });
 
 describe('T8: the uploader never ships a non-age or stray file, and still ships the good ones', () => {

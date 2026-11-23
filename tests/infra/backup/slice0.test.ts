@@ -1,14 +1,13 @@
 // POLY-99 R12 slice 0: `backup.sh nightly` against the scratch stack, plus the watcher's own proof (it must fail on planted plaintext,
 // or a clean run proves nothing). The rest of the 99c cases are written after this goes green with the builder.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AGE_HEADER, R2_DUMP, type Stack, sh, teardown, up } from './stack.ts';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { AGE_HEADER, R2_DUMP, type Stack, attach, sh } from './stack.ts';
 
 let s: Stack;
 let setupError: string | null = null;
 beforeAll(() => {
-  try { s = up(); } catch (e) { setupError = String((e as Error).message); teardown(); }
-}, 900_000);
-afterAll(() => { if (s) s.down(); });
+  try { s = attach(); } catch (e) { setupError = String((e as Error).message); }
+});
 const need = () => { if (setupError) throw new Error(setupError); };
 
 /** effective permission of 10005 on a spool file, from getfacl */
