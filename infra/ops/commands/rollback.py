@@ -37,7 +37,11 @@ def run(args, ctx):
             ctx.err("rollback: there is no previous release")
             return 4
         rel.quarantine(ctx, project, cur["digest"], "rollback")
-        if not deploy.restore(project, ctx, prev):
+        try:
+            ok = deploy.restore(project, ctx, prev)
+        except Exception:  # F2: an exception inside the rollback is `rollback-unhealthy`, always with an alert
+            ok = False
+        if not ok:
             rel.log(ctx, project, "rollback-unhealthy", cur["digest"])
             rel.alert(ctx, project, "rollback-unhealthy")
             ctx.err("rollback: previous release is not healthy")
