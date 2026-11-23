@@ -243,7 +243,11 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   order and `first-deploy prod`'s last line; S11, S15, A11 and S16's ownership half.
 - **Networks.** Both projects declare their edge network `external`, and only `edge.yml` created them, so a project could not
   run `check-config` (R6 step 5) before edge was up (read from the files, `(unmeasured)`). `provision.sh --stage host` now creates both
-  with the fixed names and subnets, `edge.yml` declares them external too, and provision-check compares name, subnet and driver.
+  with the fixed names and subnets (`polycarpic-edge-prod` 10.201.30.0/28, `polycarpic-edge-staging` 10.202.30.0/28, driver
+  `bridge`): present and equal → no change; present and different → stop, never replace. `edge.yml` declares them external
+  too, with no `ipam`; the guard policy (S14) follows. provision-check asserts each name, subnet and driver, and that both
+  subnets are outside every `pg_hba` allow range and the 10.200.0.0/16 pool (S24). What compose does when an external network is missing is
+  `(unmeasured)`: this loop's tests start no container; POLY-104 runs a first deploy before any edge exists.
 - **Open (§L6):** how Caddy is first brought up before a `v1.*` release exists. Until it is ruled, staging runs and is not served.
 - `/etc/polycarpic/edge.env` (`POLY_DOMAIN`, `POLY_BIND_ADDR`, `POLY_STAGING_ALLOW`, `POLY_TLS`; root 0644) is written by
   `provision.sh`, with a provision-check line.
@@ -439,6 +443,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
 | T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture. A missing compose plugin fails, never skips |
 | T-help | A refused candidate whose bundle puts a command, newlines, ESC bytes and a fake `install.sh` line everywhere it can write (service names, keys, image names, project name, comments): alert, log and status hold exactly the template. Missing or malformed `ssh-target` and bundle id print placeholders; staging says unsigned, prod the tag and `verify-tag`; a `current` refusal prints no command; review precedes install; the text holds no `switch`, `checkout` or `pull`. `install.sh --commit` ships C while HEAD is elsewhere; C off `origin/main` is exit 2 with no ssh; a `post-checkout` hook planted in C leaves no canary; a bad target is refused before extraction. A refused first deploy shows RED | mutant printing the guard's detail; C from the label; target from `edge.env`; command for `current`; install before review; `--commit` via checkout |
+| T-net | All three compose files declare both edge networks they use as external, by exact name, and no file creates one (red on `d634da53`'s `edge.yml`); `provision.sh` creates exactly the two, reruns with no change, and stops on a different subnet (fake docker, provision job); provision-check fails on a missing network, another subnet, another driver. T-render renders `edge.yml` in the external form | today's files; mutant recreating a network that differs; mutant checking names only |
 | T-caddy | `caddy-allow` passes the real file and refuses: `forward_auth` in a site; a second global `log`; `php_fastcgi` on one line with its block; `import other`; an extra site block; a repeated allowed line; `@denied` moved below `basic_auth`; a `command` on caddy; a literal `POLY_TLS` with a newline. provision refuses an `edge.env` value with a newline, and one with `}` (S20) | mutant naming bad directives instead of allowing; mutant comparing counts, not order |
 | T-probe | Baseline 200 then 502: rollback and quarantine; baseline 200 then a certificate failure: the same; baseline failing: healthy, `edge-probe-baseline` logged and alerted, no quarantine; first deploy and staging: no probe | mutant without the probe; mutant without the baseline; mutant skipping verification (real `https_status` against a local self-signed listener) |
 | T-env | For each app service, the keys of the rendered `docker compose config` env plus `env_file` cover `packages/config`'s required keys for it, and none of the non-secret values is `mismatch`, `invalid` or `forbidden` (a `not_set`-only filter passes swapped `PLAID_ENV` values) | mutant compose keeping `DB_PASSWORD_FILE`; mutants with `PLAID_ENV` absent, and with the two projects' values swapped |
@@ -509,7 +514,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S21 (seceng `ruling-review.md` @ `d6bab4f7`): met by
+## S1–S25 (seceng `ruling-review.md` @ `a1db2870`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -534,5 +539,6 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S18 unreadable bundle id keeps the quarantine | R8; T10q |
 | S20 ordered Caddyfile lines; caddy `environment`/`command` pinned | R11 `caddy-allow`; T-caddy |
 | S21 what a guard refusal prints | R10 help; R11 `install.sh --commit`; T-help |
+| S24 networks from provision (S22, S23, S25 wait on §L6) | R9; T-net |
 | S19 rerun skips the backup only on an empty database | R6; T12 |
 | A12, A13 (adopted) | R11 `caddy-allow`, T-caddy; R7 through Caddy, T-probe |
