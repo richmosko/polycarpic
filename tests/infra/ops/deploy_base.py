@@ -75,7 +75,7 @@ class World(object):
         self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
         self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
-        self.systemctl_log, self.premigration_calls = [], []
+        self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
         self._git_origin()
@@ -272,7 +272,7 @@ class World(object):
             if argv[i] == "-p":
                 project = argv[i + 1]
                 i += 2
-            elif argv[i] in ("-f", "--env-file", "--project-directory"):
+            elif argv[i] in ("-f", "--env-file", "--project-directory", "--profile"):
                 i += 2
             elif argv[i].startswith("-"):
                 i += 1
@@ -281,6 +281,8 @@ class World(object):
                 break
         self.compose_log.append(dict(argv=list(argv), project=project, cmd=subcmd, rest=argv[i + 1:]))
         rest = argv[i + 1:]
+        if self.on_compose:
+            self.on_compose(subcmd, list(argv))
         if subcmd == "config":
             return 0, self.render(argv, "--no-interpolate" in rest), ""
         if subcmd == "ps":
