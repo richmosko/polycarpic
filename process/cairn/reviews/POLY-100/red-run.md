@@ -242,3 +242,4 @@ Harness fixes first (test-side): the build needs `--build-arg GIT_COMMIT` (a 40-
 | F3: both together (the original bug) | test_deploy_shared_release.py | red: `test_a_guard_refusal_of_prods_run_leaves_stagings_release_directory_alone` |
 
 Still to mutate (not yet done): F2, F5, F6, F7, F10, F12, F14, F15, F16 (covered by the flags lint), S33's fallback to a bundle compose file, S35's saved-secret check (needs a mutant that saves an unredacted env value: none exists in the build), A17 prune of renders, A18's `render-user`.
+| A18 H23: the row comparison in provision-check.sh never fails | tests/infra/provision/host.test.ts (H23 case) | red on "a shell" (the case with a shell, a home, another group, another uid, missing); a complete host box also passes H23 |

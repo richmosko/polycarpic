@@ -266,13 +266,29 @@ describe('provision-check: positive case and the R4 output contract', () => {
   it('a complete host box: PASS for every H check, INFO H12b (never a pass), WAIT for D1–D6 and for the two things only the operator can supply (H18 allowed_signers, H22 staging-auth), the HOST CHECKS PASSED summary, exit 3', () => {
     const rr = run(`${b2Fixture({})}\n bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}; echo "rc=$?"`, { image: COMPLETE });
     expect(rr.out).toMatch(/rc=3/);
-    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'H15']) expect(find(rr.out, 'PASS', id), `PASS ${id}`).toBeDefined();
+    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'H15', 'H23']) expect(find(rr.out, 'PASS', id), `PASS ${id}`).toBeDefined();
     expect(find(rr.out, 'INFO', 'H12b')?.text).toMatch(/bucket lock: checked off-box by b2-setup\.py/);
     expect(lines(rr.out).some((l) => l.kind === 'PASS' && l.id === 'H12b')).toBe(false);
     const waits = lines(rr.out).filter((l) => l.kind === 'WAIT').map((l) => l.id).sort();
     expect(waits).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'H18', 'H22']);
     expect(lines(rr.out).some((l) => l.kind === 'FAIL')).toBe(false);
     expect(rr.out.split('\n').filter((l) => /rc=/.test(l) === false && l.trim()).pop()).toBe('HOST CHECKS PASSED; 8 checks wait for the first deploy');
+  });
+
+  it('H23 (A18): the render user missing, with a shell, a home or another group is a FAIL naming what it found; the exact user passes', () => {
+    for (const [label, cmd] of [
+      ['missing', 'userdel polycarpic-render'],
+      ['a shell', 'usermod -s /bin/bash polycarpic-render'],
+      ['a home', 'usermod -d /home/render polycarpic-render'],
+      ['another group', 'groupadd -f extra23 && usermod -aG extra23 polycarpic-render'],
+      ['another uid', 'usermod -u 10021 polycarpic-render'],
+    ] as const) {
+      const r = run(`${b2Fixture({})}\n${cmd}; ${CHECK}${rc}`, { image: COMPLETE });
+      const h23 = lines(r.out).find((l) => l.id === 'H23');
+      expect(h23?.kind, `${label}: ${r.out.slice(-400)}`).toBe('FAIL');
+      expect(h23?.text, label).toMatch(/polycarpic-render|groups/);
+      expect(r.out, label).toMatch(/rc=1/);
+    }
   });
 
   it('is read-only: no file under /etc, /srv or /var/lib/polycarpic changes, and no mutating fake verb is called', () => {
