@@ -148,7 +148,7 @@ class Help(ProdBase):
         self.world.dir_hooks[cur] = lambda d: d["services"]["web"].update(privileged=True) or d  # current's own render is wrong, the candidate's is fine
         r = self.deploy("staging")
         self.assertNotEqual(r.rc, 0)
-        self.assertRegex(r.err.splitlines()[-1], r"^deploy: refused guard-")
+        self.assertRegex(r.err.splitlines()[-1], r"^deploy: refused current-guard-")
         self.assertNotIn("install.sh", r.err + (self.state("staging", "alert") or ""))
         self.assertNotIn("--commit", r.err)
 

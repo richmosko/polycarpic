@@ -65,7 +65,7 @@ class Status(OpsTest):
         self.psql_calls = []
         # POLY-100 R10: a deployed, freshly polled box with a token that has weeks left (the new items are tested in test_deploy_status.py)
         for proj in ("prod", "staging"):
-            self.host.write("/var/lib/polycarpic/state/deploy/%s/current" % proj, "sha256:%s v1.0.0 %s %s 2026-11-22T18:21:00Z\n" % ("1a2b3c4d5e6f" + "0" * 52, "a" * 40, "0" * 64))
+            self.host.write("/var/lib/polycarpic/state/deploy/%s/current" % proj, "sha256:%s %s %s %s 2026-11-22T18:21:00Z\n" % ("1a2b3c4d5e6f" + "0" * 52, "v1.0.0" if proj == "prod" else "-", "a" * 40, "0" * 64))  # F6: staging's tag is -
             self.host.write("/var/lib/polycarpic/state/deploy/%s/last-poll" % proj, "2026-11-22T18:35:00Z\n")
         self.host.mkdir("/etc/polycarpic/secrets/host", 0o700)
         self.host.write("/etc/polycarpic/secrets/host/github_read_token", "github_pat_" + "a" * 82 + "\n", 0o400)

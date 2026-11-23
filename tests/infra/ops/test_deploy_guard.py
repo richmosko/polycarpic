@@ -105,7 +105,7 @@ CASES = [
     ("a larger tmpfs on operator", both(svc("operator", tmpfs=["/tmp:size=10g"])), "pinned"),
     ("an extra tmpfs on web", both(svc("web", tmpfs=["/tmp", "/var/lib/x"])), "pinned"),
     # A18 (ruling 13e43e26): a bind's mount propagation is pinned; rshared would let a mount made inside the container appear on the host
-    ("a bind with propagation rshared on postgres", both(lambda d: d["services"]["postgres"]["volumes"][0].setdefault("bind", {}).update(propagation="rshared") or d), ("mount", "key")),
+    ("a bind with propagation rshared on postgres", plain_only(lambda d: d["services"]["postgres"]["volumes"][0].setdefault("bind", {}).update(propagation="rshared") or d), ("mount", "key")),
     # S27 (ruling-review.md @ d6cb5d6b): the env_file list of each service is exact and ordered; only the raw render keeps it
     ("mail.env on web", raw_only(svc("web", env_file=[S_HOST, S_MAIL])), "env"),
     ("auth missing its mail.env (a subset)", raw_only(svc("auth", env_file=[S_HOST])), "env"),

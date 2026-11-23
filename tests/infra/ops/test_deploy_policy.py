@@ -37,7 +37,7 @@ class PolicyIsInstalled(g.Guard):
         self.candidate({})
         self.world.dir_hooks[cur] = lambda d: d["services"]["web"].update(privileged=True) or d
         r = self.deploy("staging")
-        self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused guard-key"), r.err)
+        self.assertEqual((r.rc, r.err.splitlines()[-1]), (1, "deploy: refused current-guard-key"), r.err)
         self.assertEqual(self.started(r), [])
 
     # the inherited T8 cases are test_deploy_guard.py's; not repeated here
