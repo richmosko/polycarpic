@@ -465,8 +465,13 @@ drill run, and a backup of 3–4 s per backup case.
 *CI:*
 - The suite joins the existing `image` job as one more step, and no new job is added.
 - That step runs only when a new `backup` output of `infra/ci/changes.mjs` is true. It is true for `infra/backup/`,
-  `infra/restore.sh`, `infra/drill.sh`, `infra/postgres/archive-wal.sh`, `infra/compose/prod.yml`,
-  `infra/ops/commands/backup.py`, `infra/ops/commands/upload.py` and `tests/infra/backup/`.
+  `infra/restore.sh`, `infra/drill.sh`, `infra/postgres/` (the whole directory), `infra/compose/prod.yml`,
+  `infra/ops/commands/backup.py`, `infra/ops/commands/upload.py`, `packages/db/sql/roles.sql` and
+  `tests/infra/backup/`.
+- *(Correction: this list first named only `archive-wal.sh` under `infra/postgres/`, and left out `roles.sql`.)*
+  The stack applies `roles.sql`, poly_backup's grants come from it, and the drill's DR5 and DR6 read it. The stack is
+  also built from the derivative `Dockerfile`, `postgresql.prod.conf` and `pg_hba.prod.conf`. A change to any of
+  them can break the suite.
 - **Before:**
   - `image` takes 306 s.
 - **After:**
