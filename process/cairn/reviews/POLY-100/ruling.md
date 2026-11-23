@@ -531,8 +531,8 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 
 | Job | May add | Holds |
 |---|---|---|
-| image | ≤ 5 s | F1's real-tar case only; the POLY-99 backup suite (386 s) stays as it is |
-| provision | ≤ 46 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take, T-sauth |
+| image | ≤ 5 s added on CI, where F1's case uses the image the job already builds: the step sets `POLY_APP_TEST_IMAGE=polycarpic:ci`, and the test fails on CI when it is unset instead of building a second image (today it builds one, about 25 s locally). A local run builds its own, outside the budget | F1's real-tar case only; the POLY-99 backup suite (386 s) stays as it is |
+| provision | ≤ 46 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s **added** by the box fixture and provision config over the same-day control (measured +13.1 s: 85.5 against 72.4; met) | T1–T18, T-edge, T-take, T-sauth |
 | db | ≤ 10 s after the restructure below; if qa then measures more, ≤ 15 s stands with no case dropped. Today: +12 to +20 s (qa, same day; main 13.1–13.4 s) | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 20 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
