@@ -173,12 +173,24 @@ export function up(opts: UpOpts = {}): Stack {
   const rr = sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, 'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'polycarpic', '-X', '-v', 'ON_ERROR_STOP=1', '-f', '-'],
     { env, input: readFileSync(join(ROOT, 'packages', 'db', 'sql', 'roles.sql'), 'utf8') });
   if (rr.code !== 0) throw new Error(`roles.sql failed: ${rr.err.slice(-600)}`);
+  // The real migration chain (architect, ruling R11 correction): each file in journal order as poly_owner, one transaction per file, after the drizzle schema and
+  // tracking table exist. DR7 (real FORCE-RLS tables), DR8 (public.session and app.session_handle) and INFRA's F4 then run on real tables.
+  superSql('CREATE SCHEMA IF NOT EXISTS drizzle AUTHORIZATION poly_owner; CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint); ALTER TABLE drizzle.__drizzle_migrations OWNER TO poly_owner');
+  const mig = join(ROOT, 'packages', 'db', 'migrations');
+  const journal = JSON.parse(readFileSync(join(mig, 'meta', '_journal.json'), 'utf8')) as { entries: Array<{ tag: string }> };
+  for (const e of journal.entries) {
+    const r = sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, 'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'polycarpic', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '-1', '-f', '-'],
+      { env, input: `SET ROLE poly_owner;\n${readFileSync(join(mig, `${e.tag}.sql`), 'utf8')}\n` });
+    if (r.code !== 0) throw new Error(`migration ${e.tag} failed: ${r.err.slice(-500)}`);
+  }
   const pw = 'qa-db_password_backup__backup-fixture'; // the fixture value written above (the file is root:10004 0440 by now)
   superSql(`SET password_encryption='scram-sha-256'; ALTER ROLE poly_backup PASSWORD '${pw}'`);
   const canary = `CANARY-${randomBytes(12).toString('hex')}`;
   superSql(`CREATE TABLE public.canary_t (v text); ALTER TABLE public.canary_t ENABLE ROW LEVEL SECURITY; ALTER TABLE public.canary_t FORCE ROW LEVEL SECURITY; CREATE POLICY p ON public.canary_t USING (true); INSERT INTO public.canary_t VALUES ('${canary}'); GRANT SELECT ON public.canary_t TO poly_backup`);
   // C1: the scratch dump must exceed 1 MiB (the backup container's /tmp cap) or a /tmp detour would fit and stay invisible: 6 MiB of random hex
   superSql("CREATE TABLE public.pad_t (g int, v text); INSERT INTO public.pad_t SELECT g, string_agg(md5(random()::text || g || i), '') FROM generate_series(1, 6) g, generate_series(1, 32768) i GROUP BY g; GRANT SELECT ON public.pad_t TO poly_backup");
+  // one session with its handle (the deferred constraint wants the handle in the same transaction): DR8 counts it
+  superSql("WITH u AS (INSERT INTO public.\"user\" (name, email) VALUES ('qa', 'qa@example.test') RETURNING id), s AS (INSERT INTO public.session (expires_at, token, updated_at, user_id) SELECT now() + interval '1 day', 'qa-token-' || md5(random()::text), now(), id FROM u RETURNING id) INSERT INTO app.session_handle (session_id, handle_hash) SELECT id, sha256('qa-handle'::bytea) FROM s");
   info.canary = canary;
   info.sys = superSql('SELECT system_identifier FROM pg_control_system()');
   info.major = superSql("SELECT current_setting('server_version_num')::int / 10000");

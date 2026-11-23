@@ -19,6 +19,7 @@ let s: Stack, fake: Fake, lap: Laptop;
 let setupError: string | null = null;
 let SET: Files = {}, WAL: Files = {}, B: Files = {};
 let boxCred = '';
+let lastFault: { fresh: string; dumpName: string } | null = null;
 
 beforeAll(() => {
   try {
@@ -69,6 +70,7 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     expect({ code: r.code, last: last(r.out), err: r.err.slice(-300) }).toEqual({ code: 3, last: 'DRILL PASSED WITH SKIPS: DR9', err: expect.any(String) });
     for (const id of ['DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'DR7', 'DR8', 'DR10', 'DR11']) expect(c[id]?.kind, `${id}: ${JSON.stringify(c[id])}`).toBe('PASS');
     expect(c.DR9?.kind).toBe('SKIP');
+    expect(c.DR8?.text, 'DR8 counts the one session the stack planted').toMatch(/\b1 sessions? counted/);
     expect(existsSync(report)).toBe(true);
     const md = readFileSync(report, 'utf8');
     expect(md).toMatch(/\d{4}-\d\d-\d\d/); // the date
@@ -100,12 +102,13 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     const fresh = msToTs(Date.now() - 5_000);
     plant({ rename: (n) => n.replace(TS0(), fresh), replace: { globals: readFileSync(f) }, siblingWrong: ['base'], uploadedMs: Date.now() - 1_000 });
     const dumpName = Object.keys(SET).find((n) => n.startsWith('dump-'))!.replace(TS0(), fresh);
-    plantObject(fake, s.major, 'dump', dumpName, B[Object.keys(B).find((n) => n.startsWith('dump-'))!]!, Date.now(), { sibling: false }); // DR1: a newer second version
+    plantObject(fake, s.major, 'dump', dumpName, B[Object.keys(B).find((n) => n.startsWith('dump-'))!]!, Date.now()); // DR1: a newer second version WITH its own matching sibling, so it cannot cause DR2
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/${dumpName}`, Buffer.from(''), Date.now() + 1_000, 'hide'); // and a hide marker after it
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/junk`, Buffer.from('junk'), Date.now()); // F1: stray objects under the instance prefix
     plantVersion(fake, `${INSTANCE}/${s.major}/dump/../../x`, Buffer.from('x'), Date.now());
     fake.mode('permissive');
     const r = lap.run('drill.sh', DRILL());
+    lastFault = { fresh, dumpName };
     const c = checks(r.out);
     for (const id of ['DR1', 'DR2', 'DR3', 'DR10', 'DR11']) expect({ id, kind: c[id]?.kind, out: r.out.slice(-1500) }).toMatchObject({ id, kind: 'FAIL' });
     expect(r.out + r.err).toMatch(/hide/i);
@@ -114,9 +117,75 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     expect(r.out).not.toContain('poly-test-bucket');
     expect(r.out).not.toContain(`${INSTANCE}/`);
     expect(r.err).toMatch(/^version 4_zfake_\d+ /m);
-    expect(r.out).toMatch(/\b2 stray objects?\b/); // F1: DR1 makes the stray objects loud, with a count and no names
+    const dr1 = checks(r.out).DR1!.text;
+    expect(dr1).toMatch(/\b2 stray objects?\b/); // F1: loud, with a count and no names
+    expect(dr1).toContain('a chosen object has a second version or a hide marker'); // one line, both causes
     expect(r.out).not.toContain('junk');
+    expect(r.err).toMatch(/base-\S+ does not match its sha256 sibling/); // DR2 comes from the base sibling alone...
+    expect(r.err).not.toMatch(/dump-\S+ does not match its sha256 sibling/); // ...the dump's newest version matches its own sibling
     expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: (?=.*\bDR1\b)(?=.*\bDR2\b)(?=.*\bDR3\b)(?=.*\bDR10\b)(?=.*\bDR11\b)/) });
     expect(lap.scratches()).toEqual([]);
   }, 900_000);
 });
+
+describe('each fault is proven by its own mutant (architect verdict read): the same fixture, the scratch start refused, one line of the script mutated', () => {
+  const NOSCRATCH = { POLY99_SCRATCH_FAIL: '1' };
+  async function faultFixture() {
+    const f = join(lap.dir, 'globals-with-passwords.age');
+    const mk = sh('bash', ['-c', `docker exec ${PROJECT}-postgres-1 pg_dumpall -U postgres --globals-only | age -r ${s.recipient.trim()} -o '${f}'`]);
+    expect(mk.code, mk.err).toBe(0);
+    const wait = tsToMs(TS0()) + 75_000 - Date.now();
+    if (wait > 0) await new Promise((res) => setTimeout(res, wait));
+    const fresh = msToTs(Date.now() - 5_000);
+    plant({ rename: (n) => n.replace(TS0(), fresh), replace: { globals: readFileSync(f) }, siblingWrong: ['base'], uploadedMs: Date.now() - 1_000 });
+    const dumpName = Object.keys(SET).find((n) => n.startsWith('dump-'))!.replace(TS0(), fresh);
+    plantObject(fake, s.major, 'dump', dumpName, B[Object.keys(B).find((n) => n.startsWith('dump-'))!]!, Date.now());
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/${dumpName}`, Buffer.from(''), Date.now() + 1_000, 'hide');
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/junk`, Buffer.from('junk'), Date.now());
+    plantVersion(fake, `${INSTANCE}/${s.major}/dump/../../x`, Buffer.from('x'), Date.now());
+  }
+  it('DR2 RED ON THE FAULT: a mutant without the sibling comparison (`if [ "$got" != "$want" ]`) reports no DR2 FAIL on the lying base sibling; the real run does', async () => {
+    await faultFixture();
+    const real = lap.run('drill.sh', DRILL(), { env: NOSCRATCH });
+    expect(checks(real.out).DR2?.kind).toBe('FAIL');
+    const m = lap.mutantInfra('backup/restore-lib.sh', /if \[ "\$got" != "\$want" \]; then/, 'if false; then');
+    const mut = lap.run('drill.sh', DRILL(), { infra: m, env: NOSCRATCH });
+    expect(checks(mut.out).DR2?.kind).toBe('PASS');
+  }, 300_000);
+  it('DR1 RED ON THE FAULT: a mutant without the two-version line (`# T10`) keeps the stray text but loses the second-version cause; the real run has both', async () => {
+    await faultFixture();
+    const m = lap.mutantInfra('backup/restore-lib.sh', /^.*# T10\s*$/m, ':');
+    const mut = lap.run('drill.sh', DRILL(), { infra: m, env: NOSCRATCH });
+    const t = checks(mut.out).DR1!.text;
+    expect(t).toMatch(/\b2 stray objects?\b/);
+    expect(t).not.toContain('a chosen object has a second version or a hide marker');
+  }, 300_000);
+});
+
+describe('DR8 on real tables (architect, ruling R11 correction): the stack applied the migration chain and planted one session with its handle', () => {
+  const NOMUT = { POLY99_NONE: '' };
+  void NOMUT;
+  const run = (mut: { file: string; from: RegExp; to: string }) => {
+    plant();
+    const m = lap.mutantInfra(mut.file, mut.from, mut.to);
+    return lap.run('drill.sh', DRILL(), { infra: m });
+  };
+  const SQL = (q: string) => `docker exec "$SC_DUMP" psql -U postgres -X -d polycarpic -c "${q}" > /dev/null`;
+  it('a mutant that deletes the handle in the dump scratch makes DR8 FAIL (a session without its handle)', () => {
+    const r = run({ file: 'drill.sh', from: /^(\s*)if restore_dump; then SC_DUMP=\$SC; else SC_DUMP=''; fi\s*$/m, to: `$1if restore_dump; then SC_DUMP=$SC; else SC_DUMP=''; fi; [ -z "$SC_DUMP" ] || ${SQL('DELETE FROM app.session_handle')}` });
+    expect({ kind: checks(r.out).DR8?.kind, out: r.out.slice(-900) }).toMatchObject({ kind: 'FAIL' });
+    expect(last(r.out)).toMatch(/^DRILL FAILED: .*\bDR8\b/);
+  }, 600_000);
+  it('a mutant that drops the tables in the dump scratch makes DR8 FAIL and names them', () => {
+    const r = run({ file: 'drill.sh', from: /^(\s*)if restore_dump; then SC_DUMP=\$SC; else SC_DUMP=''; fi\s*$/m, to: `$1if restore_dump; then SC_DUMP=$SC; else SC_DUMP=''; fi; [ -z "$SC_DUMP" ] || ${SQL('DROP TABLE app.session_handle; DROP TABLE public.session CASCADE')}` });
+    const c = checks(r.out);
+    expect(c.DR8?.kind).toBe('FAIL');
+    expect(c.DR8?.text).toMatch(/public\.session/);
+    expect(c.DR8?.text).toMatch(/app\.session_handle/);
+  }, 600_000);
+  it('a mutant that loads the dump data-only makes DR8 FAIL (INFRA F4: the whole dump, never data-only)', () => {
+    const r = run({ file: 'backup/restore-lib.sh', from: /pg_restore -U postgres --create -d postgres/, to: 'pg_restore -U postgres --data-only -d postgres' });
+    expect({ kind: checks(r.out).DR8?.kind, out: r.out.slice(-900) }).toMatchObject({ kind: 'FAIL' });
+  }, 600_000);
+});
+

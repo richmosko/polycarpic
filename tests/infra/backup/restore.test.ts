@@ -387,11 +387,15 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     sh('docker', ['rm', '-f', '-v', c]);
   }, 300_000);
 
-  it('F2: a fileId that belongs to none of the chosen keys (`--accept-version`) exits 2 before any restore starts; a malformed one too', () => {
+  it('F2: `--accept-version` with a fileId that belongs to none of the chosen objects exits 2 with `does not belong to a chosen object`; a malformed one exits 2 with `bad --accept-version`; nothing starts (the message is what tells this from the old unknown-option exit 2)', () => {
     plantA();
-    for (const id of ['4_znotafileid', 'x/../y', '']) {
+    const unknown = lap.run('restore.sh', REST_BUCKET(['--accept-version', '4_znotafileid']));
+    expect(unknown.code).toBe(2);
+    expect(unknown.err).toContain('--accept-version 4_znotafileid does not belong to a chosen object');
+    for (const id of ['x/../y', '']) {
       const r = lap.run('restore.sh', REST_BUCKET(['--accept-version', id]));
       expect({ id, code: r.code }).toEqual({ id, code: 2 });
+      expect({ id, err: r.err }).toEqual({ id, err: expect.stringContaining('bad --accept-version') });
     }
     noScratch();
   });
