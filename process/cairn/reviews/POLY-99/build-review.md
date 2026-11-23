@@ -304,6 +304,47 @@ that a reading can miss. qa-99's cases are not on the branch yet.
 
 When F5 lands I re-check it and the five fix tests, and nothing else.
 
+## Final re-check @ `7e4b95d202d8719b70190dd39cd93474a281b6cd`
+
+**F5 (`e7c7cc6b`): met in code.**
+- `list_versions` and `bucket_select`'s `b2 choose` refusal listing now end `| clean >&2`.
+- What remains on drill stdout is:
+  - the `res` lines;
+  - `scratch_start`'s end-time line;
+  - the verdict.
+- No path left in `drill.sh` or `restore-lib.sh` prints a fileId, a bucket name or an `<instance>/` key to stdout.
+- The DR1 and "selection refused" texts say "on stderr".
+
+**DR1 change (`7e4b95d2`): accepted.** Stray objects (F1) and a second version or hide marker (C9) are reported
+together in one FAIL line, so neither anomaly hides the other. A PASS needs both to be absent. It is text only, and
+changes no exit path.
+
+**qa's F4/F5 cases (`c94a4bf6`) meet my spec.**
+- **F5** (`drill.test.ts`, the fault run): the fixture holds a second version, a hide marker and two stray objects
+  (`junk`, and the `../../x` key).
+  - stdout is asserted to hold no `4_zfake_` id, no bucket name (`poly-test-bucket`) and no `<instance>/` key;
+  - stderr is asserted to hold the `version 4_zfake_<n>` lines.
+  - The red proof (on the pre-F5 tree) is qa's to run at the gate.
+- **F4, the real-Docker case** (`restore.test.ts`, the one real restore):
+  - the volume set is taken **before** the restore starts;
+  - the scratch is then `docker kill`ed, which stands in for the end of the sleep;
+  - the test asserts that no labelled container is left and that the volume set equals the earlier one. That shows
+    `--rm` removed the container and its anonymous volume.
+  - Together with `17f99c51`'s argv, `--hours` and `--cleanup` cases, this is what I asked for.
+- Not a gap that gates: `restore.sh`'s refusal is read as `r.out + r.err`, not as stderr alone. The drill case pins
+  the stream, and both scripts take the listing from the same library line.
+
+**D1:** still built as (a). If the Principal chooses (b), I re-check only its argument rule and its two tests.
+
+### Verdict: **PASS on `7e4b95d2`, conditional on qa's gate**
+
+F1–F5 are all met in code. Each closes when qa's gate run shows its cases green on `7e4b95d2`, and red on the tree
+before its fix:
+- F1–F4: `17f99c51`;
+- F5 and the F4 real-Docker case: `c94a4bf6`. These two run next.
+
+No fix remains on my side. If the gate turns anything red, that item reopens, and only that item.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
