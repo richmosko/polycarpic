@@ -108,7 +108,12 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report): two 
     const r = lap.run('drill.sh', DRILL());
     const c = checks(r.out);
     for (const id of ['DR1', 'DR2', 'DR3', 'DR10', 'DR11']) expect({ id, kind: c[id]?.kind, out: r.out.slice(-1500) }).toMatchObject({ id, kind: 'FAIL' });
-    expect(r.out).toMatch(/hide/i);
+    expect(r.out + r.err).toMatch(/hide/i);
+    // F5: identifiers (fileIds, the bucket, `<instance>/` keys) are for the operator's terminal on stderr; stdout carries only check lines, the scratch name and the verdict
+    expect(r.out).not.toMatch(/4_zfake_/);
+    expect(r.out).not.toContain('poly-test-bucket');
+    expect(r.out).not.toContain(`${INSTANCE}/`);
+    expect(r.err).toMatch(/^version 4_zfake_\d+ /m);
     expect(r.out).toMatch(/\b2 stray objects?\b/); // F1: DR1 makes the stray objects loud, with a count and no names
     expect(r.out).not.toContain('junk');
     expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: (?=.*\bDR1\b)(?=.*\bDR2\b)(?=.*\bDR3\b)(?=.*\bDR10\b)(?=.*\bDR11\b)/) });

@@ -348,12 +348,20 @@ describe("restore from the bucket (R7, T10, C5, C7, C7', C9, C11): selection, th
     const older = msToTs(tsToMs(tsA) - 2 * 3600_000);
     for (const [n, b] of Object.entries(A)) plantObject(fake, s.major, 'dump', n.replace(tsA, older), b, tsToMs(tsA) + 60_000);
     plantObject(fake, s.major, 'dump', name(A, 'dump').replace(tsA, older), B[name(B, 'dump')]!, tsToMs(tsA) + 120_000, { sibling: false });
+    const volumes = () => sh('docker', ['volume', 'ls', '-q']).out.split('\n').filter(Boolean).sort();
+    const before = volumes();
     const r = lap.run('restore.sh', REST_BUCKET(['--before', iso(tsToMs(tsA) + 90_000)]));
     expect({ code: r.code, err: r.err.slice(-500) }).toEqual({ code: 0, err: expect.any(String) });
     expect(r.err).toContain('WARN');
     const c = scratchName(r.out);
     expect(canaryIn(c)).toBe(s.canary);
-    sh('docker', ['rm', '-f', '-v', c]);
+    // F4, the real-Docker case: killing the scratch's PID 1 stands in for the end of its sleep; --rm must then remove the container and its anonymous volume
+    expect(lap.scratches()).toContain(c);
+    expect(sh('docker', ['kill', c]).code).toBe(0);
+    for (let i = 0; i < 40 && lap.scratches().length > 0; i++) sh('sleep', ['0.5']);
+    expect(lap.scratches()).toEqual([]); // no labelled container is left
+    for (let i = 0; i < 20 && volumes().join() !== before.join(); i++) sh('sleep', ['0.5']);
+    expect(volumes()).toEqual(before); // and no volume: the set equals the one taken before the start
   }, 300_000);
   it('C9/F2: version 1 hidden and unsiblinged, version 2 siblinged -> the refusal lists `sibling no` for v1 and `sibling yes` for v2 and names the hide marker; `--accept-version <v2>` passes it (WARN accepting, the ORIGINAL canary restored); `<v1>` exits 4 at the sibling check; an unknown fileId exits 2; none of the refusals starts a scratch', () => {
     for (const [n, b] of Object.entries(A)) if (n !== name(A, 'dump')) plantObject(fake, s.major, 'dump', n, b, tsToMs(tsA) + 60_000);
