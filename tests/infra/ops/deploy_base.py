@@ -97,6 +97,8 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.config_wrapped = []
+        self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
         self.unmounted = set()
         self.owners = {}
         self.dir_hooks = {}
@@ -187,6 +189,7 @@ class World(object):
     # --- the children ---
     def handler(self, runner):
         runner.on(lambda a: a[0] == "docker", fn=self._docker)
+        runner.on(lambda a: a[0] == "unshare", fn=self._unshare)
         runner.on(lambda a: a[0] == "gh", fn=self._gh)
         runner.on(lambda a: a[0] in ("git", "ssh-keygen"), fn=self._real)
         runner.on(lambda a: a[0] == "systemctl", fn=self._systemctl)
@@ -246,6 +249,20 @@ class World(object):
             return 1, "", "verification failed\n"
         return 1, "", "FAKE gh: unhandled %r\n" % (argv,)
 
+    def _unshare(self, argv, stdin):
+        """F4: `unshare --net -- setpriv ... -- docker compose ... config`: recorded whole, then served as the docker command inside it, marked as isolated."""
+        env = self._last_env(argv) or {}
+        self.wrapped_calls.append((list(argv), dict(env)))
+        try:
+            inner = argv[len(argv) - argv[::-1].index("docker") - 1:]
+        except ValueError:
+            return 1, "", "FAKE unshare: no docker command inside %r\n" % (argv,)
+        self._isolated = True
+        try:
+            return self._docker(inner, stdin)
+        finally:
+            self._isolated = False
+
     def _docker(self, argv, stdin):
         self.docker_log.append(list(argv))
         sub = argv[1]
@@ -267,7 +284,7 @@ class World(object):
         if sub == "rm":
             return 0, "", ""
         if sub == "compose":
-            return self._compose(argv)
+            return self._compose(argv, stdin)
         if sub == "inspect":
             c = self.by_name.get(argv[2])
             if c is None:
@@ -314,7 +331,7 @@ class World(object):
                 d = fn(d) or d
         return json.dumps(d)
 
-    def _compose(self, argv):
+    def _compose(self, argv, stdin=None):
         i = 2
         project, subcmd = None, None
         while i < len(argv):
@@ -333,6 +350,16 @@ class World(object):
         if self.on_compose:
             self.on_compose(subcmd, list(argv))
         if subcmd == "config":
+            self.config_wrapped.append(self._isolated)
+            if stdin is not None:  # the re-render of the saved judged file (`-f -`): the same JSON back, unless a test makes the second answer differ
+                d = json.loads(stdin)
+                return 0, json.dumps(self.rerender_hook(d) or d if self.rerender_hook else d), ""
+            for i, a in enumerate(argv):  # a remote include in a compose file: fetched over the network unless the render is isolated
+                if a == "-f" and argv[i + 1].endswith((".yml", ".yaml")) and os.path.exists(argv[i + 1]) and "oci://" in open(argv[i + 1], errors="replace").read():
+                    if not self._isolated:
+                        self.network_attempts += 1
+                    else:
+                        return 1, "", "failed to resolve remote include: network unreachable\n"
             return 0, self.render(argv, "--no-interpolate" in rest), ""
         if subcmd == "ps" and project in self.ps_fails:
             return 1, "", "Cannot connect to the Docker daemon\n"
@@ -351,10 +378,12 @@ class World(object):
                 if a == "--env-file":
                     envs.update(self.images_from(argv[j + 1]))
             self.up_marks.append(self.sleeps_total())
+            saved = [argv[j + 1] for j, a in enumerate(argv) if a == "-f" and argv[j + 1].endswith(".json") and os.path.exists(argv[j + 1])]
+            saved_images = json.load(open(saved[0]))["services"] if saved else {}
             svcs = [rest[k] for k in self._positionals(rest)] or ["postgres", "web", "auth", "worker"]
             for svc in svcs:
                 key = self.KEY.get(svc, "APP")
-                ref = envs.get("POLY_%s_IMAGE" % key)
+                ref = (saved_images.get(svc) or {}).get("image") or envs.get("POLY_%s_IMAGE" % key)
                 if ref is None:
                     return 1, "", "FAKE compose up: no image for %s\n" % svc
                 self.set_container(project, svc, ref)
