@@ -354,11 +354,11 @@ def digest_of(rdir):
     return "sha256:" + os.path.basename(os.path.normpath(rdir))[len("sha256-"):]
 
 
-def guard(project, ctx, rdir, images):
+def guard(project, ctx, rdir, images, restore=False):
     """F4: the isolated render of the release's compose file is corrected, judged, saved and rendered once more; -> the Judged record that every
     `up` and `run` of this release then names (never a bundle's file)."""
     env_files = ["%s/images.env" % rdir] + ([ctx.p(EDGE_ENV)] if project == "edge" else [])
-    return compose_guard.judge(ctx, rdir, project, env_files, images, digest_of(rdir), bind_addr(ctx))
+    return compose_guard.judge(ctx, rdir, project, env_files, images, digest_of(rdir), bind_addr(ctx), restore=restore)
 
 
 def edge_domain(ctx):
@@ -623,7 +623,7 @@ def _prune(ctx):
         if not os.path.isdir(sdir):
             continue
         for name in os.listdir(sdir):
-            m = re.fullmatch(r"render-([0-9a-f]{12})\.json", name)
+            m = re.fullmatch(r"render-([0-9a-f]{12})\.(json|sha256)", name)
             if m and m.group(1) not in kept:
                 try:
                     os.unlink(os.path.join(sdir, name))
@@ -671,8 +671,8 @@ def restore(project, ctx, ptr, owns=None, probe=None):
         return False
     try:
         images = stack.kinds(stack.refs(rdir))
-        pj = guard(project, ctx, rdir, images)  # rollback renders, judges and writes afresh
-        ej = guard("edge", ctx, rdir, images) if owner else None  # both renders are judged before either `up`
+        pj = guard(project, ctx, rdir, images, restore=True)  # rollback renders and judges in memory; it writes only when the bytes differ (S36)
+        ej = guard("edge", ctx, rdir, images, restore=True) if owner else None  # both renders are judged before either `up`
     except Refusal:
         return False
     code, _, _ = _compose(ctx, stack.up_argv(pj, project))

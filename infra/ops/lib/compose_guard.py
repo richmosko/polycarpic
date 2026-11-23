@@ -83,6 +83,10 @@ def render_argv(rdir, project, env_files, raw):
     return argv + ["--format", "json"]
 
 
+def stdin_render(project):
+    return ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "-f", "-", "--profile", "*", "config", "--format", "json"]
+
+
 def _render_env(ctx):
     home = ctx.p(HOME)
     if not os.path.isdir(home):
@@ -130,11 +134,8 @@ def canonical(doc):
     return (json.dumps(doc, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def save(ctx, project, digest, data):
-    """root 0600, temp and rename, no link followed, mounted by nothing (S35). -> the path."""
-    d = ctx.p("%s/%s" % (STATE, project))
-    os.makedirs(d, mode=0o755, exist_ok=True)
-    path = os.path.join(d, "render-%s.json" % digest.split(":", 1)[1][:12])
+def _write_file(ctx, path, data):
+    """root 0600, a temp file then a rename, no link followed."""
     tmp = path + ".tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     try:
@@ -144,6 +145,45 @@ def save(ctx, project, digest, data):
     finally:
         os.close(fd)
     os.replace(tmp, path)
+
+
+def render_path(ctx, project, digest):
+    return os.path.join(ctx.p("%s/%s" % (STATE, project)), "render-%s.json" % digest.split(":", 1)[1][:12])
+
+
+def sidecar(path):
+    return path[:-len(".json")] + ".sha256"
+
+
+def stored_sha(path):
+    """The sha256 the sidecar records, or None."""
+    try:
+        fd = os.open(sidecar(path), os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return None
+    try:
+        text = os.read(fd, 128).decode("ascii", "replace").strip()
+    finally:
+        os.close(fd)
+    return text if re.fullmatch(r"[0-9a-f]{64}", text) else None
+
+
+def pair_ok(path):
+    """The saved file hashes to what its sidecar records (G5): the test every reader makes before use."""
+    want = stored_sha(path)
+    return want is not None and sha_of(path) == want
+
+
+def save(ctx, project, digest, data):
+    """S35, G5: the file, then `render-<…>.sha256` beside it. Nothing is written when both already hold exactly these bytes (S36). -> the path."""
+    d = ctx.p("%s/%s" % (STATE, project))
+    path = render_path(ctx, project, digest)
+    want = hashlib.sha256(data).hexdigest()
+    if pair_ok(path) and stored_sha(path) == want:
+        return path
+    os.makedirs(d, mode=0o755, exist_ok=True)
+    _write_file(ctx, path, data)
+    _write_file(ctx, sidecar(path), (want + "\n").encode("ascii"))
     return path
 
 
@@ -174,8 +214,10 @@ def verify(judged, project=None, digest=None):
     return judged
 
 
-def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None):
-    """Render (isolated), correct, judge, save, render the saved bytes once more on stdin and require the same. -> Judged."""
+def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore=False):
+    """Render (isolated), correct, judge, and require the fixed point in memory (the corrected bytes rendered once more on stdin); only then save
+    them beside their sha256 (G5). With `restore` (S36) a failed save is survivable: the saved pair is used when its hash holds and its bytes pass
+    the guard now. -> Judged."""
     if not render_user_ok(ctx):
         raise Refusal("render-user", code=4)
     policy = load_policy(ctx)
@@ -184,11 +226,31 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None):
     check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
     corrected = correct(corrected, policy, project)
     data = canonical(corrected)
-    path = save(ctx, project, digest, data)
-    again = _json(ctx, ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "-f", "-", "--profile", "*", "config", "--format", "json"], stdin=data.decode("utf-8"))
+    again = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"))
     if canonical(correct(again, policy, project)) != data:
         fail("render")
+    try:
+        path = save(ctx, project, digest, data)
+    except OSError:
+        if not restore:
+            raise Refusal("state")
+        return _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr)
     return Judged(project, digest, path, hashlib.sha256(data).hexdigest())
+
+
+def _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr):
+    """S36: the save failed. The saved pair serves only if its hash holds and its bytes, read back through the isolated stdin render, pass the guard now."""
+    path = render_path(ctx, project, digest)
+    if not pair_ok(path):
+        raise Refusal("state")
+    with open(path, "rb") as fh:
+        data = fh.read()
+    plain = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"))
+    corrected = correct(plain, policy, project)
+    if canonical(corrected) != data:
+        fail("render")
+    check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
+    return Judged(project, digest, path, stored_sha(path))
 
 
 def _resolve_source(src, rdir):

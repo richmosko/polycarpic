@@ -32,7 +32,7 @@ def compose_source(ctx, project, fname, bundle_path):
     if not cur:
         return bundle_path, []
     path = ctx.p("%s/%s/render-%s.json" % (compose_guard.STATE, project, cur["digest"].split(":", 1)[1][:12]))
-    if compose_guard.sha_of(path) is None:
+    if not compose_guard.pair_ok(path):  # G5: the file and the hash beside it, compared before use
         raise ComposeError("state")
     return path, []
 

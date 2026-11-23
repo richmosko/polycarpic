@@ -191,7 +191,7 @@ def restore(ctx, ptr, wait_healthy=True):
     if sauth.check(ctx):
         return False
     try:
-        judged = deployer.guard("edge", ctx, rdir, stack.kinds(stack.refs(rdir)))  # rendered, judged and saved afresh
+        judged = deployer.guard("edge", ctx, rdir, stack.kinds(stack.refs(rdir)), restore=True)  # in memory; written only when the bytes differ (S36)
         code = deployer._edge_up(ctx, judged, ptr["digest"])
     except Refusal:
         return False
