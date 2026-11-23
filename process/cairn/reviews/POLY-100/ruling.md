@@ -81,10 +81,14 @@ next poll.
 | V1 | `gh attestation verify oci://ghcr.io/richmosko/polycarpic@<digest> --repo richmosko/polycarpic --signer-workflow richmosko/polycarpic/.github/workflows/build.yml --source-ref refs/heads/main --deny-self-hosted-runners --source-digest C --predicate-type https://slsa.dev/provenance/v1`, exit 0, **before any pull** | `attestation` | no (gh's exit does not tell a refusal from an outage; the next poll re-checks) |
 | V2 | `docker pull ghcr.io/richmosko/polycarpic@<digest>`; `RepoDigests` holds it | `pull` | no |
 | V3 | Label `org.opencontainers.image.revision` == C (a build-bug check; V1 is the binding) | `label` | yes |
-| V4 (prod) | In the bare repo `/var/lib/polycarpic/state/deploy/tags.git` (created by root): `git fetch --no-tags https://github.com/richmosko/polycarpic refs/tags/<tag>:refs/tags/<tag>`; `cat-file -t` = `tag`; the signature block is SSH; `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/etc/polycarpic/allowed_signers verify-tag <tag>` exit 0, with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1`; `rev-parse <tag>^{commit}` gives C | `tag-signature`, `tag-commit` | yes |
+| V4 (prod) | In the bare repo `/var/lib/polycarpic/state/deploy/tags.git` (created by root): `git fetch --no-tags https://github.com/richmosko/polycarpic refs/tags/<tag>:refs/tags/<tag>`; `cat-file -t` = `tag`; the signature block is SSH; `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/etc/polycarpic/allowed_signers verify-tag <tag>` exit 0, with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1`; C = the tag object's direct target, which must be a commit (`tag-commit` otherwise: a tree, blob or nested tag) | `tag-signature`, `tag-commit` | yes |
 | V5 | Bundle extracted and checked (R4); its `images.env` well-formed; each sibling passes V1 with the **same** C and the same flags, then V2 and V3 | `bundle`, `sibling-<name>` | yes (V1/V2 of a sibling: no) |
 | V6 | Bundle `infra/postgres-major` equals `current`'s (skipped on the first deploy) | `postgres-major` (a major upgrade is INFRA §5's operator procedure) | yes |
 | V7 | Compose guard passes on the rendered config (R5) | `guard-<rule>` | yes |
+
+**Prod order:** V4 runs first and yields C, then V1, V2, V3, V5–V7. A correctly signed tag whose commit is not the one
+the image was attested at is therefore refused by V1 as `attestation` (no Q, as V1); V3 then only catches a build bug.
+`tag-name` is checked before `not-newer`.
 
 **Nothing with a candidate digest is created, run or composed before V1–V7 pass.** The only exceptions are `pull`,
 `image inspect`, and R4's `docker create`, which never starts. Every `compose up` and `compose run` carries
@@ -319,7 +323,7 @@ qa commits the harness and this one test first, with any contract pins; the buil
 |---|---|---|
 | T1 | V1's argv is exactly R3's seven flags with C; V1 precedes any pull; a failure stops all | mutant without `--source-ref`; without `--source-digest`; that pulls first |
 | T2 | **Label alone does not bind:** an image labelled X, attested at H; `--source-digest X` refuses it (the label check alone would pass) | mutant using the label as C |
-| T3 | V4 real: a tag signed by a key not in `allowed_signers`, a lightweight tag, a GPG-signed tag, a signed tag on another commit, a correctly signed `v1.0` tag object fetched as ref `v1.99` with Release `v1.99` (S2): each refused | mutant without `-c gpg.ssh.allowedSignersFile`; without the name compare; honouring a global git config that sets another signers file |
+| T3 | V4 real: a tag signed by a key not in `allowed_signers`, a lightweight tag, a GPG-signed tag, a signed tag on a commit the image was not attested at (refused by V1, `attestation`), a signed tag of a non-commit object (`tag-commit`), a correctly signed `v1.0` tag object fetched as ref `v1.99` with Release `v1.99` (S2): each refused | mutant without `-c gpg.ssh.allowedSignersFile`; without the name compare; honouring a global git config that sets another signers file |
 | T4 | Monotonic: prod highest semver, not newest; lower than `current` refused; staging candidate not descending from `current` (a re-run of an old run) refused | mutant picking by date; mutant without the ancestry check |
 | T5 | A sibling failing V1, or attested at another commit, stops the deploy | mutant skipping siblings |
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
