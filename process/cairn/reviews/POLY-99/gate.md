@@ -18,7 +18,7 @@
 
 drill 146, uploader 59, backup 54, restore 45, roundtrip 17, slice0 13, fake-b2 6 (sum 340; 384 s wall including the globalSetup: images, one stack with the migration chain and a planted session, three real backups, WAL). Target ≤ 420 s: **met, 36 s to spare**. The figure rose from 277 s (before F1-F5) through 301, 354, 369 to 384 s as the verdict-read cases landed.
 
-Real scratch restores: roundtrip 3, restore.test.ts 1, drill seven runs of two (happy, all-faults, F6 BASE-skip, the three DR8 mutants, F8) = 18. The architect accepted 16 (ruling Guards correction @ `450ba87c`) and said another real restore needs a ruling; F8 needs a real run because a skip after a failure is fallout (asked of the architect, answer pending in this record).
+Real scratch restores: roundtrip 3, restore.test.ts 1, drill seven runs of two (happy, all-faults, F6 BASE-skip, the three DR8 mutants, F8) = 18. The architect accepted 16 (ruling Guards correction @ `450ba87c`) and said another real restore needs a ruling; F8 needs a real run because a skip after a failure is fallout (asked of the architect, the architect accepted 18 in the Guards correction @ `40eee5f4`: cap 18, projected about 391 s, measured 384 s).
 
 ## Suite-time delta against a same-day control on `origin/main` (clean worktree, same machine)
 
@@ -38,6 +38,22 @@ CI figures are unmeasured (this is a Mac); devops-99 reports the CI image-job fi
 - F5 shown red on the tree before its fix: with `infra/backup/restore-lib.sh` and `infra/drill.sh` at `e7c7cc6b^`, the drill fault run fails on `4_zfake_` in stdout (the case that reads stdout and stderr apart is `drill.test.ts :: every planted fault at once`; restore cases read both streams merged and cannot see F5).
 - F4's removal is shown on real Docker: kill the scratch's PID 1, then no labelled container and an unchanged `docker volume ls -q` set (`restore.test.ts :: T10 + C7′`).
 - F1-F4 were shown red on `5501a740` (11 cases) and green on the fixed build (test-plan.md pin 44).
+
+## Red on the tree before each fix, green on `a780368f` (seceng's list, build-review.md @ f38ae493)
+
+Each run puts the named files back to the commit before the fix, runs the named cases, then restores the tip (`git restore --source=HEAD`).
+
+| Cases | Files reverted to | Red result |
+|---|---|---|
+| `17f99c51` F1-F4 (stray objects, `--accept-version`, redacted report, `--rm`/`--hours`/`--cleanup`/WARN) | restore.sh, restore-lib.sh, b2read.py, drill.sh @ `5501a740` | 11 cases red (restore 5, roundtrip 4, drill 2) |
+| `c94a4bf6` F5 stdout/stderr split | restore-lib.sh, drill.sh @ `e7c7cc6b^` | the fault run fails on `4_zfake_` in stdout |
+| `c94a4bf6` F4 real Docker (kill the scratch, no labelled container, no new volume) | restore.sh, restore-lib.sh, drill.sh @ `314b2dcf^` | red: a labelled scratch container is left (`polycarpic-restore-…`) after the kill; the three F4 argv/`--cleanup`/WARN cases red too |
+| `4cfca88f` F6, F7, INCOMPLETE verdict | drill.sh @ `4a75ade1^` | 5 cases red: the happy run's last line, the fault run's DR6 (BASE passes, the dump instance's missing role unseen), the DR10-deleted mutant (no FAIL line), the BASE-skip mutant (exit 3, not 1), and F8 |
+| `4cfca88f` T17b, T17p | restore.sh, restore-lib.sh @ `a937f9a5^` (before the markers were split) | both red: the mutant cannot be built (`mutant did not change …`); on the tip each mutant reaches the scratch |
+| `4cfca88f` DR2 for a WAL segment | the mutant on the `if [ "$(sha256f …)" != … ]; then` line | real run exits 4 with the sibling message and no scratch; the mutant reaches the scratch (a harness-level red, no revert needed) |
+| `ac615b11` F8 | drill.sh @ `4a75ade1` | red: the mutant's SKIP stays a SKIP (`DRILL INCOMPLETE`, exit 3) |
+
+A leftover scratch container from the F4 red run was removed by hand afterwards.
 
 ## Every test commit since the red run (`1cd28a70`)
 
