@@ -1,10 +1,7 @@
 # POLY-100 ruling: pull-based deploy and timers
 
-Architect, 2026-11-23. Tree read at `aa8247f327a68b619342e27a06f895232f293d32`. Sources: the description, seven criteria and
-twelve comments on `POLY-100.md`; POLY-99 ruling R5/R6 and verdict §8; INFRA §2.2, §3.2–§3.3, §4.4–§4.6, §6.4, §6.8, §7.1,
-§8.6–§8.10; ARCH §8.1; SECURITY C-83, T-64, T-92, TB-12, R-29; DECISIONS 2026-11-23; seceng-100's prep (holes 1–5, D1–D15,
-A-a–A-d) and review conditions S1–S9 (mapped at the end). A claim is measured (§M) or tagged `(unmeasured)`.
-The ruling proceeds on each recommendation in §D unless the issue file says otherwise.
+Architect, 2026-11-23. Tree read at `aa8247f327a68b619342e27a06f895232f293d32`. Sources: `POLY-100.md` with its comments; POLY-99 ruling R5/R6 and
+verdict §8; INFRA, ARCH §8.1, SECURITY; DECISIONS 2026-11-23; seceng-100's prep and `ruling-review.md`. Claims are measured (§M) or `(unmeasured)`.
 
 ## M — Measurements (this Mac, gh 2.105.0, 2026-11-23, digest of build run 45196636649)
 
@@ -208,20 +205,17 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 
 ## R8 — Rollback and quarantine
 
-- **Automatic:** at the 120 s mark:
-  1. Quarantine the candidate (`<digest> <UTC> unhealthy`).
-  2. Re-check `previous`'s tree hash, run the R5 guard on its render (S3), then `up -d` from its bundle and `images.env`.
-  3. On prod, do the same for edge from the same release:
-     guard the **edge** render, then `up` caddy. Step 8 changes caddy before health is judged, so a rollback that leaves
-     edge alone keeps the failed release's Caddy in front of prod.
-  4. Run R7 again, caddy included. Both renders are judged before either `up` (S3).
-  - Healthy → `rolled-back`, alert.
-  - Unhealthy, or no `previous` (first deploy) → `rollback-unhealthy`, alert, change nothing else (INFRA §8.6).
-  - **Rollback never migrates.**
-  - Criterion 3's "within 120 s" means the rollback **starts** no later than 120 s after `up -d`.
-- **Manual:** `polycarpic-ops rollback <project>` makes no GitHub call. It quarantines `current` and ups `previous` from
-  `releases/`, after the tree-hash re-check, R1's integrity check and the R5 guard, then runs R7. Prod's
-  restores edge too.
+- **Automatic,** starting no later than 120 s after `up -d` (criterion 3's "within 120 s"):
+
+| # | Step |
+|---|---|
+| 1 | Quarantine the candidate (`<digest> <UTC> unhealthy`) |
+| 2 | Re-check `previous`'s tree hash; judge its render, and on prod its **edge** render, with R5, both before either `up` (S3) |
+| 3 | `up -d` from its bundle and `images.env`; on prod then caddy, because step 8 changed caddy before health was judged |
+| 4 | R7 again, caddy included. Healthy → `rolled-back`, alert. Unhealthy, or no `previous` → `rollback-unhealthy`, alert, change nothing else (INFRA §8.6). **Never migrates** |
+
+- **Manual:** `polycarpic-ops rollback <project>` makes no GitHub call: quarantine `current`; tree hash, R1's integrity check and R5 on
+  `previous`; `up` it from `releases/` (prod's edge too); R7.
 - **What health sees of Caddy.** Its healthcheck is `caddy version`, so that alone catches only a Caddy that does not
   start. R7's probe (A13) adds one that misroutes the health path or serves no valid certificate. A Caddy that logs or
   forwards wrongly while answering is stopped before the image exists, by the lint (R11, A12), review and the signature.
@@ -325,11 +319,8 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
 
 ## R11 — CI, images, env wiring, signers (F3, F10; POLY-85, 97, 98 comments)
 
-- **`build.yml` siblings job.** It builds, pushes by per-run tag, Trivy-scans and provenance-attests three images, each with
-  `GIT_COMMIT` and the revision label:
-  - `polycarpic-postgres` from `infra/postgres/Dockerfile`;
-  - `polycarpic-tools` from `infra/backup/tools.Dockerfile`;
-  - `polycarpic-caddy` from `infra/caddy/Dockerfile`.
+- **`build.yml` siblings job:** builds, pushes by per-run tag, Trivy-scans and provenance-attests, with `GIT_COMMIT` and the revision label,
+  `polycarpic-postgres` (`infra/postgres/Dockerfile`), `polycarpic-tools` (`infra/backup/tools.Dockerfile`), `polycarpic-caddy` (`infra/caddy/Dockerfile`).
 - **`build.yml` `release-lint` job** (seceng B1). It `needs: siblings` and has `permissions: {contents: read}`. It writes
   its own `images.env` from the siblings' outputs, installs with the frozen lockfile and lifecycle scripts blocked, and
   runs the compose-policy lint. The lint imports `yaml`, so it needs npm packages, and no third-party package may be
@@ -364,7 +355,6 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
     change it. Prod says `production` from the first deploy, and check-config stays strict (C-77). The value opens
     nothing by itself: nothing outside `packages/config` reads it today, and a Plaid call also needs `plaid_secret`. An
     unset-allowed rule would be a gap to remember to close when the adapter lands.
-
   - `MAIL_FROM` leaves `host.env`. `provision.sh` writes it to `/etc/polycarpic/mail.env` (staging: `staging-mail.env`; root 0644, that one key),
     and only auth and worker list that file, as a second `env_file` entry. `check-config` is unchanged: `MAIL_FROM` is not a secret, and
     the refusal on web, migrate and operator keeps the sender setting with the two services that hold the Resend key, so a
@@ -384,12 +374,9 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
   (`cert-authority` above all, `valid-before`/`valid-after`, a second namespace) or key type exits 2, nothing written (S9). It writes
   `/etc/polycarpic/allowed_signers` root:root 0644, asks for `yes` before replacing, and prints the fingerprints. The file
   is never fetched.
-- **provision-check lines,** in the POLY-97 R6 format:
-  - the deploy units equal the bundle's copies;
-  - `compose-allow.json` is present and root-owned;
-  - `allowed_signers` is present and well-formed (WAIT before the first edge or prod release);
-  - `edge.env` is present;
-  - the deploy timer is enabled for each project that has a `current` (WAIT before then).
+- **provision-check lines** (POLY-97 R6 format): deploy units equal the bundle's copies; `compose-allow.json` present and root-owned;
+  `allowed_signers` present and well-formed (WAIT before the first edge or prod release); `edge.env` present; the deploy timer enabled for each project
+  that has a `current` (WAIT before then).
 - **`install.sh --commit <40 hex>`** (S21). The operator's own checked-out `install.sh` ships `git archive <C>` and C's `install_box.py`,
   with no checkout. It refuses (exit 2, before any ssh) a C that is not an ancestor of `origin/main`. Without the flag it ships HEAD as
   today. It passes `user@host` as a second argument, which `install_box.py` checks before extraction and writes to `ssh-target`.
@@ -494,89 +481,44 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 **Builder split.** R12 is backend-lead's, as POLY-100f (filed): about 40 lines in `packages/db/src/migrate.ts` plus T-pre
 and T-lock, disjoint from every infra path; backend-lead owns the refusal codes the deploy reads. devops-engineer builds R1–R11.
 
-## D — Decisions for the Principal
+## D — Decided by the Principal (2026-11-23, `process/DECISIONS.md`)
 
-**D1 — The box's GitHub token scope** (seceng P-a).
-- *Mechanism:* the token is needed only for `gh attestation verify` (M4), the staging artifact download (M3) and the
-  rate limit (60 an hour anonymous, per seceng). Everything it reads is public (M1, M2).
-- *Reach if stolen* (that needs root on the box or the laptop during `set-secret`):
-  - **(a)** INFRA's spec, fine-grained, this repo, `contents:read packages:read`. Today it reads only public data; it would
-    read private content if the repo were made private. seceng believes GHCR refuses fine-grained tokens for packages,
-    forcing a classic `read:packages` PAT, which reaches every package the account can read.
-  - **(b)** Fine-grained, "public repositories, read-only", no permissions. It reads only what anyone can, under the
-    owner's rate limit; the worst a thief can do is exhaust that limit and so stall the poll.
-- *Cost of (b):* nothing in code. It must be shown to download a public artifact and to run `verify` `(unmeasured)`, by a
-  one-call check before POLY-104.
-- **Recommend (b).** A classic PAT is refused under either option. The build is the same either way.
-
-**D2 — Who may touch Caddy: decided, strict** (Principal, 2026-11-23). Staging never touches it, on any host (R9). Not taken: edge
-from staging while a host has no prod (its checks failed open four times; the DNS check sees poll time only), and edge always
-from staging (bypasses the signature).
-
-**D3 — Box-guard policy changes ship only by an operator step** (R5; seceng P-b). *Mechanism:* the guard and
-`compose-allow.json` are installed tooling; a release that adds a mount, service or network is refused (`guard-…`,
-quarantined) until the operator runs `install.sh` from a reviewed checkout. *Why:* staging has no human gate, so a bundle
-judging itself would let any `main` merge mount host paths on the box that runs prod. *Cost:* a compose change becomes a
-two-step release, refused loudly. Options: **(a)** as ruled; **(b)** the release's own policy checked by the installed
-code, which lets a `main` merge widen the policy itself. **Recommend (a).**
+| # | Decision |
+|---|---|
+| D1 | Token: fine-grained, public repositories, read-only, no permissions. Classic tokens refused (R11). Shown to download the artifact and run `verify` before POLY-104, or it returns to the Principal |
+| D2 | Strict: staging never touches Caddy (R9). First edge: edge alone, from a signed `edge-<n>` tag (R9). Not taken: edge from staging while no prod exists (its checks failed open; DNS is seen at poll time only); edge always from staging (bypasses the signature); prod first |
+| D3 | Guard policy ships only by `install.sh` (R5); the refusal prints the exact commands (R10). Not taken: the release's own policy, which a `main` merge could widen |
 
 ## L — For the lead
 
-- **L1.** Criterion 5 says "measured in the restore drill", but the drill and its timing are POLY-116's. Amend the
-  criterion to "the runbook's inputs are proven (T13); the 60 minutes is POLY-116's", or say otherwise.
-- **L2.** `self-update` has no issue; I suggest the ops follow-up umbrella.
-- **L4.** User steps before the first real deploy:
-  - create the token (§D1), and run the one-call check;
-  - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment): both are needed before staging is **served**;
-  - `allowed-signers install` on the box, with the same key;
-  - sign and push `edge-1` on a `main` commit built in the last 90 days; wait for its Release;
-  - after the first `build.yml` run, confirm that the three new GHCR packages are public `(unmeasured)`.
-- **L5.** POLY-104's and INFRA's note on when to create the `app.` record (S11, S15) is withdrawn: no staging-built Caddy
-  exists to obtain that certificate. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with
-  `github_read_token` and staging's password file, `allowed-signers install`, `first-deploy staging` (again after
-  `provision --stage database` if it asks), `edge-deploy edge-1`, then the scans. Staging comes first because it needs no Caddy and shows that it needs none. It also measures a staging deploy before any edge exists, what Caddy does while `app.` has
-  no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`).
+| # | Item |
+|---|---|
+| L1 | Criterion 5 says "measured in the restore drill"; drill and timing are POLY-116's. Amend to "the runbook's inputs are proven (T13)", or say otherwise |
+| L2 | `self-update` has no issue; suggest the ops follow-up umbrella |
+| L4 | User steps, in order: the token and its one-call check; the SSH tag-signing key and `RELEASE_SIGNERS` (needed before staging is **served**); `allowed-signers install` on the box with the same key; after the first `build.yml` run, confirm the three new GHCR packages are public `(unmeasured)`; sign and push `edge-1` on a `main` commit built in the last 90 days and wait for its Release |
+| L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and staging's password file, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
 
 ## E — Doc passages (owners, at the verdict)
 
-- **INFRA** (devops):
-  - §3.2 and §3.3: the token and `HOST_ONLY`;
-  - §4.4–§4.6;
-  - §4.4's re-run sentence, which is wrong: a re-run keeps the original commit;
-  - §7.1 first-deploy;
-  - D-9: no provision-check line checks staging's `PLAID_ENV`; `check-config` and T-env do;
-  - §8.6.
-- **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
-- **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
-
-## S1–S25 (seceng `ruling-review.md` @ `a1db2870`): met by
-
-Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
-
-| Cond. | Met by |
+| Doc | Passages |
 |---|---|
-| S1 `--source-digest` + `--predicate-type`, app and siblings | R3 V1, V5 (M6, M7); T1, T2, T5 |
-| S2 tag object's name = ref = Release | R2 (prod), R3 V4; T3 (`v1.0` as `v1.99`). release.yml mirror: advisory, §E |
-| S3 installed-policy guard before any candidate container, and before rollback's `up` | R5 (table), R6 step 1, R8; T8 |
-| S4 edge never from staging | R9 (absolute); T9 |
-| S5 poly_backup memberships | R12 (c); T-pre |
-| S6 token in gh's env only; git without credentials | R2; T15 |
-| S7 no argv element under `releases/` but `-f`/`--env-file`/`--project-directory` | R4; T7 |
-| S8 `HOST_ONLY` exactly two names; `github_pat_` shape; never printed | R11; T18 |
-| S9 signers plain form only | R11; T17 |
-| S10 per-service key/value allowlist; env sources; no line regex | R5 (`key`, `pinned`, `mount`, `file`, `env`; raw + plain renders, M8); T8 |
-| S11, S15, A11 | withdrawn with D2 strict (R9) |
-| S12 `current`'s images until step 5 | R6 step 2, step 3, the note under the table; T12 |
-| S13 rollback through the guard | R5, R8; T8 |
-| S14 network judged by its resolved name | R5 `network`; T8 |
-| S16 `_edge_up` refuses an unjudged render (ownership half withdrawn) | R9; T9 |
-| S17 malformed `current` is not absent | R10; T9 |
-| S18 unreadable bundle id keeps the quarantine | R8; T10q |
-| S20 ordered Caddyfile lines; caddy `environment`/`command` pinned | R11 `caddy-allow`; T-caddy |
-| S21 what a guard refusal prints | R10 help; R11 `install.sh --commit`; T-help |
-| S27 exact `env_file` list per service | R11; T-env |
-| S26 the prod edge network is `polycarpic-edge-prod` | R5, T8 |
-| S22 namespaces cannot cross; S23 one owner after prod; S25 edge's Caddy rescanned | R9; T-edge, T-take, T-relyml |
-| S24 networks from provision | R9; T-net |
-| S19 rerun skips the backup only on an empty database | R6; T12 |
-| A12, A13 (adopted) | R11 `caddy-allow`, T-caddy; R7 through Caddy, T-probe |
+| INFRA (devops) | §3.2 and §3.3 (token, `HOST_ONLY`); §4.4–§4.6; §4.4's re-run sentence (a re-run keeps the original commit); §7.1 first-deploy; D-9 (no provision-check line checks staging's `PLAID_ENV`; `check-config` and T-env do); §8.6 |
+| SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
+| ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
+
+## S1–S27 (seceng `ruling-review.md`): met by
+
+| Cond. | Met by | Cond. | Met by |
+|---|---|---|---|
+| S1 | R3 V1, V5; T1, T2, T5 | S2 | R2, R3 V4, R9 `release.yml`; T3, T-relyml |
+| S3, S13 | R5, R6 step 1, R8; T8 | S4 | R9 (absolute); T9 |
+| S5 | R12 (c); T-pre | S6 | R2; T15 |
+| S7 | R4; T7 | S8 | R11; T18 |
+| S9 | R11; T17 | S10 | R5; T8 |
+| S11, S15, A11 | withdrawn with D2 | S12 | R6 steps 2–3 and note; T12 |
+| S14, S26 | R5 `network`; T8 | S16 | R9 (`_edge_up`; ownership half withdrawn); T9 |
+| S17 | R10; T9 | S18 | R8; T10q |
+| S19 | R6; T12 | S20, A12 | R11 `caddy-allow`; T-caddy |
+| S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
+| S24 | R9; T-net | S27 | R11; T-env |
+| A13 | R7; T-probe | | |
