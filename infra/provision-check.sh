@@ -47,7 +47,7 @@ gid_of() {
   esac
 }
 # Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
-HOST_ONLY="heartbeat_url=host"
+HOST_ONLY="heartbeat_url=host github_read_token=host"
 # The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
 files_for() {
   local pair
