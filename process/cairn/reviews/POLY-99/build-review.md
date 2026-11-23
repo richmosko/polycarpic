@@ -166,6 +166,57 @@ and `# T15` in `upload.py`. Bash and Python treat each as a comment, and none si
   fileIds, and the lead files it under `process/`. If the repository is public, drop the bucket name and the fileIds
   from the filed copy.
 
+## Re-ruled with the repository public (`gh repo view` → PUBLIC): A-g becomes F3, A-f becomes F4
+
+**F3. The filed drill report must carry no bucket name, fileId or system id.**
+- *What a reader gains without a key:*
+  - **Bucket name.** It identifies our store across Backblaze. With the bucket private, a download by name or by
+    fileId needs an authorization token, so nothing downloads. If the bucket were ever made public by mistake, a
+    name plus the object names gives a direct download URL. Even then that yields ciphertext only.
+  - **fileIds.** Every B2 call that takes one needs a token, so a reader can do nothing with them. They identify
+    versions exactly, which is useful to us and to nobody else.
+  - **System id, instance, timestamps.** They show the backup schedule, the Postgres major and the cluster identity.
+    That is reconnaissance, not access.
+- So the reach is small. It becomes a fix for two reasons. A public commit cannot be withdrawn: git history and forks
+  keep it. And the redaction costs a few lines.
+- *Required:*
+  - `drill.sh --report` writes only the filed form: the date; per object its kind, `<TS>`, upload time and the sha256
+    from its sibling (a ciphertext hash, which reveals nothing); and every check line.
+  - It writes no bucket name, no fileId, no system id and no object key. The fileIds the operator needs to act on stay
+    in the terminal output, which is local.
+  - DR1, DR2 and DR11 FAIL lines that name objects use kind and `<TS>` in the report.
+- *Test:*
+  - In the `drill.test.ts` happy run with `--report`, the file holds no `4_zfake_` id, no bucket name, no
+    `SET_SYS`-shaped id and no `/` object key.
+  - It still holds every DR id with its result, and each object's kind and TS.
+  - Red: today's report, which lists `fileId=` and the keys.
+
+**F4. A successful restore's scratch must not outlive the session by default.** Printing the removal command is not
+enough.
+- *Mechanism:* the scratch runs `sleep 86400` with no `--rm`. When the sleep ends, the container stops but is not
+  removed. Its writable layer, holding the decrypted ledger including BetterAuth's password hashes and session
+  tokens, then stays on the laptop's Docker disk **indefinitely**, and any process that can reach the Docker socket
+  can read it. A forgotten restore becomes a permanent plaintext copy.
+- Removing it at exit by default would make `restore.sh` useless, because the running scratch is what the operator
+  compares against. So the scratch gets a bounded life, and a way to end it.
+- *Required:*
+  - The scratch runs with `docker run -d --rm`, its main process `sleep <seconds>` from `--hours <n>`. The default is
+    8 and the maximum 24; outside 1–24 is exit 2. When the time ends, Docker removes the container and its layer.
+  - `scratch_report` prints the end time and `restore.sh --cleanup`.
+  - `restore.sh --cleanup` removes every container labelled `polycarpic.restore=scratch` (`docker rm -f -v`) and
+    prints how many.
+  - Every `restore.sh` run first lists any existing labelled scratch on stderr as a `WARN`, so a forgotten one is
+    seen.
+  - `--keep` stays what it is: it keeps the decrypt directory, and says so.
+- *Test:*
+  - The fake docker log shows the scratch `run` with `--rm` and `sleep 28800`. `--hours 2` gives `sleep 7200`, and
+    `--hours 0` or `--hours 25` gives exit 2.
+  - `--cleanup` with two labelled containers present issues `rm -f -v` for both, and none for an unlabelled one.
+  - A run with a labelled container present prints the `WARN`.
+  - Red: today's argv, which has no `--rm`.
+- `drill.sh` already removes its scratches on exit. It also gains `--rm`, so an interrupted drill cannot leave one
+  behind.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
