@@ -864,3 +864,19 @@ is answered by measurement (`{}` only for zero). S35 applies to the saved YAML a
 - `provision-check` on `compose-allow.json`'s owner: accept; the installed copy is the one that matters.
 
 **F4 counts as proven** only when devops-100 shows the source's exit code and container per service, and one `create` per service from a render made as `polycarpic-render`. Nothing else of mine is open in the ruling.
+
+## Draft: section G (architect-100, not yet in the ruling)
+
+**G1, G3: agree** (G1 with S37). **G2: agree with S36.** G4-G8: agree. The additions are right: `render-path` without quarantine, `in-progress` cleared only after the quarantine is on disk.
+
+**S36 (on G2). The restore itself must need no write.** "Restore first" still renders, judges and **saves** the old release's file before its `up` (F4, G5), so on a full disk the restore fails at the save, which
+is the case G2 is for. *Required:* in a restore, the release is rendered and judged in memory; when the corrected bytes equal the saved file's and its sha256 sidecar, nothing is written and `up` names the saved
+file. Only when they differ is it saved; if that save fails, the saved pair is used when its own hash holds and its bytes pass the guard now, read back through the isolated stdin render. Otherwise
+`rollback-unhealthy`. *Tests:* `ENOSPC` on every write from the candidate's `up` onward: the old release is back up and healthy, for a project, for prod with edge, for edge and for both manual rollbacks. Red on a mutant
+that saves before every `up`. The manual rollbacks write their pointers after; a failed pointer write is reported and exits 1, with the old release up.
+
+**S37 (on G1). Repair only what is ours.** Each directory is opened without following a link and must be root-owned before its mode is set; a link, another owner or a non-directory is `render-path`, never repaired.
+The render home stays empty and unwritable by 10020. *Tests:* a symlink and a foreign owner at each level. `state/deploy` at 0755 shows logs and alerts to host accounts: they hold no secret (S35 for the renders).
+
+**T-real: I recommend it, with the rollback case.** F1, F16 and G1 share one cause: every fake agreed with the code. *Security limits on it:* it runs last in a job with read-only permissions and never in `build.yml`; the
+`ghcr.io` hosts line and the CA are removed even on failure, and no later step pulls; the fake `gh` is written by the test and is in no shipped path. It does not replace POLY-104.
