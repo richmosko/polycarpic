@@ -89,10 +89,6 @@ class S3(Base):
         mode = STATE["mode"]
         if "retention" in qs or "object-lock" in qs:  # PutObjectRetention / PutObjectLockConfiguration: a writeFiles key may do neither
             return self.send(200) if mode == "permissive" else self.deny()
-        _parts = u.path.lstrip("/").split("/", 1)
-        _name = unquote(_parts[1]) if len(_parts) == 2 else ""
-        if self.headers.get("If-None-Match") == "*" and STORE.get(_name) and mode != "permissive":
-            return self.send(412, "<Error><Code>PreconditionFailed</Code></Error>")
         if mode == "refuse":
             return self.deny()
         if mode == "5xx":
@@ -106,9 +102,10 @@ class S3(Base):
         parts = urlparse(self.path).path.lstrip("/").split("/", 1)
         name = unquote(parts[1]) if len(parts) == 2 else ""
         with LOCK:
-            if STORE.get(name) and mode != "permissive":
-                pass  # B2 keeps every upload as a new version; nothing is refused here
-            new_version(name, data)
+            if STORE.get(name) and mode == "permissive":
+                STORE[name][0]["data"] = data  # permissive: the first version is OVERWRITTEN in place (same fileId), what an unlocked bucket allows
+            else:
+                new_version(name, data)  # B2 keeps every upload as a new version
         etag = "0" * 32 if mode == "etag" else md5.hex()
         self.send(200, b"", headers={"ETag": '"%s"' % etag})
 

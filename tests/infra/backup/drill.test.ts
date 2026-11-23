@@ -4,8 +4,9 @@
 //
 // Pins 34-37 (test-plan.md): output lines are `PASS|FAIL|SKIP <id> <text>`; the last line `DRILL PASSED` (0), `DRILL PASSED WITH SKIPS: <ids>`
 // (3), `DRILL FAILED: <ids>` (1); usage 2. Today's schema has no ledger, so DR9 is SKIP and the happy run is exit 3. DR8 is PASS when
-// neither public.session nor app.session_handle exists (nothing to check). DR10 uses the box key against the S3 half: DELETE, a conditional
-// PUT (`If-None-Match: *`) over an existing name, PutObjectRetention (`?retention`) and PutObjectLockConfiguration (`?object-lock`); each must be refused.
+// neither public.session nor app.session_handle exists (nothing to check). DR10 (architect, POLY-99.md @ e585d393) runs on a probe object `<instance>/drill/probe-<UTC TS>` the drill uploads with the box key, never on a backup
+// object: DELETE, `PUT ?retention` and `PUT ?object-lock` must be refused; a plain PUT over the probe's name passes only if the ORIGINAL version (by fileId) still
+// downloads with its original sha256.
 import { existsSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -75,6 +76,10 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report)', () 
     expect(md).toMatch(/4_zfake_\d+/); // fileIds
     for (const id of ['DR1', 'DR10', 'DR11']) expect(md).toContain(id);
     expect(lap.scratches()).toEqual([]); // scratch containers are removed on exit
+    const st = fake.store();
+    const probes = Object.keys(st).filter((n) => n.startsWith(`${INSTANCE}/drill/probe-`));
+    expect(probes.length).toBeGreaterThanOrEqual(1); // DR10 ran against a probe, and every backup object still has exactly one version (DR1 on the next run)
+    for (const n of Object.keys(st).filter((k) => !k.startsWith(`${INSTANCE}/drill/`))) expect(st[n], n).toHaveLength(1);
     expect(r.out + r.err).not.toContain(APP_KEY);
     expect(r.out + r.err).not.toContain(readFileSync(lap.identity, 'utf8').split('\n').find((l) => l.startsWith('AGE-SECRET-KEY-'))!);
   }, 600_000);
@@ -91,7 +96,7 @@ describe('drill.sh on the real set (R8: DR1-DR11, the last line, --report)', () 
     expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR3\b/) });
   }, 600_000);
 
-  it('DR10: a bucket that lets the box key delete, overwrite or change retention (fake-b2 permissive) is FAIL -> the last line names DR10, exit 1', () => {
+  it('DR10: a bucket that lets the box key delete, overwrite a version in place or change retention (fake-b2 permissive) is FAIL -> the last line names DR10, exit 1', () => {
     plant();
     fake.mode('permissive');
     const r = lap.run('drill.sh', DRILL());

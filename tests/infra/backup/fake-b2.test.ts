@@ -49,13 +49,21 @@ describe('fake-b2 S3 half', () => {
     fake.mode('permissive');
     expect(client(`curl -s --cacert /ca.crt -o /dev/null -w "%{http_code}" -X DELETE ${URL}/o1`).out).toBe('204');
   });
-  it('DR10 verbs: PutObjectRetention and PutObjectLockConfiguration are 403, a conditional PUT over an existing name (If-None-Match: *) is 412; permissive allows them', () => {
+  it('DR10 verbs: PutObjectRetention and PutObjectLockConfiguration are 403; a plain PUT over an existing name makes a NEW version and leaves the old bytes; permissive overwrites the first version in place', () => {
     client(put('o/exists'));
     const c = 'curl -s --cacert /ca.crt -o /dev/null -w "%{http_code} " -X PUT --data-binary x';
-    const codes = () => client(`${c} "${URL}/o/exists?retention"; ${c} "${URL}/o/exists?object-lock"; ${c} -H "If-None-Match: *" ${URL}/o/exists; ${c} -H "If-None-Match: *" ${URL}/o/fresh`).out.trim();
-    expect(codes()).toBe('403 403 412 200'.replace(/ 200$/, ' 400')); // the last PUT carries no Content-MD5 here: a new name is not refused by the condition
+    expect(client(`${c} "${URL}/o/exists?retention"; ${c} "${URL}/o/exists?object-lock"`).out.trim()).toBe('403 403');
+    client(put('o/exists'));
+    const v = fake.store()['o/exists']!;
+    expect(v).toHaveLength(2);
+    expect(v[0]!.sha256).toBe(v[1]!.sha256); // same bytes ("hello") twice: two versions, nothing replaced
     fake.mode('permissive');
-    expect(codes().split(' ').slice(0, 3)).toEqual(['200', '200', '400']);
+    expect(client(`${c} "${URL}/o/exists?retention"`).out.trim()).toBe('200');
+    client(`curl -s --cacert /ca.crt -o /dev/null -X PUT -H "Content-MD5: $(printf other | openssl dgst -md5 -binary | base64)" --data-binary other ${URL}/o/exists`);
+    const after = fake.store()['o/exists']!;
+    expect(after).toHaveLength(2);
+    expect(after[0]!.fileId).toBe(v[0]!.fileId);
+    expect(after[0]!.sha256).not.toBe(v[0]!.sha256); // overwritten in place
   });
   it('a client without the test CA is refused by TLS (the real CA bundle is not what the fake presents)', () => {
     expect(client(`curl -s -o /dev/null -w "%{http_code}" ${URL}/o`).out).not.toBe('403');
