@@ -128,6 +128,8 @@ for (const [kind, path] of Object.entries(files)) {
 await Promise.all(pending);
 
 // ---- pg_hba
+// R12(a) (POLY-100): the migrate preflight sweeps only the current database for poly_backup and relies on these four lines; a PR that widens
+// pg_hba.prod.conf must widen that sweep in the same PR.
 const hbaProd = read('infra/postgres/pg_hba.prod.conf');
 const hbaStaging = read('infra/postgres/pg_hba.staging.conf');
 const backupCidrs = [];
@@ -139,7 +141,7 @@ else {
     && r1.join(' ').startsWith('host replication poly_backup') && r2.join(' ').startsWith('host polycarpic poly_backup')
     && r1[3] === r2[3] && r1[4] === 'scram-sha-256' && r2[4] === 'scram-sha-256'
     && r3.join(' ') === 'host all poly_backup all reject' && r4.join(' ') === 'host replication all all reject';
-  if (!ok) v('pg-hba-prod', 'infra/postgres/pg_hba.prod.conf', 'the four C-79 lines must come first, in order');
+  if (!ok) v('pg-hba-prod', 'infra/postgres/pg_hba.prod.conf', "the four C-79 lines must come first, in order; R12(a)'s preflight sweeps only this database and relies on it");
   for (const r of rules) if (r[2] === 'poly_backup' && r[4] !== 'reject') backupCidrs.push(r[3]);
 }
 if (hbaStaging == null) v('pg-hba-staging', 'infra/postgres/pg_hba.staging.conf', 'missing');
