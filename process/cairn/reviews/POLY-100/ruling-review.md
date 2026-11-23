@@ -333,3 +333,51 @@ S1–S9 against `900d23f6` are in the table above: S1, S2, S4–S9 met, and S3 m
 
 Also new in the rewrite, already ruled above: V1 is not quarantined (A7); `first-deploy` skips the premigration backup
 (A8). S12's step 2 was in `43af9303` too, and I missed it in the first review.
+
+## Re-check @ `d6ee5088` (S10–S12 and what the edit touches)
+
+| Condition | At `d6ee5088` |
+|---|---|
+| S10 key and value allowlist, env sources | **Met.** R5's `key`, `pinned`, `mount`, `file` and `env` rules over two renders. M8 shows the raw render keeps `env_file` paths and resolves a quoted `include`, so the line regex goes, which is better than my YAML-parse suggestion. `extends` is unmeasured and carried as a T8 case, which is enough. One gap remains in the `network` rule, unchanged by this edit: **S14**. |
+| S11 no prod key for staging-era Caddy | **Met in mechanism**, (i) through DNS plus (ii) the wipe. The reasoning holds: no CA validates a name that does not resolve to the box, and Hetzner's Caddy holds no DNS token, so a wildcard or DNS-01 is out of reach. One ordering gap: **S15**. |
+| S12 `current`'s images until step 5 | **Met.** R6 steps 2–3, the note, T12. |
+| A8 `first-deploy` on existing data | **Adopted.** `existing-data` exit 4, and `--existing-data` makes the backup required. |
+
+### Measured here (Compose v5.7.0, `-p polycarpic-staging`, no container started)
+
+SM6: a staging file whose service joins `default`, with top-level `networks: default: {external: true, name:
+polycarpic-prod_default}`. In the plain render, the service lists only the key `default`. The real name,
+`polycarpic-prod_default`, appears only in the top-level `networks` entry.
+
+**S14. The `network` rule judges the resolved network, not its key.**
+- *Rule:* for each network a service joins, the guard looks up the top-level entry in the plain render and compares its
+  `name`, `external` and `driver` to the project's installed list. Any other top-level network property (`driver_opts`,
+  `ipam` other than the policy's) is refused `guard-network`.
+- *Why it blocks:* with a key-only check, the SM6 file passes. A staging service then sits on prod's application network,
+  inside 10.201.1.0/24, which prod's `pg_hba.conf` admits. It reaches prod's web and auth without Caddy, and prod
+  Postgres's listener. It still needs a prod password for the database, but every unauthenticated internal port is open
+  to it.
+- *Test (T8 adds):* SM6's file is refused `guard-network`, and so is an `edge` alias naming `polycarpic-prod-edge`. Red on
+  a guard that checks service network keys only.
+
+**S15. The `app.` record is created only after prod's first deploy has wiped and recreated Caddy.**
+- *Mechanism:* Caddy keeps retrying a failed issuance in the background. If a staging-era Caddyfile names `app.<domain>`,
+  the staging-era Caddy that is running obtains the certificate in the minutes between the operator creating the record
+  and prod's first deploy stopping it. In that window the key can leave the box, and the wipe revokes nothing.
+- *R9's precondition alone does not close this.* It checks DNS when a staging run starts, not while Caddy runs.
+- *Required:*
+  - §L5 and the INFRA first-deploy runbook state the order: prod first deploy first (stop, wipe, recreate from prod's
+    bundle), then the `app.` A/AAAA records.
+  - `first-deploy prod` prints that instruction as its last line.
+  - `first-deploy prod` refuses `edge-prod-name-early` (exit 4) if `app.<domain>` already resolves while caddy is still a
+    staging-era container (no prod `current`). The operator removes the record, or passes `--caddy-never-staged` when no
+    staging edge ever ran on the host.
+- *Test (T9 adds):* `first-deploy prod` with `app.` resolving and a staging-era caddy is refused with that code, and
+  nothing changes. Red on a mutant without the check.
+- *Cost:* one resolve call and one flag.
+
+**Advisory A9.** A CAA record for the domain pinning `accounturi` to prod's ACME account, set after the first prod
+deploy, makes any later certificate from another account fail at the CA. Today Caddy's `/srv/polycarpic/caddy` is the
+only account store.
+
+**Gate: not open.** S14 and S15 are two small ruling edits, plus their T8 and T9 cases. Everything else is met.
