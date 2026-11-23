@@ -25,11 +25,28 @@ def images_env_text(sibs=None):
     return "".join("POLY_%s_IMAGE=ghcr.io/richmosko/polycarpic-%s@%s\n" % (n.upper(), n, d) for n, d in sorted(s.items()))
 
 
+def dockerfile_manifest():
+    """F1 (iii): the files the Dockerfile assembles at /release/infra, read from the Dockerfile (never from the code's own FILES list), globs expanded against the checkout."""
+    import re
+    text = (REPO / "Dockerfile").read_text()
+    lines = [l for l in text.splitlines() if re.search(r"/release\b", l)]
+    if not lines:
+        raise AssertionError("the Dockerfile assembles no /release/infra (POLY-100 F1): a bundle cannot be built from its list")
+    out = set()
+    for l in lines:
+        for tok in re.findall(r"\binfra/[A-Za-z0-9_./*-]+", l):
+            tok = tok.rstrip("/")
+            if "*" in tok:
+                out.update(str(f.relative_to(REPO)) for f in REPO.glob(tok) if f.is_file())
+            elif (REPO / tok).is_dir():
+                out.update(str(f.relative_to(REPO)) for f in (REPO / tok).rglob("*") if f.is_file())
+            elif (REPO / tok).is_file() or tok == "infra/release/images.env":
+                out.add(tok)
+    return sorted(out)
+
+
 def good_files(env=None):
-    files = {p: (REPO / p).read_bytes() for p in MANIFEST}
-    for f in sorted((REPO / "infra" / "postgres").iterdir()):
-        if f.is_file() and f.suffix in (".conf", ".sh"):
-            files["infra/postgres/" + f.name] = f.read_bytes()
+    files = {p: (REPO / p).read_bytes() for p in dockerfile_manifest() if p != "infra/release/images.env"}
     files["infra/release/images.env"] = (env or images_env_text()).encode()
     return files
 
