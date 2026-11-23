@@ -187,6 +187,38 @@ class RenderFiles(Render):
         for name, v in values.items():
             self.assertNotIn(v.encode(), blob, "the value of %s is in a saved render, log or alert" % name)
 
+    def baked(self, refused):
+        """The plain render carries env_file values; the saved file (0600) is the only place they may be, on an accepted run and on a refused one."""
+        mark = "s35" + os.urandom(12).hex()
+
+        def hook(d):
+            d["services"]["web"].setdefault("environment", {})["S35_BAKED"] = mark
+            if refused:
+                d["services"]["web"]["privileged"] = True
+            return d
+        self.world.render_hooks[("staging", None)] = hook
+        self.candidate()
+        r = self.deploy("staging")
+        self.assertEqual(r.rc != 0, refused, r.err)
+        self.assertNotIn(mark, r.out + r.err, "a baked value was printed")
+        in_saved = 0
+        for base, _, files in os.walk(str(self.host.p("/"))):
+            for f in files:
+                try:
+                    blob = open(os.path.join(base, f), "rb").read().decode("utf-8", "replace")
+                except OSError:
+                    continue
+                if mark in blob:
+                    self.assertRegex(f, r"^render-[0-9a-f]{12}\.json$", "a baked value is in %s" % os.path.join(base, f))
+                    in_saved += 1
+        return in_saved
+
+    def test_s35_an_accepted_runs_baked_value_is_in_the_saved_file_alone(self):
+        self.assertGreaterEqual(self.baked(False), 1, "the control: the saved render has the value")
+
+    def test_s35_a_refused_runs_baked_value_is_in_no_file_log_alert_or_output(self):
+        self.assertEqual(self.baked(True), 0, "a refused render is not saved (nor printed, logged or alerted)")
+
 
 class RenderUser(Render):
     """A18 (ruling 13e43e26): renders run as `polycarpic-render` (uid and gid 10020, no shell, no other group); a missing or wrong user refuses `render-user` (exit 4)."""

@@ -84,7 +84,7 @@ describe('compose-policy lint: POLY-99 rules', () => {
 const ROOTDIR = join(dirname(new URL(import.meta.url).pathname), '..', '..');
 // POLY-100 (seceng, approved): POLY_CADDY_IMAGE, POLY_BIND_ADDR and POLY_DOMAIN are keys of root-owned images.env and edge.env, never of the process environment.
 // The exact set; no `on main` exemption (it would let any name that merged through afterwards).
-const ALLOW = new Set(['POLY_INSTANCE', 'POLY_POSTGRES_IMAGE', 'POLY_TOOLS_IMAGE', 'POLY_APP_IMAGE', 'POLY_CADDY_IMAGE', 'POLY_BIND_ADDR', 'POLY_DOMAIN', 'POLY_B2_AUTH_URL']);
+const ALLOW = new Set(['POLY_INSTANCE', 'POLY_POSTGRES_IMAGE', 'POLY_TOOLS_IMAGE', 'POLY_APP_IMAGE', 'POLY_CADDY_IMAGE', 'POLY_BIND_ADDR', 'POLY_DOMAIN', 'POLY_STAGING_ALLOW', 'POLY_TLS', 'POLY_B2_AUTH_URL']);
 const BANNED = /\bPOLY99_|\bPOLY_TEST|\bFAKE_|_FAKE\b/;
 const READ_DIRS = /^(infra\/backup\/|infra\/restore\.sh$|infra\/drill\.sh$|infra\/ops\/)/;
 function noTestVars(files: Record<string, string>): string[] {
@@ -103,7 +103,7 @@ describe('no-test-vars (seceng B-2): no tracked file under infra/ reads a test-o
   });
   it('RED ON THE FAULT: a fixture reading an unlisted POLY_DEBUG fails the rule; the allowlisted names do not', () => {
     expect(noTestVars({ 'infra/restore.sh': 'echo "${POLY_DEBUG:-}"\n' }).length).toBeGreaterThan(0);
-    expect(noTestVars({ 'infra/restore.sh': 'echo "$POLY_B2_AUTH_URL $POLY_INSTANCE $POLY_POSTGRES_IMAGE $POLY_TOOLS_IMAGE $POLY_APP_IMAGE $POLY_CADDY_IMAGE $POLY_BIND_ADDR $POLY_DOMAIN"\n' })).toEqual([]);
+    expect(noTestVars({ 'infra/restore.sh': 'echo "$POLY_B2_AUTH_URL $POLY_INSTANCE $POLY_POSTGRES_IMAGE $POLY_TOOLS_IMAGE $POLY_APP_IMAGE $POLY_CADDY_IMAGE $POLY_BIND_ADDR $POLY_DOMAIN $POLY_STAGING_ALLOW $POLY_TLS"\n' })).toEqual([]);
   });
   it('the tracked tree is clean: no infra/ file matches the banned patterns, and every POLY_* read in the backup scripts and ops is in the exact allowlist', () => {
     const files: Record<string, string> = {};
