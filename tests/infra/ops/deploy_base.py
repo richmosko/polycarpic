@@ -64,6 +64,20 @@ def tar_of(files):
     return buf.getvalue()
 
 
+class HookList(list):
+    """r.sleeps that fires `fire` once, at the first sleep: the moment a command is still waiting (for the lock)."""
+
+    def __init__(self, fire):
+        super().__init__()
+        self.fire = fire
+
+    def append(self, v):
+        if self.fire:
+            f, self.fire = self.fire, None
+            f()
+        super().append(v)
+
+
 class World(object):
     def __init__(self, tmp):
         self.tmp = Path(tmp)
@@ -82,6 +96,8 @@ class World(object):
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
+        self.bad_caddy = set()
+        self.ps_fails = set()
         self.plan_out, self.psql_result = "", (0, "0\n", "")
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
@@ -202,6 +218,10 @@ class World(object):
             url = next(a for a in argv[2:] if not a.startswith("-"))
             if "/actions/workflows/build.yml/runs" in url:
                 return 0, json.dumps({"total_count": len(self.runs), "workflow_runs": self.runs[:1]}), ""
+            if "/releases/tags/" in url:
+                tag = url.split("/releases/tags/", 1)[1].split("?", 1)[0]
+                hit = [r for r in self.releases if r["tag_name"] == tag]
+                return (0, json.dumps(hit[0]), "") if hit else (1, "", "HTTP 404: Not Found\n")
             if "/releases" in url:
                 return 0, json.dumps(self.releases), ""
             return 1, "", "FAKE gh api: no fixture for %s\n" % url
@@ -306,11 +326,14 @@ class World(object):
             self.on_compose(subcmd, list(argv))
         if subcmd == "config":
             return 0, self.render(argv, "--no-interpolate" in rest), ""
+        if subcmd == "ps" and project in self.ps_fails:
+            return 1, "", "Cannot connect to the Docker daemon\n"
         if subcmd == "ps":
             self.polls += 1
             rows = []
             for svc, c in sorted(self.containers.get(project, {}).items()):
                 bad = c["image"].split("@")[1] in self.bad_apps and svc in self.APP_SVC
+                bad = bad or (svc == "caddy" and c["image"].split("@")[1] in self.bad_caddy)
                 health = "unhealthy" if bad else "healthy"
                 rows.append(json.dumps({"Service": svc, "Name": c["name"], "State": "running", "Health": health, "ID": "id" + svc}))
             return 0, "\n".join(rows) + "\n", ""
@@ -438,7 +461,7 @@ class DeployTest(OpsTest):
     def log_events(self, project):
         return [l.split()[1] for l in (self.state(project, "deploy.log") or "").splitlines()]
 
-    def deploy(self, *argv, world=None, ctx_seams=True, cmd="deploy", **kw):
+    def deploy(self, *argv, world=None, ctx_seams=True, cmd="deploy", sleeps_hook=None, **kw):
         w = world or self.world
         runner = kw.pop("runner", None) or Runner(None)
         w.runner = runner
@@ -452,6 +475,8 @@ class DeployTest(OpsTest):
         if ctx_seams and "run_bytes" in names:
             extra["run_bytes"] = w.run_bytes
         def ready(rr):
+            if sleeps_hook:
+                rr.sleeps = HookList(sleeps_hook)
             w.sleeps_ref = rr.sleeps
         r = self.host.go(cmd, *argv, runner=runner, ctx_extra=extra, on_ready=ready, **kw)
         r.world = w
