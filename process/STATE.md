@@ -15,14 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Backup, uploader, restore, drill
-- **Issue:** `POLY-99` (cairn)
-- **Milestone:** `POLY-M1`
-- **Branch:** `feature/poly-99-backup-restore-drill`
-- **Started:** 2026-11-22
-- **Goal:** Encrypted backups leave the box through a put-only uploader, and `restore.sh` and `drill.sh` prove on a scratch Postgres that they restore, with a premigration mode the deploy calls.
-- **Status:** In Review — verdict PASS on build `a780368f` (`process/cairn/reviews/POLY-99/verdict.md`); the PR is on the board and the issue's `pr:` field
-- **Parked:** POLY-100 (Pull-based deploy) is claimed on `feature/poly-100-pull-based-deploy` and waits for this issue to merge (Principal, 2026-11-22).
+_None. POLY-99 (Backup, uploader, restore, drill) merged 2026-11-23 via PR [#150](https://github.com/richmosko/polycarpic/pull/150) — ARCH 1.27.1, SECURITY 1.18.0, INFRA 1.3.23. `infra/backup/backup.sh` (nightly and premigration), `infra/postgres/archive-wal.sh`, the put-only uploader (`infra/backup/upload.sh` and its tools image), `polycarpic-ops backup` and `upload`, `infra/restore.sh` and `infra/drill.sh` exist. Backups are compressed, then encrypted with age before they touch the disk; decryption happens only on the operator's laptop, into a throwaway scratch Postgres with no network. The deploy calls `polycarpic-ops backup premigration` (ruling R6, `process/cairn/reviews/POLY-99/ruling.md`). It is proven against a fake bucket, the test box image and a real Postgres only: no real Backblaze call, real key or real backup has been made (`process/cairn/reviews/POLY-99/verdict.md` §8); the real-box items are on POLY-100, POLY-103, POLY-104, POLY-105 and POLY-116. Open with the Principal, not yet decided: D1 whether `restore.sh --premigration --from-box` always requires the bucket cross-check; D2 whether decrypted premigration data may be restored into a temporary scratch cluster on the box, which decides the design of the route back into prod (not built, not filed); D3 whether to file the daily off-box list-only bucket check now. The drill report is redacted because this repository is public._
+
+- **Parked:** POLY-100 (Pull-based deploy) is claimed on `feature/poly-100-pull-based-deploy` and resumes now that POLY-99 is merged; the branch needs `main` merged in (Principal, 2026-11-22).
 
 _Standing context. POLY-98 (polycarpic-ops operator CLI) merged 2026-11-22 via PR [#149](https://github.com/richmosko/polycarpic/pull/149) — ARCH 1.27.0, SECURITY 1.17.1, INFRA 1.3.22. `polycarpic-ops` exists under `infra/ops/` with `set-secret`, `list-secrets`, `status`, `gate-check`, `provision`, `provision-check`, `restart` and `cli user invite`; `infra/ops/install.sh` installs it and the provisioning files into `/opt/polycarpic/ops/`. It is proven against fakes, the test box image and a real Postgres only; the ten real-box measurements are on POLY-104 (`process/cairn/reviews/POLY-98/verdict.md`). Decided by the Principal on 2026-11-22 (`process/DECISIONS.md`): `cli user reset-mfa` stays refused until its own review (POLY-155, before prod opens to a second person); one Resend key in two files. Not yet done: a live `cli user invite`, which needs POLY-100 to wire the `operator` service's environment. Follow-ups are on POLY-99, POLY-100, POLY-104 and POLY-155._
 

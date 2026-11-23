@@ -1,7 +1,7 @@
 ---
 id: POLY-99
 title: Backup, uploader, restore, drill
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-95, POLY-83]
@@ -11,7 +11,7 @@ labels: [ops, backup, security]
 priority: null
 pr: https://github.com/richmosko/polycarpic/pull/150
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 INFRA §2.2, §6.1, §6.4, §6.7, D-13..D-15. backup: pg_basebackup -Ft -X none, pg_dump -Fc, pg_dumpall --globals-only --no-role-passwords, each through age in the pipe; a premigration mode. uploader: rclone put-only to B2 with checksum verify. restore.sh decrypts on the operator's laptop only; drill.sh carries the §6.7 assertions. The bad-migration restore runs off the box from the laptop, RTO 60 minutes, and no plaintext dump ever exists on the box (Principal Q8, 2026-11-08).
@@ -146,3 +146,13 @@ Gate 4, verdict: PASS. `process/cairn/reviews/POLY-99/verdict.md` @ d0c2c6478710
 ### @team-lead — 2026-11-22
 
 PR opened: https://github.com/richmosko/polycarpic/pull/150. Two PR runs were red before the green one, all three causes on the test or check side and none visible on the Mac: the container shellcheck step (SC2148 and seven SC2015 lines, fixed in the build at b7bde21d and reviewed line by line by seceng); T3 re-attaching the shared fake-b2, which on a Linux daemon moves its published port off the host (15 cases); `mutant_dispatcher` leaving `sys.modules['lib']` on a deleted copy, 132 import errors under CI's whole-directory unittest run. Full CI run 45106019246 green at `0ded203e`: provision 150 s (dry run included, its first Linux run), image 737 s with the backup step at 386 s, db 244 s. Merge state CLEAN. Open with the Principal: ruling D1, D2, D3. Awaiting the merge decision.
+
+### @team-lead — 2026-11-23
+
+Validate passed; merging via PR #150. Closing.
+
+- CI run 45106019246 green at `0ded203e` (provision 150 s, image 737 s with the backup step at 386 s, db 244 s).
+- Architect: the PASS verdict carries to `0ded203e`; neither harness fix (261bc9bd, 16c3cecd) loosens a case.
+- seceng build review PASS; qa gate green on the same build.
+- Loop cost per `cairn loop-stats`: $177.55 against an estimate of $45–55.
+- Open with the Principal at merge: D1 (bucket cross-check always required for `--premigration --from-box`), D2 (scratch restore of premigration data on the box), D3 (file the daily list-only bucket check now). The box-side route back into prod is not built and not filed; it waits on D2.
