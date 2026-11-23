@@ -76,3 +76,10 @@ Ruling clarification (R10, gap raised by devops-99; not an addendum). `heartbeat
 - **File and mode unchanged:** `/etc/polycarpic/secrets/uploader/heartbeat_url`, 0440 `root:10005`, as H6 expects for every secret. No host account holds gid 10005 (H9), so the group bit grants nothing. `provision.sh` still makes the `uploader/` dir. H13 is unchanged.
 - **Not 0640:** one mode for every secret file keeps H6 and `list-secrets` free of a special case.
 - **Tests:** qa updates the two `test_set_secret` cases to expect the write to that path. A new case covers a host-only name that is not in `HOST_ONLY`, which still exits 2, and one covers H6 failing on a mismatched constant.
+
+### @qa-engineer — 2026-11-22
+
+Tests-red gate (99c). Record: process/cairn/reviews/POLY-99/red-run.md @ 1cd28a70; plan, pins 1-41 and the condition map: test-plan.md in the same directory.
+Counts (what each is over, in red-run.md): tests/infra/backup 134 (80 green, 54 red: restore 46, drill 5, round trip 3); ops unit tests test_backup 24/25, test_upload 20/21, test_status 46/50, test_set_secret 30/31, test_provision 17/20; lint-poly99 12/28; provision/poly99 5/18; backup-wiring 4/15. Red is for missing code (restore.sh, drill.sh, provision ACL/units/endpoint, new lint rules, CI wiring, three marker lines), not for harness defects.
+Green already because devops-99's code landed first: backup.sh, upload.sh, the runner, archive-wal.sh R3. Each security-bearing case has a mutant or planted fault the same check flags (table in red-run.md). Harness defects found against the real tools image are fixed and listed there.
+Open: (1) D1 --from-box cross-check cases not written, waiting for the Principal. (2) The container directory takes 358 s with restore/drill still red; green it will pass the ruling's 240 s guard, so an addendum must move cases or raise it. (3) DR10's 'uploading over an existing version' has no defined verb; pin 35 is my reading (conditional PUT If-None-Match). (4) Three postgres.test.ts cases cannot fail on Docker Desktop (bind mounts do not enforce 0600); they need Linux CI.
