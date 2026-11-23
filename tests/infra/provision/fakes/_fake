@@ -88,9 +88,20 @@ case "$name" in
         case "$2" in
           ls) echo "$nets" | jq -r '.[].Name' ;;
           inspect)
-            shift 2; names=()
-            while [ $# -gt 0 ]; do case "$1" in -f|--format) shift ;; -*) ;; *) names+=("$1") ;; esac; shift; done
-            if [ ${#names[@]} -eq 0 ]; then echo "$nets"; else echo "$nets" | jq -c --args '[.[] | select(.Name as $n | $ARGS.positional | index($n))]' "${names[@]}"; fi ;;
+            shift 2; names=(); fmt=""
+            while [ $# -gt 0 ]; do case "$1" in -f|--format) fmt=$2; shift ;; -*) ;; *) names+=("$1") ;; esac; shift; done
+            if [ -n "$fmt" ]; then
+              # POLY-100 R9: provision.sh asks `-f '{{.Driver}} {{range .IPAM.Config}}{{.Subnet}} {{end}}'` of one network: "<driver> <subnet> ", exit 1 when absent
+              one=$(echo "$nets" | jq -r --arg n "${names[0]}" '[.[] | select(.Name == $n)] | .[0] // empty | "\(.Driver // "bridge") \([.IPAM.Config[]?.Subnet] | map(. + " ") | join(""))"')
+              [ -n "$one" ] || { echo "Error response from daemon: network ${names[0]} not found" >&2; exit 1; }
+              echo "$one"
+            elif [ ${#names[@]} -eq 0 ]; then echo "$nets"; else echo "$nets" | jq -c --args '[.[] | select(.Name as $n | $ARGS.positional | index($n))]' "${names[@]}"; fi ;;
+          create)
+            shift 2; drv=bridge; sub=""; nm=""
+            while [ $# -gt 0 ]; do case "$1" in --driver) drv=$2; shift ;; --subnet) sub=$2; shift ;; -*) ;; *) nm=$1 ;; esac; shift; done
+            echo "$nets" | jq -e --arg n "$nm" 'any(.[]; .Name == $n)' > /dev/null && { echo "Error response from daemon: network with name $nm already exists" >&2; exit 1; }
+            echo "$nets" | jq -c --arg n "$nm" --arg d "$drv" --arg s "$sub" '. + [{Name: $n, Driver: $d, IPAM: {Config: [{Subnet: $s}]}}]' > "$S/networks.json"
+            echo "net$(echo "$nm" | cksum | cut -d' ' -f1)" ;;
           *) unsupported "$@" ;;
         esac
         exit 0 ;;
