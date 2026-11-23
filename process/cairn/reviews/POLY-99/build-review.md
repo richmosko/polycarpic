@@ -451,6 +451,55 @@ otherwise `DRILL PASSED` (exit 0). The GA gate accepts exit 0 only.
 
 **My PASS is withheld at `a929a3fb`** until F6 and F7 land. After that I re-check `drill.sh` and their tests only.
 
+### Re-check of F6 and F7 @ `4a75ade196bf73ba46acb65405a3727843fd620c` (`git diff a937f9a5..4a75ade1 -- infra`: `drill.sh`, README)
+
+**F7: met.**
+- On the DUMP instance, `roles_check` now runs **before** `roles.sql` is re-run, so it sees only what the globals file
+  and the dump restored.
+- On BASE it runs after the re-run, as ruled.
+
+**F6(b): met.** The exit-3 line is `DRILL INCOMPLETE: not checked: <ids>`. The README and INFRA §6.7 follow.
+
+**DR7/DR8 messages: accepted.** Each restore is now named, so DR7 says which restore failed, and DR8's block runs
+whenever the dump instance exists, independent of the base. That resolves my text advisory. DR8 still FAILs when the
+dump instance is absent.
+
+**F6(a): met as built. The SKIP exemption is the one gap: F8.** The completeness loop runs before the verdict is
+computed (line 198 comes before line 206). It counts PASS and FAIL lines per id, needs two for DR5 and DR6, and
+FAILs an id with too few, **unless any SKIP line exists for that id**.
+
+*Can that exemption let an integrity check go unexamined to exit 3 today?* **No.** By enumeration, SKIP is emitted at
+four places:
+- for DR1, DR2 and DR11 after the selection FAIL;
+- for DR3–DR9 after the same FAIL;
+- for DR9 when there is no ledger;
+- for DR9 when the dump restore failed, next to DR8's FAIL.
+
+Every SKIP of an id other than DR9 is printed on a path that has already printed a FAIL, so the verdict is
+`DRILL FAILED`. Exit 3 is reachable with only DR9 skipped.
+
+*Why it still needs closing.*
+- The exemption keys on the mere existence of a SKIP line. A later edit that skips an integrity check (say
+  `res SKIP DR10 …` when a probe cannot start) would land in `DRILL INCOMPLETE: not checked: DR9, DR10`, not in a
+  FAIL.
+- Until the ledger exists, **every** monthly drill ends `INCOMPLETE … DR9`, so the operator learns to read that line
+  as normal. A second id appended to it is easy to miss.
+- F6's intent was that only DR9's skip, which the ruling names, is legitimate.
+
+**F8. A SKIP is legitimate for DR9 only.**
+- In the verdict, any SKIP line for an id other than DR9 with no FAIL anywhere in the run becomes `FAIL <id> skipped
+  without a failure`.
+- Equivalently: exit 3 is reached only when the skipped set is exactly `{DR9}`.
+- The completeness loop's exemption also becomes DR9-only.
+- *Test:* a mutant replacing DR10's block with `res SKIP DR10 "probe not run"`. Expect `DRILL FAILED: DR10`, exit 1.
+  Today's code gives `DRILL INCOMPLETE: not checked: DR10, DR9`, exit 3. The happy run still ends `DRILL INCOMPLETE:
+  not checked: DR9`.
+- *Cost:* one condition in the verdict and one in the loop.
+
+**Verdict: PASS on `4a75ade1` is withheld for F8 alone.** Once F8 lands with its test, I re-check `drill.sh`'s verdict
+lines only. The PASS is then conditional on qa's gate: qa's F6/F7 cases at `4cfca88f`, the WAL DR2 case, and the F8
+case, each green on the tip and red on the tree before its fix.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
