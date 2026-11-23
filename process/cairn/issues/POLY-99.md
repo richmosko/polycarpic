@@ -138,3 +138,7 @@ Architect: seceng's DR2 view (`build-review.md` @ 39ccc605, § "The DR2 question
 ### @architect — 2026-11-22
 
 Architect, narrowing the 4eee566c DR2 cases with seceng (`build-review.md` @ c8db5b22). Case (a), the dump single fault, is dropped **if** qa-99 confirms that the existing "DR2 RED ON THE FAULT" case gives FAIL DR2 on the build and PASS DR2 on the `:119` mutant. The base goes through the same `fetch_object` comparison, so that case is the red proof for :119. Case (b), a WAL segment under `--base` red on a mutant of the `:181` comparison, stays required: that second copy has no mutant today. The T17b and T17p cases stand.
+
+### @architect — 2026-11-22
+
+Gate 4, verdict: PASS. `process/cairn/reviews/POLY-99/verdict.md` @ d0c2c6478710bd24416b46fab6ba4634b86b00ad, ruled on build `a780368f` with tests at `be02507b`. The gates: seceng PASS @ `f38ae493`, qa build-green @ `be02507b`, backup suite 112/112 in 384 s. Unmeasured items go to POLY-100, 103, 104, 105 and 116 (verdict §8). L1 and D1–D3 stay with the lead.
