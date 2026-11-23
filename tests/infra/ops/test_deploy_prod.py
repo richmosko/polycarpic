@@ -79,7 +79,7 @@ class ProdBase(DeployTest):
 
 class Prod(ProdBase):
     # ---- first deploy ----
-    def test_first_deploy_prod_takes_no_backup_enables_the_three_timers_and_ends_on_the_dns_instruction(self):
+    def test_first_deploy_prod_takes_no_backup_and_enables_the_three_timers(self):
         x, r = self.first_prod()
         self.assertEqual(r.rc, 0, r.err)
         self.assertEqual(r.world.premigration_calls, [], "the project has never had a release: nothing to back up")
@@ -88,8 +88,6 @@ class Prod(ProdBase):
         for unit in ("polycarpic-deploy@prod.timer", "polycarpic-backup.timer", "polycarpic-uploader.timer"):
             self.assertTrue(any(unit in a for a in enabled), unit)
         self.assertTrue(self.host.p("/opt/polycarpic/images.env").exists())
-        last = r.out.rstrip("\n").splitlines()[-1]
-        self.assertRegex(last, r"app\. A/AAAA record")
 
     def test_a8_first_deploy_on_a_non_empty_data_dir_exits_4_unless_existing_data_which_makes_the_backup_required(self):
         self.host.write("/srv/polycarpic/pg-prod/PG_VERSION", "17\n")

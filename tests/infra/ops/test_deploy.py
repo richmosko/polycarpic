@@ -35,10 +35,11 @@ class Slice0(DeployTest):
 class CtxSeams(unittest.TestCase):
     """Contract pins: the seams R13 names exist on Ctx (red until the builder adds them)."""
 
-    def test_ctx_has_resolve_and_run_bytes(self):
+    def test_ctx_has_the_deploy_seams(self):
         names = ctx_class().__init__.__code__.co_varnames
-        self.assertIn("resolve", names)
-        self.assertIn("run_bytes", names)
+        for seam in ("run_bytes", "stdin", "https_status"):  # `resolve` is gone: R9 is strict (d634da53)
+            self.assertIn(seam, names)
+        self.assertNotIn("resolve", names)
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ class Backup(BackupBase):
         self.assertIn(run, argvs)
         self.assertLess(argvs.index(rm), argvs.index(run))
         call = [c for c in r.calls if c["argv"] == run][0]
-        self.assertEqual(call["env"], dict(FIXED_ENV, POLY_POSTGRES_IMAGE=PG_REF))
+        self.assertEqual(call["env"], dict(FIXED_ENV, POLY_POSTGRES_IMAGE=PG_REF, POLY_APP_IMAGE="ghcr.io/richmosko/polycarpic@sha256:" + "0" * 64, POLY_TOOLS_IMAGE="ghcr.io/richmosko/polycarpic-tools@sha256:" + "0" * 64))  # POLY-100: no release yet, so backup.py supplies an all-zero app digest that only satisfies ${...:?}
         self.assertEqual(call["timeout"], 3 * 3600)
 
     def test_premigration_uses_the_premigration_mode_and_a_30_minute_timeout(self):
