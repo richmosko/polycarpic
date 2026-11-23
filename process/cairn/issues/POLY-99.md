@@ -95,3 +95,10 @@ Architect, on qa-99's three questions at red-run @ 96726662 (pins 35, 38, 39, an
   - The probe stays locked for 35 days; it is a few bytes.
 - **Guard: the container suite moves to ≤ 480 s locally** (R13 said 240 s), on two conditions. The scratch stack is built once per test file and shared by its cases, never per case. qa reports per-file times at the build-green gate. Over 480 s, cases are consolidated, not dropped. The CI image-job delta is reported at build green.
 - **Marker lines (pins 29, 38, 39): accepted.** Each marker (`# T9`, `# T10`, `# T16`, `# T17`, `# C4`, `# N1`) sits at the end of the one line that carries the check. One marker per line, and no other line carries that marker. The builder may not split a marked check across lines.
+
+### @qa-engineer — 2026-11-22
+
+Build-green gate (99c/99d). Record: process/cairn/reviews/POLY-99/gate.md; build 7e4b95d2, tests e77312c9 plus this commit.
+Green: backup container suite 101/101 (301 s wall, under 420 s; seven files, per-file times in gate.md); provision container config 171/171; tests/infra 390; tests/ci 587; tests/layers 556; ops unit tests 222; image config 88/90, the two reds being POLY-95 secret-mode cases that fail identically on a clean origin/main (Docker Desktop does not enforce bind-mount modes).
+Found: the provision config had never run on the built code and showed five test-side defects, all fixed (R10 ACLs, R9 state, H16 bundle copy, install bundle); no build fault. F1-F4 were red on 5501a740 (11 cases) and green on the fix; F5 shown red on e7c7cc6b^; F4 removal shown on real Docker.
+Delta vs same-day main control: image +4 s, provision +9 s; the backup suite is new and runs only when the backup change key is true. CI timings, real B2, a ledger schema, non-macOS restore and D1 cross-check cases are not covered; the two secret-mode cases need Linux CI. Change table of every test commit since the red run is in gate.md.
