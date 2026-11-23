@@ -105,7 +105,9 @@ class Provision(ProvisionBase):
 
         def child(argv, stdin):  # provision.sh writes the endpoint line (R10); the Python wrapper then writes the bucket line
             conf.parent.mkdir(parents=True, exist_ok=True)
-            conf.write_text("B2_S3_ENDPOINT=%s\n" % self.EP)
+            have = conf.read_text() if conf.exists() else ""
+            if "B2_S3_ENDPOINT=" not in have:  # provision.sh adds the line once and keeps the others
+                conf.write_text(have + "B2_S3_ENDPOINT=%s\n" % self.EP)
             return (0, "", "")
         runner = Runner(None)
         runner.on(("provision.sh",), fn=lambda a, s: child(a, s))
