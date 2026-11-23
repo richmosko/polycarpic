@@ -243,3 +243,16 @@ Harness fixes first (test-side): the build needs `--build-arg GIT_COMMIT` (a 40-
 
 Still to mutate (not yet done): F2, F5, F6, F7, F10, F12, F14, F15, F16 (covered by the flags lint), S33's fallback to a bundle compose file, S35's saved-secret check (needs a mutant that saves an unredacted env value: none exists in the build), A17 prune of renders, A18's `render-user`.
 | A18 H23: the row comparison in provision-check.sh never fails | tests/infra/provision/host.test.ts (H23 case) | red on "a shell" (the case with a shell, a home, another group, another uid, missing); a complete host box also passes H23 |
+| F2/S32: quarantine at the first interruption | test_deploy_hang.py | red: `test_a_leftover_in_progress_is_interrupted_the_first_time_and_quarantines_the_second` |
+| F12: `transient-stale` never fires | test_deploy_faults.py | red: `test_a_persistent_transient_alerts_after_an_hour_and_success_clears_it` |
+| F10: `edge.env` keys never checked | test_deploy_faults.py | red: `test_edge_env_missing_a_key_or_unreadable_is_edge_env_…` |
+| A17: prune removes no render / removes every render (kept ones too) | test_deploy_render_prune.py | red both ways (2 tests each) |
+| F15: no inspect after the timeout's `rm -f` | test_deploy_oneoff.py | GREEN at first: the fake showed the stuck container before the run, so the pre-run check refused and the timeout path was never reached. Fake changed (a stuck one-off exists only once a run of it has hung); then red: `test_a_one_off_that_is_still_there_after_rm_is_oneoff_stuck_…` |
+| F6: the pointer's tag, tree and time unvalidated | test_deploy_state.py | red ×3 (bad field per project, damaged tag, unhashable tree) |
+| F5: any read error is "absent" | test_deploy_state.py | red ×3 (unreadable current/previous, first-attempt, quarantine) |
+| F14: logging, ulimits, mem_limit, tmpfs pins removed | test_deploy_guard.py | red: all 8 F14 cases |
+| S33: a missing render falls back to the bundle's compose file | test_deploy_render_users.py | red: backup/upload/cli |
+| A18: shell check removed from `render_user_ok` | test_deploy_render.py RenderUser | red |
+| F7: a transient `first-deploy`/`edge-deploy` exits 0 without the cause | test_deploy_state.py | red |
+| F16: `compose run --no-build` (the original) | test_deploy_flags.py, flow tests | red on the build before the fix; `bad_options` refuses it in every fake |
+Mutants not made: S35's secret-in-render check (the build never saves a secret value, no natural mutant; the test is green today and the fixture secrets are random per run); F1's static form (red-run F1 row above).

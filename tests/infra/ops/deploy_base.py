@@ -153,7 +153,7 @@ class World(object):
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
         self.bad_flags = []
-        self.run_hang, self.run_names, self.stuck_oneoff = set(), [], set()
+        self.run_hang, self.run_names, self.stuck_oneoff, self.run_started = set(), [], set(), set()
         self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
         self.config_wrapped = []
         self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
@@ -353,7 +353,7 @@ class World(object):
             return self._compose(argv, stdin)
         if sub == "inspect" and "inspect" in self.hang and self.hang_from < len(self.up_marks) <= self.hang_from + (10 ** 9 if self.hang_through else 1):
             raise TimeoutError("inspect")
-        if sub == "inspect" and argv[2] in self.stuck_oneoff:
+        if sub == "inspect" and argv[2] in self.stuck_oneoff and argv[2] in self.run_started:
             return 0, json.dumps([{"Id": "x", "Config": {"Image": "x"}, "State": {"Status": "running"}}]), ""
         if sub == "inspect":
             c = self.by_name.get(argv[2])
@@ -469,6 +469,8 @@ class World(object):
             tail = rest[pos[0] + 2:]
             self.run_names.append((svc, rest[rest.index("--name") + 1] if "--name" in rest else None))
             if (svc, tail[0] if tail else "") in self.run_hang:
+                if "--name" in rest:
+                    self.run_started.add(rest[rest.index("--name") + 1])  # a stuck one-off exists only once a run of it has hung
                 raise TimeoutError("run %s" % svc)
             if "--plan" in tail:
                 return self.plan_code, self.plan_out, ""
