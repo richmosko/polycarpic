@@ -43,17 +43,21 @@ STAGING_SERVICES="postgres web worker migrate operator auth"
 gid_of() {
   case "$1" in
     postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;;
+    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;; host) echo 0 ;;
   esac
 }
-# The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table).
+# Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
+HOST_ONLY="heartbeat_url=host"
+# The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
 files_for() {
+  local pair
   case "$1" in
     postgres) echo db_superuser_password ;; web) echo "db_password_app plaid_secret" ;;
     auth) echo "db_password_auth auth_secret resend_api_key" ;; worker) echo "db_password_worker credential_keyring resend_api_key" ;;
     migrate) echo db_password_migrator ;; operator) echo db_password_operator ;; backup) echo db_password_backup ;;
-    uploader) echo "backup_store_credential heartbeat_url" ;; caddy) echo staging_basic_auth ;;
+    uploader) echo backup_store_credential ;; caddy) echo staging_basic_auth ;;
   esac
+  for pair in $HOST_ONLY; do if [ "${pair#*=}" = "$1" ]; then echo "${pair%%=*}"; fi; done
 }
 in_list() { local x=$1; shift; local i; for i in "$@"; do [ "$i" = "$x" ] && return 0; done; return 1; }
 
@@ -145,7 +149,7 @@ h6=''
 tmp_h=$(mktemp -d /dev/shm/pcheck.XXXXXX)
 trap 'rm -rf "$tmp_h"' EXIT
 secret_root() { # root services
-  local root=$1 services=$2 svc d f gid mode
+  local root=$1 services=$2 svc d f gid mode dmode fmode
   [ -d "$root" ] || { h6="$h6 $root is missing;"; return; }
   mode=$(stat -c '%a %U:%G' "$root")
   [ "$mode" = "700 root:root" ] || h6="$h6 $root is $mode (want 700 root:root);"
@@ -155,22 +159,24 @@ secret_root() { # root services
     # shellcheck disable=SC2086
     if ! in_list "$svc" $services; then h6="$h6 $d must not exist here;"; continue; fi
     gid=$(gid_of "$svc")
-    [ "$(stat -c '%a %u:%g' "$d")" = "750 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want 750 0:$gid);"
+    dmode=750 fmode=440
+    if [ "$svc" = host ]; then dmode=700 fmode=400; fi # secrets root reads and no service mounts (HOST_ONLY): root:root, nobody else
+    [ "$(stat -c '%a %u:%g' "$d")" = "$dmode 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want $dmode 0:$gid);"
     for f in "$d"*; do
       [ -e "$f" ] || continue
       # shellcheck disable=SC2046
       if ! in_list "$(basename "$f")" $(files_for "$svc"); then h6="$h6 $f is not a file compose mounts from $svc;"; continue; fi
-      [ "$(stat -c '%a %u:%g' "$f")" = "440 0:$gid" ] || h6="$h6 $f is $(stat -c '%a %u:%g' "$f") (want 440 0:$gid);"
+      [ "$(stat -c '%a %u:%g' "$f")" = "$fmode 0:$gid" ] || h6="$h6 $f is $(stat -c '%a %u:%g' "$f") (want $fmode 0:$gid);"
     done
   done
 }
-secret_root "$ETC/secrets" "$PROD_SERVICES"
+secret_root "$ETC/secrets" "$PROD_SERVICES host"
 secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
   case "$f" in
     "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;;
-    "$ETC/ops.conf") # POLY-98 R3: world-readable by design, so it may hold only bucket-name lines
-      if [ ! -s "$f" ] || grep -qvE '^B2_BUCKET=[a-z0-9-]{6,50}$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name>;"; fi ;;
+    "$ETC/ops.conf") # world-readable by design, so it may hold only the bucket name and the endpoint URL
+      if [ ! -s "$f" ] || grep -qvE '^(B2_BUCKET=[a-z0-9-]{6,50}|B2_S3_ENDPOINT=https://s3\.[a-z0-9-]+\.backblazeb2\.com)$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name> or B2_S3_ENDPOINT=<url>;"; fi ;;
     *) h6="$h6 $f is world-readable;" ;;
   esac
 done < <(find "$ETC" -type f -perm -o=r 2> /dev/null)
@@ -202,8 +208,11 @@ report H6 "secrets layout and modes" "$h6" "inspect the paths named; restore the
 
 # ------------------------------------------------------------------ H7 data dirs, spool, ACLs
 h7=''
-expect_acl=$(printf '%s\n' 'default:group::---' 'default:mask::rwx' 'default:other::---' 'default:user::rwx' 'default:user:10005:rwx' \
-  'group::---' 'mask::rwx' 'other::---' 'user::rwx' 'user:10005:rwx' | LC_ALL=C sort)
+# POLY-99 C3: 10005 lists and reads (r-x) and never writes or deletes; .inflight/ gives it only a default r-- and no access entry.
+expect_acl=$(printf '%s\n' 'default:group::---' 'default:mask::r-x' 'default:other::---' 'default:user::rwx' 'default:user:10005:r-x' \
+  'group::---' 'mask::r-x' 'other::---' 'user::rwx' 'user:10005:r-x' | LC_ALL=C sort)
+expect_inflight_acl=$(printf '%s\n' 'default:group::---' 'default:mask::r--' 'default:other::---' 'default:user::rwx' 'default:user:10005:r--' \
+  'group::---' 'other::---' 'user::rwx' | LC_ALL=C sort)
 for d in pg-prod pg-staging; do
   got=$(stat -c '%a %u:%g' "$DATA/$d" 2> /dev/null || echo missing)
   [ "$got" = "700 999:999" ] || h7="$h7 $d is $got (want 700 999:999);"
@@ -218,6 +227,15 @@ for pair in spool/wal:999:999 spool/dump:10004:10004 spool/premigration:10004:10
     missing=$(LC_ALL=C comm -13 <(echo "$acl") <(echo "$expect_acl") | tr '\n' ' ')
     extra=$(LC_ALL=C comm -23 <(echo "$acl") <(echo "$expect_acl") | tr '\n' ' ')
     h7="$h7 $d ACL differs (missing: ${missing:-none}; unexpected: ${extra:-none});"
+  fi
+  if [ ! -d "$DATA/$d/.inflight" ]; then h7="$h7 $d/.inflight is missing;"; continue; fi
+  got=$(stat -c '%u:%g' "$DATA/$d/.inflight")
+  [ "$got" = "$own" ] || h7="$h7 $d/.inflight is owned by $got (want $own);"
+  acl=$(getfacl -cp "$DATA/$d/.inflight" 2> /dev/null | grep -v '^$' | sed 's/[[:space:]]*#effective.*//' | LC_ALL=C sort)
+  if [ "$acl" != "$expect_inflight_acl" ]; then
+    missing=$(LC_ALL=C comm -13 <(echo "$acl") <(echo "$expect_inflight_acl") | tr '\n' ' ')
+    extra=$(LC_ALL=C comm -23 <(echo "$acl") <(echo "$expect_inflight_acl") | tr '\n' ' ')
+    h7="$h7 $d/.inflight ACL differs (missing: ${missing:-none}; unexpected: ${extra:-none});"
   fi
 done
 while IFS= read -r f; do
@@ -234,9 +252,24 @@ report H7 "data dirs, spool and ACLs" "$h7" "never chmod a spool file; to repair
 
 # ------------------------------------------------------------------ H8 spool contents
 h8=''
-while IFS= read -r f; do h8="$h8 stray file $f;"; done < <(find "$DATA/spool" -type f ! -name '*.age' ! -name '*.sha256' ! -path '*/.inflight/*' 2> /dev/null)
-while IFS= read -r f; do h8="$h8 inflight file older than 10 minutes: $f;"; done < <(find "$DATA/spool/wal/.inflight" -type f -mmin +10 2> /dev/null)
+# a .sha256 (the uploaded marker) is admitted in premigration/ only
+while IFS= read -r f; do h8="$h8 stray file $f;"; done < <(find "$DATA/spool" -type f ! -name '*.age' ! -path '*/.inflight/*' ! -path "$DATA/spool/premigration/*.sha256" 2> /dev/null)
+for d in wal dump premigration; do
+  while IFS= read -r f; do h8="$h8 inflight file older than 10 minutes: $f;"; done < <(find "$DATA/spool/$d/.inflight" -type f -mmin +10 2> /dev/null)
+done
 report H8 "spool contents" "$h8" "a stale or stray spool file means an interrupted writer: inspect it, move it out, and run the backup again (INFRA §6.1)"
+
+# ------------------------------------------------------------------ H16 backup units
+# The four unit files equal the bundle's copies. Whether the timers are enabled is the first deploy's line, not this check's.
+h16=''
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
+  inst=/etc/systemd/system/$u
+  if [ ! -f "$inst" ]; then h16="$h16 $u is not installed;"; continue; fi
+  cmp -s "$here/backup/systemd/$u" "$inst" || h16="$h16 $u differs from the bundle copy;"
+  [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h16="$h16 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
+done
+report H16 "backup units" "$h16" "rerun: sudo bash provision.sh --stage host ... (installs the unit files from the bundle)"
 
 # ------------------------------------------------------------------ H9 service gids
 h9=''
@@ -315,10 +348,10 @@ fi
 info H12b "bucket lock" "b2-setup.py"
 
 # ------------------------------------------------------------------ H13 heartbeat
-if [ -s "$ETC/secrets/uploader/heartbeat_url" ]; then
+if [ -s "$ETC/secrets/host/heartbeat_url" ]; then
   pass H13 "heartbeat"
 else
-  warn H13 heartbeat "alert path B does not exist; a box going quiet or a full bucket goes unnoticed" "put the ping URL in $ETC/secrets/uploader/heartbeat_url (root:10005, 0440) with polycarpic-ops set-secret (INFRA §6.5)"
+  warn H13 heartbeat "alert path B does not exist; a box going quiet or a full bucket goes unnoticed" "put the ping URL in $ETC/secrets/host/heartbeat_url (root:root, 0400) with polycarpic-ops set-secret (INFRA §6.5)"
 fi
 
 # ------------------------------------------------------------------ H14 clock

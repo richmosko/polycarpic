@@ -101,7 +101,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -116,6 +116,7 @@ class Ctx:
         self.statvfs = statvfs or os.statvfs
         self.stdout = stdout or sys.stdout
         self.stderr = stderr or sys.stderr
+        self.stdout_bytes = stdout_bytes or getattr(sys.stdout, "buffer", None)  # fetch-premigration writes the file's bytes here
         self.trusted_uid = trusted_uid
 
     def p(self, logical):

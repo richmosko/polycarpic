@@ -17,7 +17,7 @@ done
 case "$host" in -* | *[!A-Za-z0-9@._-]* | '') echo "install.sh: bad host" >&2; exit 2 ;; esac
 case "$key" in -*) echo "install.sh: bad --ssh-key" >&2; exit 2 ;; esac
 
-PATHS="infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
+PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
 
 # shellcheck disable=SC2086
 dirty=$(git status --porcelain -- $PATHS)

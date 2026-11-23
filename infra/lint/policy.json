@@ -43,8 +43,7 @@
         "db_password_backup"
       ],
       "uploader": [
-        "backup_store_credential",
-        "heartbeat_url"
+        "backup_store_credential"
       ]
     },
     "staging": {
@@ -133,6 +132,10 @@
     ],
     "prod.backup": [
       {
+        "source": "../backup/backup.sh",
+        "target": "/usr/local/bin/backup.sh"
+      },
+      {
         "source": "/srv/polycarpic/spool/dump",
         "target": "/spool/dump",
         "rw": true
@@ -149,14 +152,20 @@
     ],
     "prod.uploader": [
       {
-        "source": "/srv/polycarpic/spool",
-        "target": "/spool",
-        "rw": true
+        "source": "../backup/upload.sh",
+        "target": "/usr/local/bin/upload.sh"
       },
       {
-        "source": "/srv/polycarpic/uploader-state",
-        "target": "/state",
-        "rw": true
+        "source": "/srv/polycarpic/spool",
+        "target": "/spool"
+      },
+      {
+        "source": "/etc/polycarpic/ops.conf",
+        "target": "/etc/uploader/ops.conf"
+      },
+      {
+        "source": "/etc/polycarpic/host.env",
+        "target": "/etc/uploader/host.env"
       }
     ],
     "edge.caddy": [

@@ -75,3 +75,7 @@ From the POLY-137 and POLY-138 loops (2026-11-21):
 ### @team-lead — 2026-11-22
 
 From the POLY-97 loop (`red-run.md`): three `tests/infra/image/postgres.test.ts` cases (lines 113, 121, 184; each `expected +0 not to be +0`) fail on macOS Docker Desktop, whose bind mounts do not refuse the file reads the tests expect, and pass on Linux CI. Local-only; either skip them on darwin with a named reason or run them in a Linux VM.
+
+### @team-lead — 2026-11-22
+
+From the POLY-99 loop (PR #150): the PreToolUse `test_run_guard` hook refuses `python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops` on the host ("refusing an un-tiered full-suite run … python3 run_tests.py --gate …"), although that is CI's own command for the product's operator unit tests and has nothing to do with the cairn suite the guard protects. Builder and qa therefore ran those tests file by file, which hid a cross-file `sys.modules` leak that failed 132 of 222 cases on CI. Narrow the guard to the cairn suite (`scripts/cairn`), or give product test directories a sanctioned whole-directory run. Until then, briefs say: run each CI step's exact command, in the CI image where the host guard blocks it.

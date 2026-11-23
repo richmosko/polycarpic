@@ -45,3 +45,7 @@ From the POLY-97 loop (merged 2026-11-22 via PR #147; `process/cairn/reviews/POL
 ### @team-lead — 2026-11-22
 
 From the POLY-98 verdict (`process/cairn/reviews/POLY-98/verdict.md`, "Unmeasured: what POLY-104 inherits"): `polycarpic-ops` is proven against fakes, a test box image and a real Postgres only. This deploy measures the ten items listed there on the real box: sudo's `secure_path`; `install.sh` over real ssh and `provision-check` from the bundle after a reboot; `status`'s cert, disk, app, backupdb, revokes and slots items within 15 s; a live `cli user invite` (needs POLY-100's operator env wiring); `restart` against real health checks; `gate-check` on the deployed schema; `b2-setup.py --probe --show-rclone-output` against Backblaze; the `jobs.log` contract under POLY-99's real backup. Advisory A-1 (compare the staged installer by content hash in the second-install test) is a test nit for the next ops loop.
+
+### @team-lead — 2026-11-22
+
+From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): measured on the staging box, not before: the spool ACLs (r-x for uid 10005, .inflight/) on real LUKS ext4; core: 0 and the host's core_pattern; the backup and upload units under real systemd; `docker compose run`'s timeout and rm -f; the secrets/host/ move and the jobs.log / last-upload ownership on a provisioned box; `status`'s backupdb item against real logs; the nightly run's duration and its 256 MB limit; CONNECTION LIMIT 3 when nightly and premigration runs meet; the two POLY-95 secret-mode cases that cannot fail on Docker Desktop.

@@ -347,6 +347,36 @@ class Status(OpsTest):
         self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=5, minutes=59), -H(minutes=1), "backup") + self.window(-H(minutes=19), -H(minutes=10)))
         self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb"))
 
+    # ---- POLY-99 R9, T12: the windows and last-upload are root-written; premigration has its own cap
+    def test_T12_backupdb_is_red_when_jobs_log_has_group_or_other_write_and_ok_at_root_0644(self):
+        for mode in (0o664, 0o646, 0o666, 0o620):
+            self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=5), -H(hours=4, minutes=50), "backup-nightly"), mode)
+            self.assertEqual(self.find(self.go(), "backupdb", "prod"), line("RED", "backupdb", "prod", "jobs.log is not root-written"), oct(mode))
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=5), -H(hours=4, minutes=50), "backup-nightly"), 0o644)
+        self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb"))
+
+    def test_T12_a_jobs_log_that_is_a_symlink_is_not_root_written(self):
+        p = self.host.p("/var/lib/polycarpic/state/jobs.log")
+        os.unlink(str(p))
+        target = self.host.write("/var/lib/polycarpic/elsewhere", self.window(-H(hours=5), -H(hours=4, minutes=50), "backup-nightly"))
+        os.symlink(str(target), str(p))
+        self.assertEqual(self.find(self.go(), "backupdb", "prod"), line("RED", "backupdb", "prod", "jobs.log is not root-written"))
+
+    def test_T12_backup_is_red_when_last_upload_has_group_or_other_write_ok_at_0644(self):
+        for mode in (0o664, 0o646, 0o666):
+            self.host.write("/var/lib/polycarpic/state/last-upload", "2026-11-22T02:31:00Z\nobject-one\n", mode)
+            self.assertEqual(self.find(self.go(), "backup", "prod"), line("RED", "backup", "prod", "last-upload is not root-written"), oct(mode))
+        self.host.write("/var/lib/polycarpic/state/last-upload", "2026-11-22T02:31:00Z\nobject-one\n", 0o644)
+        self.assertEqual(self.find(self.go(), "backup", "prod"), BACKUP_OK)
+
+    def test_R9_a_premigration_window_is_capped_at_one_hour_a_nightly_window_keeps_six(self):
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=3), -H(hours=1, minutes=59), "backup-premigration"))
+        self.assertIn("jobs.log line 1", self.find(self.go(), "backupdb", "prod"))
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=3), -H(hours=2, minutes=1), "backup-premigration"))
+        self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb"))
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=5, minutes=59), -H(minutes=1), "backup-nightly"))
+        self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb"))
+
     def nightly(self, *spans):
         return "".join(self.window(a, b, "nightly") for a, b in spans)
 

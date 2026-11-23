@@ -85,8 +85,10 @@ age-keygen 2>/dev/null | age-keygen -y > /etc/polycarpic/age-recipients.txt
 chmod 0644 /etc/polycarpic/age-recipients.txt
 install -d -m 0750 -o root -g 10005 /etc/polycarpic/secrets/uploader
 printf '%s\\n%s\\n' ${FX.b2KeyId} ${FX.b2AppKey} > /etc/polycarpic/secrets/uploader/backup_store_credential
-echo https://hc-ping.example/00000000-0000-0000-0000-000000000000 > /etc/polycarpic/secrets/uploader/heartbeat_url
-chown root:10005 /etc/polycarpic/secrets/uploader/*; chmod 0440 /etc/polycarpic/secrets/uploader/*`);
+chown root:10005 /etc/polycarpic/secrets/uploader/*; chmod 0440 /etc/polycarpic/secrets/uploader/*
+install -d -m 0700 -o root -g root /etc/polycarpic/secrets/host
+echo https://hc-ping.example/00000000-0000-0000-0000-000000000000 > /etc/polycarpic/secrets/host/heartbeat_url
+chown root:root /etc/polycarpic/secrets/host/heartbeat_url; chmod 0400 /etc/polycarpic/secrets/host/heartbeat_url`); // POLY-99 H-1: host-only, root:root 0400
 }
 
 /** Shell lines that write the fake Backblaze authorize reply under /dev/shm (outside every swept path; tmpfs, so every run writes it) and link it into the fake state. */

@@ -4,7 +4,7 @@ title: Pull-based deploy + timers
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83]
+blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
 assignee: devops-engineer
 paths: [infra/deploy/**]
 labels: [ops, deploy, security]
@@ -78,3 +78,7 @@ From the POLY-98 ruling (`process/cairn/reviews/POLY-98/ruling.md` M4, Scope): t
 ### @team-lead — 2026-11-22
 
 From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-b): the ops bundle is installed from the laptop's checkout, so the compose files `set-secret` and `cli` read can drift from the deployed release's. A drift misses a mount or runs a stale `operator` definition; it grants nothing. `self-update` installing from the attested release bundle is where they converge (ruling R1 leaves the `sha256-<12 hex>` id for it).
+
+### @team-lead — 2026-11-22
+
+From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8; ruling R6 is the contract): the deploy calls `polycarpic-ops backup premigration` and migrates only on exit 0 (1 failed, 3 not ready, 4 lock not got in 30 min), writing the `premigration-set …` line to deploy.log. Also this issue's: write /opt/polycarpic/images.env; enable both timers; publish and attest the tools image; install the ops bundle from the verified image; the deploy lock alongside backup.lock; `github_read_token` joins HOST_ONLY only through seceng's pinned-set review (secrets/host/, root:root 0400).

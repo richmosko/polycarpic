@@ -1,0 +1,9 @@
+[Unit]
+Description=Polycarpic uploader (ships the spool to the bucket; root verifies and clears it)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/polycarpic-ops upload
+TimeoutStartSec=2h

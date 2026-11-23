@@ -1,0 +1,20 @@
+#!/bin/bash
+# POLY-99 laptop shim for `ssh`: logs the argv and the stdin size, then runs the remote command string in a shell with the fake box first on
+# PATH. A real remote shell joins the words with spaces and parses them, so a name carrying `;` or `$(...)` would run here exactly as it would
+# on a box. That is what makes the T16 mutant observable.
+log="${SHIM_LOG:?}"
+argv=("$@")
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -a|-x|-T|-q|-v) shift ;;
+    -o|-i|-l|-p|-F) shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+host="$1"; shift
+stdin_copy=$(mktemp)
+cat > "$stdin_copy"
+{ printf 'SSH'; for a in "${argv[@]}"; do printf ' [%s]' "$a"; done; printf '\n'; printf 'STDIN %s\n' "$(cat "$stdin_copy" | base64 | tr -d '\n')"; } >> "$log"
+rm -f "$stdin_copy"
+PATH="${BOX_BIN:?}:$PATH" exec sh -c "$*"

@@ -39,3 +39,7 @@ From POLY-150 (devops healthcheck review, 2026-11-20). The worker's and other co
 ### @team-lead — 2026-11-22
 
 From the POLY-97 loop (ruling Scope): an alert when the worker's `job.run` lines stop (POLY-137 runbook item) belongs here.
+
+### @team-lead — 2026-11-22
+
+From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): alerts left to this issue: spool older than 2 h, `last-upload` older than 26 h, the 45-day drill alert, WAL kept by a slot. Root (the job runner) sends every ping; `heartbeat_url` is a host-only secret at /etc/polycarpic/secrets/host/, root:root 0400, the full check URL with only /fail appended. Open with the Principal (ruling §D3, seceng's review): a daily off-box listing check with a list-only key, since an uploader that reports uploads it never made is seen only at the monthly drill (SECURITY C-73 residual).
