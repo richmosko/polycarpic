@@ -136,7 +136,7 @@ from_box() {
   done
   decrypt "$WORK/fetched-dump" "$WORK/dump.dec" || exit 4
   decrypt "$WORK/fetched-globals" "$WORK/globals.dec" || exit 4
-  check_time dump "$WORK/dump.dec" "$ts" 1800 || exit 4 # T17
+  check_time dump "$WORK/dump.dec" "$ts" 1800 || exit 4 # T17p
   DUMP_PLAIN=$WORK/dump.dec; GLOBALS_PLAIN=$WORK/globals.dec
   if [ -n "$CRED" ]; then
     cross_check "$d" "$dsha" "$g" "$gsha" "$ts" || exit $?

@@ -162,7 +162,7 @@ prepare_base() {
   fetch_object dump "$b" || return $?
   decrypt "$OBJ_FILE" "$OBJ_FILE.dec" || return $?
   BASE_PLAIN=$OBJ_FILE.dec
-  check_time base "$BASE_PLAIN" "$SET_TS" 600 || return 4 # T17
+  check_time base "$BASE_PLAIN" "$SET_TS" 600 || return 4 # T17b
   start=${CHECKED_WAL:-}
   # WAL records of this system id, in the same cutoff as the set
   awk -v p="$INSTANCE/$SET_M/wal/wal-$SET_M-$SET_SYS-" -v cut="${BEFORE:-0}" 'index($5, p) == 1 && (cut == 0 || $3 <= cut * 1000) { print "ver wal " $5 " " $1 " " $2 " " $3 " " $4 }' "$RECS" >> "$VERS"
