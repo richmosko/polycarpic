@@ -217,6 +217,31 @@ enough.
 - `drill.sh` already removes its scratches on exit. It also gains `--rm`, so an interrupted drill cannot leave one
   behind.
 
+## Re-check of F1 and F2 @ `a15b80cf80b535c38fdd4458cce05053e7f73e36` (code read; tests pending)
+
+**F1: met in code.**
+- `b2read.py list` leaves out a record that fails `FILE_ID` or `valid_key`, and prints `stray <n>` on stderr.
+- `list_bucket` (restore-lib) passes only that count on, as `WARN <n> stray objects in the bucket`. It is used by
+  both `bucket_select` and the from-box `cross_check`.
+- `drill.sh` reports FAIL DR1 with the count, ahead of the version check.
+- No stray name is printed or used.
+
+**F2: met in code.**
+- The refusal lists `version <fileId> <time> <key> sibling yes|no`, through `clean`. The two downloads happen only on
+  the refused path and are deleted after the comparison.
+- `--accept-version` takes only `^[A-Za-z0-9_-]+$`.
+- `one_version` takes an accepted fileId only for an **upload** version of the very key it is checking, and with a
+  WARN.
+- The accepted version still has to pass the sibling check in `fetch_object` and `prepare_base`, so accepting a bad
+  version still exits 4.
+- `check_accepted` exits 2 for an unused fileId, **before** any restore starts, in `--dump` and `--base`.
+- *Note:* in `--premigration`, an unused `--accept-version` is ignored rather than refused. That is harmless: the
+  from-box path also requires root's record hash. Calling `check_accepted` there too would be tidier, and does not
+  gate.
+
+**Gate:** F1 and F2 pass on the code at `a15b80cf`. They close when qa's tests for each are green and shown red on
+today's behaviour, as listed under each fix. F3 and F4 are still open. I re-check them, and only them, when they land.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
