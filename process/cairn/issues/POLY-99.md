@@ -18,11 +18,11 @@ INFRA §2.2, §6.1, §6.4, §6.7, D-13..D-15. backup: pg_basebackup -Ft -X none,
 
 ## Acceptance criteria
 
-- [ ] shellcheck clean; a container test shows no plaintext file ever appears in the spool.
-- [ ] backup has no route out and no bucket key; uploader has no DB credential.
-- [ ] A round trip on a scratch Postgres restores base plus WAL and the dump.
-- [ ] A mismatched checksum leaves the spool file and pings /fail.
-- [ ] restore.sh --premigration decrypts only on the machine running it.
+- [x] shellcheck clean; a container test shows no plaintext file ever appears in the spool. — tests/infra/backup/slice0.test.ts (the spool and /tmp watcher) and tests/infra/backup/backup.test.ts :: T1 (watcher plus two mutants); shellcheck is the provision-job step over the POLY-99 scripts, pinned by tests/infra/backup-wiring.test.ts
+- [x] backup has no route out and no bucket key; uploader has no DB credential. — tests/infra/backup/uploader.test.ts :: T3 and T4 (rendered services, each with its connect-succeeds fault), plus tests/infra/lint-poly99.test.ts (`state-mount`, `host-secrets`, `uploader-spool-ro`, `tmp-size`, `core-dump`)
+- [x] A round trip on a scratch Postgres restores base plus WAL and the dump. — tests/infra/backup/roundtrip.test.ts :: `restore.sh --base recovers the base through the WAL` and `restore.sh --dump restores the dump and globals` (the canary inserted after the base is present after recovery)
+- [x] A mismatched checksum leaves the spool file and pings /fail. — tests/infra/backup/uploader.test.ts :: T5 (exit 1, file kept, no `verified` line) and tests/infra/ops/test_upload.py :: test_a_wrong_sha_keeps_the_file_fails_the_run_prints_the_reason_and_pings_fail
+- [x] restore.sh --premigration decrypts only on the machine running it. — tests/infra/backup/restore.test.ts :: T9 (no identity byte and no `age -d` over ssh, with its mutant) and tests/infra/backup/roundtrip.test.ts :: the premigration round trip (T18)
 
 ## Comments
 
