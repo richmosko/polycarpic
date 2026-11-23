@@ -310,6 +310,38 @@ for proj in prod staging; do
 done
 report H20 "deploy timers" "$h20" "sudo systemctl enable --now polycarpic-deploy@<project>.timer (first-deploy does this)"
 
+# ------------------------------------------------------------------ H21 edge networks (POLY-100 R9, S24)
+# Both exist with the fixed name, subnet and driver; neither subnet lies inside a pg_hba allow range or the 10.200.0.0/16 default pool.
+h21=''
+for pair in polycarpic-edge-prod=10.201.30.0/28 polycarpic-edge-staging=10.202.30.0/28; do
+  net=${pair%%=*}
+  want=${pair#*=}
+  got=$(docker network inspect -f '{{.Driver}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' "$net" 2> /dev/null) || { h21="$h21 $net is missing;"; continue; }
+  [ "$got" = "bridge $want " ] || h21="$h21 $net is '${got% }' (want 'bridge $want');"
+  overlap=$(python3 -I - "$want" "$here/postgres/pg_hba.prod.conf" "$here/postgres/pg_hba.staging.conf" << 'PY'
+import ipaddress, re, sys
+net = ipaddress.ip_network(sys.argv[1])
+ranges = [ipaddress.ip_network("10.200.0.0/16")]
+for path in sys.argv[2:]:
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:
+        print("unreadable " + path)
+        sys.exit(0)
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0] == "host" and re.fullmatch(r"[0-9./]+", parts[3]):
+            ranges.append(ipaddress.ip_network(parts[3], strict=False))
+for r in ranges:
+    if net.overlaps(r):
+        print(str(r))
+        break
+PY
+)
+  [ -z "$overlap" ] || h21="$h21 $net ($want) overlaps $overlap;"
+done
+report H21 "edge networks" "$h21" "sudo bash provision.sh --stage host ... creates both; a different existing network must be removed by hand after checking nothing uses it"
+
 # ------------------------------------------------------------------ H9 service gids
 h9=''
 while IFS=: read -r user _ _ gid _; do

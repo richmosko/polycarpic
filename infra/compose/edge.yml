@@ -32,14 +32,13 @@ services:
       timeout: 5s
 
 networks:
+  # Both are created by provision.sh --stage host (fixed names and subnets), so a project can run before edge is up.
   edge-prod:
     name: polycarpic-edge-prod
-    ipam:
-      config: [{subnet: 10.201.30.0/28}]
+    external: true
   edge-staging:
     name: polycarpic-edge-staging
-    ipam:
-      config: [{subnet: 10.202.30.0/28}]
+    external: true
 
 secrets:
   staging_basic_auth__caddy: {file: /etc/polycarpic/secrets/caddy/staging_basic_auth}

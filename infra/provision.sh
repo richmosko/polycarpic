@@ -349,6 +349,22 @@ MAIL_FROM=\"$from\"
 POLY_INSTANCE=$instance"
 }
 
+# The two edge networks (POLY-100 R9): fixed names and subnets, created here because all three compose files declare them external.
+# Present and equal changes nothing; present and different stops; nothing is ever replaced.
+edge_networks() {
+  local pair name subnet got
+  for pair in polycarpic-edge-prod=10.201.30.0/28 polycarpic-edge-staging=10.202.30.0/28; do
+    name=${pair%%=*}
+    subnet=${pair#*=}
+    if got=$(docker network inspect -f '{{.Driver}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' "$name" 2> /dev/null); then
+      [ "$got" = "bridge $subnet " ] || die "network $name exists as '${got% }' (want 'bridge $subnet'); not replacing it"
+    else
+      docker network create --driver bridge --subnet "$subnet" "$name" > /dev/null
+      change "created network $name ($subnet)"
+    fi
+  done
+}
+
 # edge.env (POLY-100 R9): what the shared Caddy needs, read by the deploy's compose calls. Written only when all three flags are given.
 edge_env() {
   local allow=${staging_allow//,/ }
@@ -401,6 +417,7 @@ stage_host() {
   install_docker
   systemctl enable --now docker > /dev/null 2>&1 || true
   [ "$DAEMON_CHANGED" = 0 ] || systemctl restart docker
+  edge_networks
   unattended_upgrades
   systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
   no_swap
