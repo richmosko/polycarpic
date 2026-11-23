@@ -602,3 +602,26 @@ install, the unsigned wording, and T-help: agree.
 - *T-help adds:* the text holds no `switch`, `checkout` or `pull`; `install.sh --commit` ships C while HEAD is elsewhere; a
   commit not on `origin/main` is refused, exit 2, before any ssh; a `post-checkout` hook planted in C leaves no canary.
 - *Limit:* root on the box (A6) can print any text. The runbook says to compare the command with INFRA before running it.
+
+## S19 @ `ad00423d`: met (R6, T12)
+
+## D2 is strict: the shape before prod exists
+
+**My preference changes to edge alone.** I preferred prod first without knowing that `v1.0.0` is the GA tag: prod first means
+teaching prod to accept a pre-GA tag, putting prod's secrets on the box early, and running its first install unrehearsed.
+Edge alone leaves prod's `v1.*` rule untouched. Conditions if it is chosen:
+
+- **S22. Two namespaces that cannot cross.** `edge-deploy` accepts only `^edge-(0|[1-9][0-9]*)$`, prod only `v1.*`; each binds
+  the tag object's own name (S2), verifies against the same `allowed_signers`, and runs V1–V7 with the tag's commit. `n` must
+  rise. Only the edge render is upped from it: no app, database or backup container of that release starts.
+- **S23. One owner after prod.** `edge-deploy` refuses once prod has a `current` (S17: damaged counts as present). Prod's first
+  deploy takes edge over only if its commit equals or descends from edge's, so an older Caddy cannot return.
+- **S24. The networks.** `provision.sh` creating them is right. `edge.yml` then declares both external too, S14's policy follows, and
+  provision-check asserts each name and subnet, since prod's `pg_hba` relies on edge being outside its ranges.
+- **S25. `release-scan`** also covers the newest `edge-*` release's Caddy until prod has a release; otherwise the only
+  internet-facing image is never rescanned before GA.
+- *Tests:* an `edge-1` tag offered to prod and a `v1.0.0` tag to `edge-deploy`, both refused; a lower `n`; `edge-deploy` with a prod
+  `current`; a prod commit not descending from edge's; a staging run that names edge in any argv (red on the old branch).
+
+**I disagree with the note's fallback.** If the Principal declines a new tag namespace, the fallback is not the exception:
+they chose strict. It is prod first, or staging unserved until GA.
