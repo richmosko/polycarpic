@@ -153,10 +153,12 @@ else
     fi
     # ---- DR8: no session without its handle (F4)
     c=$SC_DUMP
-    if [ "$(psql_in "$c" -c "select to_regclass('public.session') is null and to_regclass('app.session_handle') is null")" = t ]; then
-      res PASS DR8 "no public.session and no app.session_handle in this schema: nothing to check"
+    # a check with nothing to check fails: it names the tables that are missing
+    missing=$(psql_in "$c" -c "select concat_ws(', ', case when to_regclass('public.session') is null then 'public.session' end, case when to_regclass('app.session_handle') is null then 'app.session_handle' end)")
+    if [ -n "$missing" ]; then
+      res FAIL DR8 "the restored database has no $missing, so there is nothing to check (a data-only or partial restore)"
     elif [ "$(psql_in "$c" -c "select count(*) from public.session s where not exists (select 1 from app.session_handle h where h.session_id = s.id)")" = 0 ]; then
-      res PASS DR8 "every public.session row has its app.session_handle row"
+      res PASS DR8 "every public.session row has its app.session_handle row ($(psql_in "$c" -c "select count(*) from public.session") sessions counted)"
     else
       res FAIL DR8 "a public.session row lacks its app.session_handle row"
     fi
