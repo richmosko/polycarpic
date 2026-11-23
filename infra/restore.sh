@@ -12,11 +12,11 @@ umask 077
 PROG=restore.sh
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-usage() { echo "usage: restore.sh --identity <file> (--premigration --from-box <user@host> [--set <TS>] | --base | --dump) [--read-credential <file> --bucket <name>] [--instance <i>] [--before <UTC>] [--keep]" >&2; exit 2; }
+usage() { echo "usage: restore.sh --identity <file> (--premigration --from-box <user@host> [--set <TS>] | --base | --dump) [--read-credential <file> --bucket <name>] [--instance <i>] [--before <UTC>] [--hours <1-24>] [--keep] | restore.sh --cleanup" >&2; exit 2; }
 die() { local code=$1; shift; echo "restore.sh: $*" >&2; exit "$code"; }
 
 [ $# -gt 0 ] || usage
-IDENTITY='' CRED='' BUCKET='' INSTANCE='' BEFORE='' SETTS='' BOX='' KEEP=0 MODE='' NMODES=0 PLAIN_OK=0 BEFORE_ISO='' ACCEPT=''
+IDENTITY='' CRED='' BUCKET='' INSTANCE='' BEFORE='' SETTS='' BOX='' KEEP=0 MODE='' NMODES=0 PLAIN_OK=0 BEFORE_ISO='' ACCEPT='' CLEANUP=0 HOURS=8
 while [ $# -gt 0 ]; do
   case "$1" in
     --identity) IDENTITY=${2:-}; shift 2 ;;
@@ -30,11 +30,20 @@ while [ $# -gt 0 ]; do
     --base) MODE=base; NMODES=$((NMODES + 1)); shift ;;
     --dump) MODE=dump; NMODES=$((NMODES + 1)); shift ;;
     --keep) KEEP=1; shift ;;
+    --cleanup) CLEANUP=1; shift ;;
+    --hours) HOURS=${2:-}; [[ $HOURS =~ ^[0-9]{1,2}$ ]] && [ "$HOURS" -ge 1 ] && [ "$HOURS" -le 24 ] || die 2 "--hours must be 1 to 24"; shift 2 ;;
     --accept-version) [[ ${2:-} =~ ^[A-Za-z0-9_-]+$ ]] || die 2 "bad --accept-version"; ACCEPT="${ACCEPT:-} $2"; shift 2 ;;
     --plaintext-disk-is-encrypted) PLAIN_OK=1; shift ;;
     *) die 2 "unknown option $1" ;;
   esac
 done
+if [ "$CLEANUP" = 1 ] && [ "$NMODES" = 0 ]; then
+  HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  # shellcheck source=/dev/null
+  . "$HERE/backup/restore-lib.sh"
+  scratch_cleanup
+  exit 0
+fi
 [ "$NMODES" = 1 ] || die 2 "choose one of --premigration, --base, --dump"
 if [ -n "$BEFORE_ISO" ] && ! [[ $BEFORE_ISO =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then die 2 "--before must be YYYY-MM-DDTHH:MM:SSZ"; fi
 if [ -n "$INSTANCE" ] && ! [[ $INSTANCE =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$ ]]; then die 2 "bad --instance"; fi
@@ -85,6 +94,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 scratch_image || exit 2
+scratch_warn_existing
 
 # The remote command is built in ONE place, for the two fixed forms only; the name is single-quoted (the grammar check below is the first guard,
 # this quoting the second). Nothing is forwarded: stdin is empty, no agent, no forwarded ports; `--` ends the options before the destination.

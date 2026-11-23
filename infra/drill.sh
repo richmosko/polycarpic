@@ -62,6 +62,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 scratch_image || exit 2
+scratch_warn_existing
 
 RESULTS=$WORK/results; : > "$RESULTS"
 START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -185,16 +186,17 @@ fi
 fails=$(awk '$1 == "FAIL" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
 skips=$(awk '$1 == "SKIP" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
 if [ -n "$REPORT" ]; then
+  # the filed form (the repository is public): the date, per object its kind, TS, upload time and sibling sha256, and every check line. No bucket
+  # name, no fileId, no system id and no object key; the fileIds the operator needs stay in the terminal output.
   {
     echo "# Restore drill report"
     echo
     echo "- Date: $START"
-    echo "- Instance: $INSTANCE, bucket: $BUCKET${BEFORE_ISO:+, as of $BEFORE_ISO}"
-    echo "- Set: ${SET_TS:-none} (system id ${SET_SYS:-none})"
+    echo "- Set: ${SET_TS:-none}${BEFORE_ISO:+, as of $BEFORE_ISO}"
     echo
-    echo "## Objects and fileIds"
+    echo "## Objects (kind, TS, upload time, sha256 of the object from its sibling)"
     echo
-    awk '{ printf "- %s fileId=%s %s uploaded %s\n", $3, $4, $5, $7 }' "$VERS" 2> /dev/null | sed 's#^- [^ ]*/##'
+    sed 's/^/- /' "$WORK/report-objects" 2> /dev/null
     echo
     echo "## Checks"
     echo

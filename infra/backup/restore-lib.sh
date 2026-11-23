@@ -122,6 +122,8 @@ fetch_object() {
   fi
   OBJ_FILE=$WORK/$fid
   OBJ_FID=$fid
+  echo "$2" | sed 's/-.*//' | tr -d '\n' >> "$WORK/report-objects"
+  printf ' %s %s %s\n' "$SET_TS" "$(awk -v f="$fid" '$4 == f { print $7; exit }' "$VERS")" "$want" >> "$WORK/report-objects"
 }
 
 decrypt() { # in out: a local age process, the identity by path only
@@ -193,10 +195,25 @@ scratch_image() {
   IMAGE=$(sed -n 's/^FROM \([^ ]*\).*/\1/p' "$HERE/postgres/Dockerfile" | head -1)
   [[ $IMAGE =~ ^postgres:[0-9A-Za-z.-]+@sha256:[0-9a-f]{64}$ ]] || { err "infra/postgres/Dockerfile has no digest-pinned FROM line"; return 1; }
 }
-scratch_start() { # -> SC
+HOURS=${HOURS:-8}
+# scratch_warn_existing: a forgotten scratch holds a decrypted ledger, so every run says when one is still there
+scratch_warn_existing() {
+  local n
+  n=$(docker ps -aq --filter label=polycarpic.restore=scratch 2> /dev/null | wc -l | tr -d ' ')
+  if [ "${n:-0}" != 0 ]; then warn "$n scratch container(s) from earlier restores still exist; restore.sh --cleanup removes them"; fi
+  return 0
+}
+scratch_cleanup() {
+  local ids n
+  ids=$(docker ps -aq --filter label=polycarpic.restore=scratch)
+  n=$(printf '%s\n' "$ids" | grep -c . || true)
+  if [ "$n" != 0 ]; then printf '%s\n' "$ids" | xargs docker rm -f -v > /dev/null; fi
+  echo "removed $n scratch container(s)"
+}
+scratch_start() { # -> SC; the container removes itself, with its writable layer, when the sleep ends
   SC=polycarpic-restore-$$-$RANDOM
-  docker run -d --name "$SC" --label polycarpic.restore=scratch --network none --cap-drop ALL --security-opt no-new-privileges \
-    --user 999:999 --pids-limit 512 --memory 2g --entrypoint sleep "$IMAGE" 86400 > /dev/null || { err "cannot start the scratch container"; return 1; }
+  docker run -d --rm --name "$SC" --label polycarpic.restore=scratch --network none --cap-drop ALL --security-opt no-new-privileges \
+    --user 999:999 --pids-limit 512 --memory 2g --entrypoint sleep "$IMAGE" "$((HOURS * 3600))" > /dev/null || { err "cannot start the scratch container"; return 1; }
   SCRATCHES="${SCRATCHES:-} $SC"
 }
 scratch_wait() { # up to 180 s for a connection that is not in recovery
@@ -235,6 +252,9 @@ restore_base() { # -> SC
 }
 
 scratch_report() {
+  local end
+  end=$(date -u -d "+$HOURS hours" +%Y-%m-%dT%H:%M:%SZ 2> /dev/null || date -u -v+"${HOURS}"H +%Y-%m-%dT%H:%M:%SZ)
+  echo "this scratch removes itself at $end (--hours $HOURS); remove it and any other now with: restore.sh --cleanup"
   echo "scratch container: $SC"
   echo "connect: docker exec -it $SC psql -U postgres"
 }
