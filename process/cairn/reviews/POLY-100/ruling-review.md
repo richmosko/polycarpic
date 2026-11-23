@@ -646,3 +646,16 @@ record there is none. It retries and fails. By documentation the CA limits faile
 so the certificate may lag the record at launch (unmeasured). That is launch timing, for POLY-104's or the GA runbook.
 
 **Recommendation: edge alone,** with S22-S25.
+
+## `ad00423d..d634da53` (D2 strict, S20, S21)
+
+- **D2 strict: nothing of the exception is left** in the ruling (read the delta, then searched the whole file for its names,
+  checks and refusals; the only hits are the lists of what was removed). S11, S15, A11 and S16's ownership half: withdrawn, agreed.
+- **S20: met.** **Networks created by provision: accept**; that is S24's first half. The rest of S24, and S22, S23, S25, wait on §L6.
+- **S21: met but for one line.** Prod's step 1 verifies the tag but not that it points at C. Add `test "$(git rev-parse
+  '<tag>^{commit}')" = <C>`. Without it a box that lies could pair a good tag with another merged commit. T-help: the prod
+  text holds the compare.
+- **S26. The wrong network name, and it was mine.** I wrote `polycarpic-prod-edge` (from INFRA) in S3, S10 and S14, and the
+  ruling's R5 and T8 carry it. The real name, in all three compose files and the policy, is `polycarpic-edge-prod`. A T8
+  case on a network that does not exist proves nothing about the real one. *Required:* R5 and T8 use
+  `polycarpic-edge-prod`; qa checks the committed fixtures and tests for the wrong name; devops corrects INFRA §2.2's row.
