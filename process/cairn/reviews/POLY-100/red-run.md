@@ -153,3 +153,10 @@ Not run: mutants for the provision-job T-net cases ("names only", "no overlap ch
 | same | `provision-check.sh` H21 without the overlap check | the pg_hba-range and 10.200.0.0/16 cases |
 | same | `provision-check.sh` H21 without the subnet/driver compare | "fails on another subnet", "fails on another driver" |
 | `sauth-box.test.ts` (T-sauth, real root) | `ctx._real_owner_of` returns `(0, 10010)` | four of the five refused cases (file/directory in another group, file/directory owned by another user); the accepted case and group-writable stay as they were |
+
+## T13 (b) (`test_deploy_t13.py`, ruling 90876ede)
+
+| Mutant | Red |
+|---|---|
+| `tests/infra/backup/fake_box.py` prints the dump and globals hashes swapped | `test_the_fake_box_and_the_real_list_print_the_same_bytes` |
+| `backup.py` `_list` swaps the two hashes | the same test, and the T13 chain test |
