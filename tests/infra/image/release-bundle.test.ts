@@ -14,11 +14,17 @@ const sh = (cmd: string, args: string[], o: { input?: Buffer | string; cwd?: str
 };
 
 let cid = '';
+let wrote = false;
 let tmp = '';
 beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), 'poly100-bundle-'));
   if (!process.env.POLY_APP_TEST_IMAGE) {
-    const b = sh('docker', ['build', '-q', '-t', IMG, '.'], { cwd: ROOT });
+    // infra/release/images.env is a build artifact (R11: infra/ci/images-env.sh writes it from the three sibling digests); the build copies it, so write one with run-time digests and remove it after
+    const dg = () => 'sha256:' + '0'.repeat(64); // all-zero, as a PR or local build leaves it
+    const e = sh('bash', ['infra/ci/images-env.sh', dg(), dg(), dg()], { cwd: ROOT });
+    if (e.code !== 0) throw new Error(`images-env.sh failed: ${e.err}`);
+    wrote = true;
+    const b = sh('docker', ['build', '-q', '--build-arg', 'GIT_COMMIT=' + 'c'.repeat(40), '-t', IMG, '.'], { cwd: ROOT });
     if (b.code !== 0) throw new Error(`docker build of the app image failed: ${b.err.slice(-600)}`);
   }
   const c = sh('docker', ['create', IMG]);
@@ -27,6 +33,7 @@ beforeAll(() => {
 }, 900_000);
 afterAll(() => {
   if (cid) sh('docker', ['rm', '-f', cid]);
+  if (wrote) rmSync(join(ROOT, 'infra', 'release', 'images.env'), { force: true });
   rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -49,8 +56,9 @@ describe('F1: the app image ships exactly the manifest at /release/infra', () =>
     expect(r.code, r.err).toBe(0);
     const got = r.out.toString().trim().split('\n');
     const files = ['infra/compose/prod.yml', 'infra/compose/staging.yml', 'infra/compose/edge.yml', 'infra/caddy/Caddyfile', 'infra/backup/backup.sh', 'infra/backup/upload.sh', 'infra/postgres-major', 'infra/release/images.env'];
-    for (const f of files) expect(got, f).toContain(f);
-    expect(got.filter((g) => !files.includes(g) && !g.startsWith('infra/postgres/')), 'nothing off the manifest').toEqual([]);
+    const pg = ['infra/postgres/archive-wal.sh', 'infra/postgres/pg_hba.prod.conf', 'infra/postgres/pg_hba.staging.conf', 'infra/postgres/postgresql.prod.conf', 'infra/postgres/postgresql.staging.conf'];
+    for (const f of [...files, ...pg]) expect(got, f).toContain(f);
+    expect(got.filter((g) => !files.includes(g) && !pg.includes(g)), 'nothing off the manifest (gate-check.sh is host code, shipped by install.sh)').toEqual([]);
   });
 
   it('the old path is not the contract: /app/infra holds more than the manifest, and the installed filter refuses it (the mutant `cp of /app/infra`)', () => {

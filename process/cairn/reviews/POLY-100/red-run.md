@@ -214,3 +214,7 @@ once devops-100's fix makes the test green (a test that never went green has no 
 ## A18 and A17 (ruling 13e43e26), red first
 
 `test_deploy_render.py`: the argv prefix is now `setpriv --reuid 10020 --regid 10020` (red: renders are unwrapped); `RenderUser`: a missing render user, one with a shell, another uid, another gid or a home refuses `render-user` exit 4 and a good one passes (red: no check); `Tamper`: a saved render changed between the judging and the `up` is refused (red: nothing is saved, nothing re-read). `test_deploy_render_prune.py` (A17): a pruned release's render goes with it, a stray one is removed, a kept one stays (red: no renders are saved or pruned). `test_deploy_guard.py`: a bind with `propagation: rshared` is refused (red: the guard accepts it). The harness plants `/etc/passwd` with the render user as `provision.sh --stage host` makes it.
+
+## F1 built image (tests/infra/image/release-bundle.test.ts), run on the Mac with devops-100's F1 fix
+
+Harness fixes first (test-side): the build needs `--build-arg GIT_COMMIT` (a 40-hex value) and the build artifact `infra/release/images.env` (written by `infra/ci/images-env.sh` with all-zero digests, removed after). Then green, 3 of 3. Mutant: `infra/postgres/gate-check.sh` added to the Dockerfile's `cp` list: green on the first test as written (it let any `infra/postgres/*` through), so the assertion was tightened to the four `.conf` files plus `archive-wal.sh`; with the mutant it is now red, restored it is green.
