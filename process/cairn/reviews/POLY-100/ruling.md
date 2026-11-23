@@ -260,6 +260,14 @@ expired. POLY-103 sends `alert` outward.
   `infra/release/images.env` from `needs.siblings.outputs`, then builds. No file crosses from `release-lint`. The
   workflow pins and mutants are seceng's B2 (`build-review.md` @ `468f28a9`). The siblings are therefore covered by the app's attestation, and V5 checks each
   sibling's own attestation as well.
+- **`build.yml` `release-scan` job** (seceng B3, in this loop). Besides the newest Release's app digest it scans the three
+  siblings frozen with it: `docker create` of the app digest (never started), `docker cp` of
+  `/app/infra/release/images.env`, `docker rm`, then each line checked against R4's grammar (exactly three names, fixed
+  name↔repo) before `image.sh scan`. All four scans run even when one fails, and any failure fails the job. A Release
+  whose image has no `images.env`, or a malformed one, fails the job (no `v1.*` Release predates the file). Permissions
+  stay `contents: read`, `packages: read`. Cost: three Trivy scans in the weekly main-only run `(unmeasured)`, none on a
+  PR. Workflow static, red on: a mutant scanning the app only; one that stops at the first failure; one that passes an
+  unchecked line to the scan.
 - `POLY_APP_IMAGE`, `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE` become `${…:?}` with no default digest anywhere (F10). The lint
   step's env sets all four.
 - **Env wiring.** web, auth, worker, migrate and operator get:
