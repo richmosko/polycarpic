@@ -242,6 +242,68 @@ enough.
 **Gate:** F1 and F2 pass on the code at `a15b80cf`. They close when qa's tests for each are green and shown red on
 today's behaviour, as listed under each fix. F3 and F4 are still open. I re-check them, and only them, when they land.
 
+## Re-check of F3 and F4 @ `147d35d96ab7dd27185ccc8043f52087100b11f9` (code read; tests pending)
+
+**F4: met in code, one residual stated.**
+- *Start.* `scratch_start` runs `docker run -d --rm --label polycarpic.restore=scratch` with C6's flags. The main process
+  is `sleep $((HOURS*3600))`. `--hours` takes 1–24, and anything else is exit 2. Postgres runs as a secondary
+  `docker exec -d` process, against `/tmp/pgdata` in the container's writable layer, with no TCP listener.
+- *Shutdown.* When the sleep ends, PID 1 exits. Docker kills the exec'd Postgres (unclean, which does not matter for a
+  throwaway) and, because of `--rm`, removes the container.
+- *What `--rm` removes.* The writable layer, which holds `/tmp/pgdata`. The official image also declares
+  `VOLUME /var/lib/postgresql/data`, so every scratch gets an **anonymous** volume. It stays empty, because the data
+  is in `/tmp/pgdata`. `--rm` removes anonymous volumes with the container. `scratch_rm` and `--cleanup` both use
+  `docker rm -f -v`, which does the same. No named volume and no bind mount exist.
+- *The drill* starts its scratches through the same `scratch_start` (restore-lib), so it gets `--rm` and the 8 h
+  default, and it still removes them on exit.
+- `--cleanup` removes every labelled container, stopped ones included (`ps -a`). Every run warns when one exists.
+- *Residual (unmeasured):* if Docker Desktop is stopped or the laptop restarts while a scratch runs, whether the
+  daemon removes that `--rm` container on its next start is unmeasured. A survivor is still caught by the start-of-run
+  `WARN` and removed by `--cleanup`. That is acceptable.
+
+**F3: the report file is met; another output path bypasses it, so this is F5.** The `--report` block writes:
+- the date and the set's `<TS>`;
+- `report-objects` (kind, TS, upload time, sibling sha256);
+- the check lines.
+
+No bucket, fileId, system id or object key is in that block. **But `drill.sh`'s stdout still carries fileIds and keys
+whenever there is an anomaly:**
+- `list_versions` prints `version <fileId> <time> <key> …` to stdout;
+- `bucket_select` prints `b2 choose`'s refusal listing (fileIds and keys) to stdout;
+- the DR1 FAIL line then says "the versions are listed above".
+
+INFRA §6.7 has the lead file the result. A drill run as `drill.sh … > drill.txt`, or captured by the lead's tool,
+therefore puts exactly what F3 removed into a public commit, on precisely the runs worth filing.
+
+**F5. Identifiers go to stderr, never stdout, in the drill and the restore.**
+- `list_versions` and the `b2 choose` refusal listing write to **stderr** in `restore-lib.sh`. That serves
+  `restore.sh` too, where the operator still sees them on the terminal.
+- `drill.sh`'s stdout then carries only the `PASS|FAIL|SKIP` lines, the scratch's name and end time, and the final
+  verdict line. Its DR1 text says "listed on stderr".
+- *Test:* in `drill.test.ts`, the C9 fixture (two versions plus a hide marker) and the F1 stray fixture, with stdout
+  and stderr captured apart:
+  - stdout holds no `4_zfake_` id, no bucket name and no `<instance>/` key;
+  - stderr holds the version lines;
+  - `restore.sh`'s refusal (exit 3) still prints them on stderr.
+  - Red: today's stdout, which holds the version lines.
+
+**`147d35d9`, `--premigration` refuses an unused `--accept-version`:** met (`check_accepted` in that branch).
+
+### Which of F1–F5 close on code and which wait on tests
+
+None of them closes on code alone. Each needs qa's case, shown red on today's behaviour, because each is a behaviour
+that a reading can miss. qa-99's cases are not on the branch yet.
+
+| Fix | Code | Waits on |
+|---|---|---|
+| F1 stray keys | met @ `a15b80cf` | qa's F1 case (restore goes on with a WARN; drill FAIL DR1) |
+| F2 two-version passage | met @ `a15b80cf` (+ `147d35d9`) | qa's F2 cases (sibling yes/no, `--accept-version` v2 / v1 / unknown; the WAL key under `--base`) |
+| F3 redacted `--report` | met @ `314b2dcf` | qa's F3 case on the report file |
+| F4 bounded scratch | met @ `314b2dcf` | qa's F4 cases (argv `--rm` and `sleep 28800`, the `--hours` bounds, `--cleanup` by label, the WARN). **Plus one real-Docker case**, since a fake cannot show the removal: `docker kill` the scratch's PID 1 (standing in for the end of the sleep), then assert the container is gone (`docker ps -a --filter label=…` empty) and no volume is left (the `docker volume ls -q` set equals the one taken before the start) |
+| F5 identifiers to stderr | **open** | the code change, and qa's F5 case |
+
+When F5 lands I re-check it and the five fix tests, and nothing else.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
