@@ -47,6 +47,7 @@ services:
     env_file: [/etc/polycarpic/host.env]
     environment:
       APP_ENV: production
+      PLAID_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -75,6 +76,7 @@ services:
     env_file: [/etc/polycarpic/host.env]
     environment:
       APP_ENV: production
+      PLAID_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -106,6 +108,7 @@ services:
     env_file: [/etc/polycarpic/host.env]
     environment:
       APP_ENV: production
+      PLAID_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -134,6 +137,7 @@ services:
     env_file: [/etc/polycarpic/host.env]
     environment:
       APP_ENV: production
+      PLAID_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -161,6 +165,7 @@ services:
     env_file: [/etc/polycarpic/host.env]
     environment:
       APP_ENV: production
+      PLAID_ENV: production
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic

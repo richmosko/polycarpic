@@ -43,6 +43,7 @@ services:
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
       APP_ENV: staging
+      PLAID_ENV: sandbox
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -71,6 +72,7 @@ services:
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
       APP_ENV: staging
+      PLAID_ENV: sandbox
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -102,6 +104,7 @@ services:
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
       APP_ENV: staging
+      PLAID_ENV: sandbox
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -130,6 +133,7 @@ services:
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
       APP_ENV: staging
+      PLAID_ENV: sandbox
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
@@ -157,6 +161,7 @@ services:
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
       APP_ENV: staging
+      PLAID_ENV: sandbox
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_NAME: polycarpic
