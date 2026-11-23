@@ -280,14 +280,14 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 | DR3 | The globals file contains no `PASSWORD` and no `SCRAM-SHA-256$` |
 | DR4 | The base recovers through the WAL and promotes; the newest WAL chosen is the newest listed |
 | DR5 | After `roles.sql` is re-run on each instance: `DO $$BEGIN END$$` as poly_app fails with `permission denied for language plpgsql`; `query_to_xml('SELECT 1', true, false, '')` fails with `permission denied for function` (SQLSTATE 42501, the message asserted) |
-| DR6 | Each role in `roles.sql` exists in both instances |
+| DR6 | Each role in `roles.sql` exists in both instances. *(Correction, seceng F7:)* on the dump instance it is checked **before** `roles.sql` is re-run (DR5), so it proves the globals file carried the roles; after the re-run it would be vacuous |
 | DR7 | The row count of every FORCE-RLS table equals between the dump and the base restores |
 | DR8 | No `public.session` row lacks an `app.session_handle` row (F4). *(Correction, verdict read:)* FAIL, not PASS, when either table is absent: a check with nothing to check fails loudly |
 | DR9 | Trial balance sums to zero per entity; the hash-chain verifier passes; the newest journal entry is within 20 min of the drill's start. SKIP while the schema has no ledger (today) |
 | DR11 | R7's replay check on every chosen artifact (archive time vs name vs upload time) |
 | DR10 | With the box credential: deleting an object, uploading over an existing version, shortening a retention, changing the bucket default retention are each refused |
 
-Last line `DRILL PASSED` (exit 0), `DRILL PASSED WITH SKIPS: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
+*(Correction, seceng F6: every expected check id DR1–DR11 must print a line; a missing one is FAIL, and exit 3 reads `DRILL INCOMPLETE: not checked: <ids>`.)* Last line `DRILL PASSED` (exit 0), `DRILL INCOMPLETE: not checked: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
 2. `--report` writes the date, timings and results as markdown for the lead to file. *(Correction, F3:)* per object it
 gives only kind, `<TS>`, upload time and sibling sha256, and no bucket name, fileId, system id or object key. The
 fileIds stay in the terminal output, on **stderr** *(correction, F5)*. Stdout carries only the check lines, the
