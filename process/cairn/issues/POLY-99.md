@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-99.md, process/cairn/reviews/POLY-99/**, infra/backup/**, infra/restore.sh, infra/drill.sh, infra/ops/**, infra/operator/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/README.md, infra/lint/**, infra/ci/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, .gitignore, .gitleaksignore]
 labels: [ops, backup, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/150
 created: 2026-11-08
 updated: 2026-11-22
 ---
@@ -142,3 +142,7 @@ Architect, narrowing the 4eee566c DR2 cases with seceng (`build-review.md` @ c8d
 ### @architect — 2026-11-22
 
 Gate 4, verdict: PASS. `process/cairn/reviews/POLY-99/verdict.md` @ d0c2c6478710bd24416b46fab6ba4634b86b00ad, ruled on build `a780368f` with tests at `be02507b`. The gates: seceng PASS @ `f38ae493`, qa build-green @ `be02507b`, backup suite 112/112 in 384 s. Unmeasured items go to POLY-100, 103, 104, 105 and 116 (verdict §8). L1 and D1–D3 stay with the lead.
+
+### @team-lead — 2026-11-22
+
+PR opened: https://github.com/richmosko/polycarpic/pull/150. Two PR runs were red before the green one, all three causes on the test or check side and none visible on the Mac: the container shellcheck step (SC2148 and seven SC2015 lines, fixed in the build at b7bde21d and reviewed line by line by seceng); T3 re-attaching the shared fake-b2, which on a Linux daemon moves its published port off the host (15 cases); `mutant_dispatcher` leaving `sys.modules['lib']` on a deleted copy, 132 import errors under CI's whole-directory unittest run. Full CI run 45106019246 green at `0ded203e`: provision 150 s (dry run included, its first Linux run), image 737 s with the backup step at 386 s, db 244 s. Merge state CLEAN. Open with the Principal: ruling D1, D2, D3. Awaiting the merge decision.
