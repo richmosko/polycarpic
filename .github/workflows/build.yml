@@ -151,9 +151,49 @@ jobs:
           subject-digest: ${{ steps.caddy.outputs.digest }}
           push-to-registry: true
 
+  release-lint:
+    name: release-lint
+    needs: siblings
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        run: pnpm install --frozen-lockfile
+
+      - name: Write the release's sibling image references
+        env:
+          POSTGRES: ${{ needs.siblings.outputs.postgres }}
+          TOOLS: ${{ needs.siblings.outputs.tools }}
+          CADDY: ${{ needs.siblings.outputs.caddy }}
+        run: bash infra/ci/images-env.sh "$POSTGRES" "$TOOLS" "$CADDY"
+
+      - name: Compose-policy lint on the release's own images (C-70)
+        env:
+          POLY_BIND_ADDR: 192.0.2.1
+        run: |
+          set -euo pipefail
+          set -a; . infra/release/images.env; set +a
+          node infra/lint/compose-policy.mjs --root .
+
   build:
     name: build
-    needs: siblings
+    needs: [siblings, release-lint]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -184,15 +224,6 @@ jobs:
           TOOLS: ${{ needs.siblings.outputs.tools }}
           CADDY: ${{ needs.siblings.outputs.caddy }}
         run: bash infra/ci/images-env.sh "$POSTGRES" "$TOOLS" "$CADDY"
-
-      - name: Compose-policy lint on the release's own images (C-70)
-        env:
-          POLY_BIND_ADDR: 192.0.2.1
-        run: |
-          set -euo pipefail
-          set -a; . infra/release/images.env; set +a
-          export POLY_APP_IMAGE="${IMAGE}@sha256:0000000000000000000000000000000000000000000000000000000000000000"
-          node infra/lint/compose-policy.mjs --root .
 
       - name: Build and push by digest (no cache)
         id: build
@@ -294,4 +325,22 @@ jobs:
           DIGEST="$(gh release view "$TAG" --json body --jq .body | sed -n 's/^digest: //p' | head -n1)"
           echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
           echo "scan of ${TAG}: ${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
-          bash infra/ci/image.sh scan "${IMAGE}@${DIGEST}"
+          status=0
+          bash infra/ci/image.sh scan "${IMAGE}@${DIGEST}" || status=1
+          # the three siblings frozen with that Release: images.env is read out of the app image (created, never started)
+          cid="$(docker create "${IMAGE}@${DIGEST}")"
+          docker cp "${cid}:/app/infra/release/images.env" images.env || status=1
+          docker rm "$cid" > /dev/null
+          if [ ! -f images.env ]; then echo "release has no infra/release/images.env" >&2; exit 1; fi
+          seen=""
+          while IFS= read -r line || [ -n "$line" ]; do
+            if [[ "$line" =~ ^POLY_(POSTGRES|TOOLS|CADDY)_IMAGE=ghcr\.io/richmosko/polycarpic-(postgres|tools|caddy)@(sha256:[0-9a-f]{64})$ ]] \
+              && [ "${BASH_REMATCH[1],,}" = "${BASH_REMATCH[2]}" ] && [[ " $seen " != *" ${BASH_REMATCH[2]} "* ]]; then
+              seen="$seen ${BASH_REMATCH[2]}"
+              bash infra/ci/image.sh scan "ghcr.io/richmosko/polycarpic-${BASH_REMATCH[2]}@${BASH_REMATCH[3]}" || status=1
+            else
+              echo "images.env: a line is not in the fixed grammar" >&2; status=1
+            fi
+          done < images.env
+          [ "$(echo $seen | wc -w)" = 3 ] || { echo "images.env: not exactly postgres, tools and caddy" >&2; status=1; }
+          exit "$status"
