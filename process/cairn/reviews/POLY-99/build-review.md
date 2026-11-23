@@ -500,6 +500,42 @@ Every SKIP of an id other than DR9 is printed on a path that has already printed
 lines only. The PASS is then conditional on qa's gate: qa's F6/F7 cases at `4cfca88f`, the WAL DR2 case, and the F8
 case, each green on the tip and red on the tree before its fix.
 
+### Re-check of F8 @ `a780368fea8426f529e6a44c6120b65842c37930` (`git diff 4a75ade1..a780368f -- infra`: `drill.sh`, 4 lines)
+
+**F8: met.**
+- `anyfail` counts the run's FAIL lines before the completeness loop.
+- In the loop, an id other than DR9 with a SKIP and no FAIL anywhere becomes `FAIL <id> skipped without a failure`.
+- With the existing "did not run" rule, exit 3 now needs **all** of the following:
+  - no FAIL at all;
+  - every id present;
+  - DR5 and DR6 each with two non-SKIP results;
+  - the skipped set exactly `{DR9}`.
+- `anyfail` is not recounted after the loop adds its own FAILs, and that does not matter: any FAIL the loop adds
+  already makes the verdict `DRILL FAILED`.
+
+**Can "a SKIP after a real FAIL is fallout" hide anything?** No.
+- On that path the verdict is `DRILL FAILED` (exit 1). The run is recorded and filed as failed, and the GA gate
+  accepts exit 0 only.
+- A skipped check there examined nothing and claims nothing. It stays in the check lines as `SKIP … not run: <id>
+  failed`, in the terminal and in the filed report, so the record says which checks were never examined.
+- Its only real effect is that a second problem behind the first can surface only on the re-run after the fix. That
+  is inherent to any check that cannot run until an earlier one passes. Because the drill can never end better than
+  FAILED on that path, it cannot hide it as a pass.
+- On today's code, SKIP for an id other than DR9 is emitted only after the selection or download FAIL (my
+  enumeration at `4a75ade1`), so fallout is the only way such a SKIP arises.
+
+### Verdict: **PASS on `a780368fea8426f529e6a44c6120b65842c37930`, conditional on qa's gate**
+
+F1–F8 are all met in code. The PASS holds when qa's gate run on `a780368f` shows each of the following green, and
+each red on the tree before its own fix:
+- F1–F4: `17f99c51`;
+- F5 and the F4 real-Docker case: `c94a4bf6`;
+- F6 and F7: `4cfca88f`;
+- the WAL DR2 single-fault case;
+- F8: `ac615b11`.
+
+No fix remains on my side. A red reopens only its own item. D1 is still built as (a).
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
