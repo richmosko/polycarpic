@@ -208,7 +208,8 @@ describe('F6(a): a check that did not run fails the verdict, whichever way it we
     const m = lap.mutantInfra('drill.sh', /^if \[ "\$prc" != 0 \]; then[\s\S]*?^fi$/m, 'res SKIP DR10 "probe not run"');
     const r = lap.run('drill.sh', DRILL(), { infra: m });
     const c = checks(r.out);
-    expect(c.DR10?.kind).toBe('SKIP'); // the mutant did what it says
+    expect(c.DR10).toMatchObject({ kind: 'FAIL', text: expect.stringContaining('skipped without a failure') }); // the verdict turns the SKIP into a FAIL line
+    expect(r.out).toMatch(/^SKIP DR10 probe not run$/m); // and the mutant did what it says
     expect(Object.entries(c).filter(([id, v]) => id !== 'DR10' && id !== 'DR9' && v.kind === 'FAIL')).toEqual([]); // no other failure to hide behind
     expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR10\b/) });
   }, 600_000);

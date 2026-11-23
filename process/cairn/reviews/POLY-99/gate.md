@@ -1,12 +1,12 @@
 # POLY-99 build-green gate (qa-99)
 
-**Final tip:** build `4a75ade1` (devops-99's last build commit: F5, F6, F7, DR8, the split `# T17` markers) with my tests at `37445c1f`. An earlier pass of this gate ran on `7e4b95d2` with tests `e77312c9` (kept below as "first pass"). Machine: this Mac, Docker 29.9.3 (Docker Desktop, arm64), Python 3.15, one suite at a time. Plan and pins: `test-plan.md`; the red run: `red-run.md`.
+**Final tip:** build `a780368f` (devops-99's last build commit: F8 on top of F5, F6, F7, DR8 and the split `# T17` markers) with my tests on top of it (the commit that carries this file). Passes on earlier tips (`7e4b95d2`, `4a75ade1`) are kept below. `git diff 4a75ade1..a780368f -- infra tests` touches only `infra/drill.sh` and `tests/infra/backup/drill.test.ts`, so the provision container config, image config, `tests/infra`, `tests/ci` and `tests/layers` numbers measured on `4a75ade1` carry over unchanged; the backup suite and the ops unit tests were re-run on the final tip. Machine: this Mac, Docker 29.9.3 (Docker Desktop, arm64), Python 3.15, one suite at a time. Plan and pins: `test-plan.md`; the red run: `red-run.md`.
 
 ## Counts per suite (each over what it says)
 
 | Suite (command) | Tests | Pass | Red | Note |
 |---|---|---|---|---|
-| backup container suite (`vitest run -c tests/infra/vitest.backup.config.ts`) | 111 | 111 | 0 | seven files; 369 s wall (6:09), 326 s in the files; one earlier red in this run, the DR10-deleted mutant, was my assertion and is fixed and green (drill file 10/10) |
+| backup container suite (`vitest run -c tests/infra/vitest.backup.config.ts`) | 112 | 112 | 0 | seven files; 384 s wall (6:24), 340 s in the files, on `a780368f`; the F8 case first asserted a SKIP line where the verdict prints a FAIL line (my assertion), fixed, drill file 11/11 |
 | provision container config (`-c tests/infra/vitest.provision.config.ts`) | 171 | 171 | 0 | checks-db 20, create 42, host 68, ops 23, poly99 18; first run 76 s wall |
 | image container config (`-c tests/infra/vitest.image.config.ts`) | 90 | 88 | 2 | the two POLY-95 secret-mode cases, which cannot fail on Docker Desktop and fail the same on a clean `origin/main` (test-plan.md, control run) |
 | `tests/infra` non-container (`-c tests/infra/vitest.config.ts`) | 390 | 390 | 0 | lint, lint-poly99, backup-wiring, ops and provision wiring |
@@ -16,9 +16,9 @@
 
 ## Per-file times, tests/infra/backup (s), final tip
 
-backup 54, drill 133, uploader 59, restore 44, roundtrip 17, slice0 13, fake-b2 6 (sum 326; 369 s wall including the globalSetup: images, one stack with the migration chain and a planted session, three real backups, WAL). Target ≤ 420 s: **met, with 51 s to spare**. The figure rose from 277 s (before F1-F5) to 301, 354 and 369 s as the architect's and seceng's verdict-read cases landed.
+drill 146, uploader 59, backup 54, restore 45, roundtrip 17, slice0 13, fake-b2 6 (sum 340; 384 s wall including the globalSetup: images, one stack with the migration chain and a planted session, three real backups, WAL). Target ≤ 420 s: **met, 36 s to spare**. The figure rose from 277 s (before F1-F5) through 301, 354, 369 to 384 s as the verdict-read cases landed.
 
-**The ruling's cap of 9 real scratch restores is exceeded.** The drill file now has six real drill runs (happy, the all-faults run, the BASE-skip mutant, and the three DR8 mutants), each with two scratch restores, plus roundtrip 3 and restore.test.ts 1: 16 in all. Each extra run is a mutant the architect or seceng required (DR8 data-only, deleted handle, dropped tables; F6 BASE-skip). The time target still holds; the cap does not. Ruling needed from the architect whether to consolidate the three DR8 mutants into one run or accept the count.
+Real scratch restores: roundtrip 3, restore.test.ts 1, drill seven runs of two (happy, all-faults, F6 BASE-skip, the three DR8 mutants, F8) = 18. The architect accepted 16 (ruling Guards correction @ `450ba87c`) and said another real restore needs a ruling; F8 needs a real run because a skip after a failure is fallout (asked of the architect, answer pending in this record).
 
 ## Suite-time delta against a same-day control on `origin/main` (clean worktree, same machine)
 
@@ -66,6 +66,7 @@ Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **l
 | `5ad60203` F2 messages, DR1/DR2 independent, DR8 real tables | stricter | the unknown `--accept-version` case asserts its message (red on the pre-F2 files); the fault run separates DR1 and DR2 with a mutant each; the stack applies the migration chain and plants a session, DR8 has three mutants |
 | `4cfca88f` T17b, T17p, WAL DR2, F6, F7 | stricter | new cases with their mutants; the happy drill's last line is now `DRILL INCOMPLETE: not checked: DR9` (a skipped check is not a pass); a role missing from the dump globals must fail DR6 |
 | `37445c1f` DR10-deleted mutant | corrected | the verdict prints its own `FAIL DR10 … did not run` line; the case asserted no line at all |
+| F8 case (`ac615b11`, assertion fixed in the final commit) | stricter | a `res SKIP DR10` mutant on a clean real run must end `DRILL FAILED: DR10`; red on `4a75ade1` (the mutant's SKIP stayed a SKIP), green on `a780368f` |
 
 ## Not measured here
 
