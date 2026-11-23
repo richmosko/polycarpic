@@ -345,6 +345,10 @@ before its fix:
 
 No fix remains on my side. If the gate turns anything red, that item reopens, and only that item.
 
+**Moved to `ac42a4d1543620f3f5f2fa36cc104a37454ec318`.** `git diff 7e4b95d2..ac42a4d1 -- infra tests .github
+packages apps` changes only `restore.sh`'s `usage()` text and the matching line of `infra/README.md`. It adds no
+parsing and no code path. The conditional PASS stands on `ac42a4d1`, on the same gate.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
