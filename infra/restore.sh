@@ -102,18 +102,20 @@ box_ssh() { # <name or empty> <verb>
 
 # from_box: the newest premigration set (or --set) from `list-premigration`, each file checked against root's record on the box
 from_box() {
-  local list line n kind rest ts d dsha g gsha state f1 f2 f3 f4 f5 f6 extra pick=''
+  local list line n kind rest ts d dsha g gsha state f1 f2 f3 f4 f5 f6 pick='' shape='^([^ ]*) (.*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*)$'
 
   list=$(box_ssh "" list-premigration) || die 5 "the box refused list-premigration"
   while IFS= read -r line; do
     if [[ $line =~ ^stray\ [0-9]{1,4}$ ]]; then echo "$line"; continue; fi
-    IFS=' ' read -r f1 f2 f3 f4 f5 f6 extra <<< "$line"
+    # six fields, the first and the last four never hold a space; the name in the second may, and is then refused by the check below
+    [[ $line =~ $shape ]] || { echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; }
+    f1=${BASH_REMATCH[1]} f2=${BASH_REMATCH[2]} f3=${BASH_REMATCH[3]} f4=${BASH_REMATCH[4]} f5=${BASH_REMATCH[5]} f6=${BASH_REMATCH[6]}
     # T16: every name, time and hash that comes back from the box is checked before any command uses it
-    [ -z "${extra:-}" ] && [ -n "${f6:-}" ] && [[ $f1 =~ $TS_RE ]] && [[ $f2 =~ $R2_PREM ]] && [[ $f3 =~ $SHA_RE ]] && [[ $f4 =~ $R2_PREM ]] && [[ $f5 =~ $SHA_RE ]] && [[ $f6 =~ ^(uploaded|pending)$ ]] || { echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; } # T16
-    if [ -z "$SETTS" ] || [ "$f1" = "$SETTS" ]; then pick=$line; fi
+    [[ $f1 =~ $TS_RE ]] && [[ $f2 =~ $R2_PREM ]] && [[ $f3 =~ $SHA_RE ]] && [[ $f4 =~ $R2_PREM ]] && [[ $f5 =~ $SHA_RE ]] && [[ $f6 =~ ^(uploaded|pending)$ ]] || { echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; } # T16
+    if [ -z "$SETTS" ] || [ "$f1" = "$SETTS" ]; then pick=$f1; PD=$f2; PDS=$f3; PG=$f4; PGS=$f5; PST=$f6; fi
   done < <(printf '%s\n' "$list")
   [ -n "$pick" ] || die 3 "no premigration set on the box${SETTS:+ for $SETTS}"
-  read -r ts d dsha g gsha state <<< "$pick"
+  ts=$pick d=$PD dsha=$PDS g=$PG gsha=$PGS state=$PST
   SET_TS=$ts
   # local files carry fixed names: a name from the box is never a path here (C5)
   for n in "dump:$d:$dsha" "globals:$g:$gsha"; do
