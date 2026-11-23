@@ -6,7 +6,7 @@ import fcntl
 import os
 import tempfile
 
-from lib import compose, compose_guard, guardhelp, release as rel, spool, stack, tokenexp
+from lib import compose, compose_guard, guardhelp, release as rel, sauth, spool, stack, tokenexp
 from lib.release import Refusal
 
 LOCK = "/run/polycarpic/deploy.lock"
@@ -74,6 +74,8 @@ def _deploy(project, ctx, work, first, existing_data):
         except _Skip:
             return 0
         rel.log(ctx, project, "candidate", digest, commit)
+        if project == "prod":
+            check_staging_auth(ctx)  # before V1: the file is Caddyfile text, and a prod run ups Caddy (S30)
         rdir, images = _verify(project, ctx, tok, work, digest, commit)
         keep = False
         try:
@@ -89,6 +91,13 @@ def _deploy(project, ctx, work, first, existing_data):
         return 0
     except Refusal as err:
         return refuse(project, ctx, err, seen["digest"])
+
+
+def check_staging_auth(ctx):
+    reason = sauth.check(ctx)
+    if reason:
+        ctx.err("deploy: staging-auth: %s; run polycarpic-ops staging-auth" % reason)
+        raise Refusal("staging-auth")
 
 
 def refuse(project, ctx, err, digest="-"):
@@ -415,6 +424,8 @@ def restore(project, ctx, ptr, owns=None, probe=None):
     if not os.path.isdir(rdir) or stack.tree(rdir) != ptr["tree"]:
         return False
     owner = project == "prod"
+    if owner and sauth.check(ctx):  # nothing is upped when the staging-auth file is wrong (S30)
+        return False
     try:
         images = stack.kinds(stack.refs(rdir))
         guard(project, ctx, rdir, images)

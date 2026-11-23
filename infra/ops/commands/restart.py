@@ -1,5 +1,5 @@
 """restart: restart services of the project and wait for them to be healthy (R9)."""
-from lib import compose
+from lib import compose, sauth
 
 HELP = "restart services (postgres web auth worker; caddy on prod) and wait for health (--staging for staging)"
 WAIT = 120
@@ -21,6 +21,11 @@ def run(args, ctx):
         shown = "".join(c if 0x21 <= ord(c) <= 0x7E else "?" for c in bad[0])[:40]
         ctx.err("restart: unknown service %s; available: %s" % (shown, ", ".join(sorted(compose.LONG_RUNNING))))
         return 2
+    if "caddy" in args.service:  # the staging basic-auth file is Caddyfile text: a restart reads it again, so it is checked first (S30)
+        reason = sauth.check(ctx)
+        if reason:
+            ctx.err("restart: staging-auth: %s; caddy untouched: run polycarpic-ops staging-auth" % reason)
+            return 1
     start = ctx.epoch()
     for svc in args.service:
         code, _, _ = ctx.run(["docker", "compose", "-p", _project(svc, args.staging), "restart", svc], timeout=WAIT)
