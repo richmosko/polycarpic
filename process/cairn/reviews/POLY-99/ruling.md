@@ -259,6 +259,13 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
     - the sibling check still applies, so accepting a bad version exits 4;
     - this holds for WAL keys under `--base` too;
     - the drill stays FAIL DR1.
+  - **The scratch has a bounded life (F4).**
+    - It runs `docker run -d --rm`, labelled `polycarpic.restore=scratch`, with `sleep` set from `--hours <n>`
+      (default 8, range 1–24, outside that exit 2).
+    - It prints its end time and the cleanup command.
+    - `restore.sh --cleanup` removes every labelled scratch (`docker rm -f -v`) and prints the count.
+    - Every run first warns about any labelled scratch still present.
+    - `--keep` still means only the decrypt directory.
 
 ## R8 — `infra/drill.sh` (the §6.7 assertions)
 
@@ -281,7 +288,9 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 | DR10 | With the box credential: deleting an object, uploading over an existing version, shortening a retention, changing the bucket default retention are each refused |
 
 Last line `DRILL PASSED` (exit 0), `DRILL PASSED WITH SKIPS: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
-2. `--report` writes the date, object names and fileIds, timings and results as markdown for the lead to file. The
+2. `--report` writes the date, timings and results as markdown for the lead to file. *(Correction, F3:)* per object it
+gives only kind, `<TS>`, upload time and sibling sha256, and no bucket name, fileId, system id or object key. The
+fileIds stay in the terminal output. The
 GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 
 ## R9 — Records root writes, and the status readers
