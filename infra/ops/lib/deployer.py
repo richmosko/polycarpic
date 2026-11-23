@@ -391,8 +391,14 @@ def _oneoff(ctx, project, judged, svc, command, timeout=600):
 
 def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh, judged, run):
     cdir = rel.release_dir(ctx, cur["digest"]) if cur else rdir  # only a first deploy, with no `current`, starts the candidate's Postgres
-    pj = judged[project]  # the judged render Postgres starts from: the candidate's on a first deploy
-    if cur and not compose.running(compose.ps(ctx, "polycarpic-" + project), "postgres"):  # current's bundle is judged before any container of it is started (S3, S12)
+    try:
+        rows = compose.ps(ctx, "polycarpic-" + project)  # G3: one `ps`, its answer carried; a failed or unparsable one stops the run
+    except (TimeoutError, OSError):
+        rows = None
+    if rows is None:
+        raise Refusal("ps")
+    pj = None if cur else judged[project]  # with a `current`, Postgres only ever starts from current's judged render; the candidate's is for a first deploy
+    if cur and not compose.running(rows, "postgres"):  # current's bundle is judged before any container of it is started (S3, S12)
         if not rel.owned_safely(ctx, cdir):
             raise Refusal("release-tree")
         try:
@@ -404,7 +410,7 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
     rerun = first and not cur and not existing_data and rel.read(ctx, project, "first-attempt") is not None  # an earlier attempt of this project
     if fresh:  # an empty data directory and no `current`: a rerun after `roles-missing` may proceed without --existing-data
         rel.put(ctx, project, "first-attempt", rel.now_utc(ctx) + "\n")
-    _start_postgres(project, ctx, pj, cdir)
+    _start_postgres(project, ctx, pj, cdir, rows)
     # S19: a rerun skips the backup only when its own earlier attempt left an empty database; a table, or a failed or unparsable read, requires it
     backup_needed = bool(cur or existing_data or (rerun and not _database_empty(project, ctx, pj)))
     if project == "prod" and backup_needed:
@@ -426,8 +432,7 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
             os.close(backup_fd)
 
 
-def _start_postgres(project, ctx, pj, cdir):
-    rows = compose.ps(ctx, "polycarpic-" + project)
+def _start_postgres(project, ctx, pj, cdir, rows):
     if compose.running(rows, "postgres"):
         return
     code, _, _ = _compose(ctx, stack.up_argv(pj, project, ["postgres"], ["--no-deps"]))
