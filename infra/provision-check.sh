@@ -174,7 +174,7 @@ secret_root "$ETC/secrets" "$PROD_SERVICES host"
 secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
   case "$f" in
-    "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;;
+    "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/mail.env" | "$ETC/staging-mail.env" | "$ETC/edge.env" | "$ETC/allowed_signers" | "$ETC/age-recipients.txt") ;;
     "$ETC/ops.conf") # world-readable by design, so it may hold only the bucket name and the endpoint URL
       if [ ! -s "$f" ] || grep -qvE '^(B2_BUCKET=[a-z0-9-]{6,50}|B2_S3_ENDPOINT=https://s3\.[a-z0-9-]+\.backblazeb2\.com)$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name> or B2_S3_ENDPOINT=<url>;"; fi ;;
     *) h6="$h6 $f is world-readable;" ;;
@@ -363,14 +363,27 @@ for f in host.env staging-host.env; do
   if [ ! -f "$p" ]; then h10="$h10 $p is missing;"; continue; fi
   origin=$(sed -n 's/^PUBLIC_ORIGIN=//p' "$p" | head -1)
   dom=${origin#https://*.}
-  mf=$(sed -n 's/^MAIL_FROM=//p' "$p" | head -1 | sed -e 's/^"//' -e 's/"$//')
-  addr=${mf##*<}; addr=${addr%%>*}
-  [ -n "$dom" ] && [ "${addr##*@}" = "mail.$dom" ] || h10="$h10 $f MAIL_FROM is '${mf}' (want an address under mail.${dom:-<domain>});"
+  # host.env holds exactly TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE: MAIL_FROM lives in the mail file (POLY-100 R11)
+  while IFS= read -r k; do
+    case "$k" in TLS_MODE | PUBLIC_ORIGIN | POLY_INSTANCE) ;; *) h10="$h10 $f holds the key $k (allowed: TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE);" ;; esac
+  done < <(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$p")
   while IFS= read -r k; do
     h10="$h10 $f holds the secret-named key $k;"
   done < <(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$p" | grep -iE '(PASSWORD|SECRET|TOKEN|_KEY|CREDENTIAL)' || true)
+  mailf=$ETC/mail.env
+  [ "$f" = staging-host.env ] && mailf=$ETC/staging-mail.env
+  if [ ! -f "$mailf" ]; then
+    h10="$h10 $mailf is missing;"
+  else
+    [ "$(stat -c '%a %u:%g' "$mailf")" = "644 0:0" ] || h10="$h10 $mailf is $(stat -c '%a %u:%g' "$mailf") (want 644 0:0);"
+    keys=$(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$mailf" | tr '\n' ' ')
+    [ "$keys" = "MAIL_FROM " ] || h10="$h10 $mailf holds '${keys% }' (want exactly MAIL_FROM);"
+    mf=$(sed -n 's/^MAIL_FROM=//p' "$mailf" | head -1 | sed -e 's/^"//' -e 's/"$//')
+    addr=${mf##*<}; addr=${addr%%>*}
+    [ -n "$dom" ] && [ "${addr##*@}" = "mail.$dom" ] || h10="$h10 $mailf MAIL_FROM is '${mf}' (want an address under mail.${dom:-<domain>});"
+  fi
 done
-report H10 "host.env files" "$h10" "edit the file: keep only TLS_MODE, PUBLIC_ORIGIN, MAIL_FROM, POLY_INSTANCE (secrets live under $ETC/secrets), or rerun provision.sh --stage host"
+report H10 "host.env files" "$h10" "edit the file: host.env keeps only TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE, the mail file only MAIL_FROM (secrets live under $ETC/secrets), or rerun provision.sh --stage host"
 
 # ------------------------------------------------------------------ H11 age recipients
 h11=''

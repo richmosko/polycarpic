@@ -342,11 +342,15 @@ host_secrets() { # secrets root reads and no service mounts (heartbeat_url): roo
 }
 
 host_env() { # file instance origin
-  local file=$1 instance=$2 origin=$3 from=$4
+  local file=$1 instance=$2 origin=$3
   put_file "$file" 0644 "TLS_MODE=real-domain
 PUBLIC_ORIGIN=$origin
-MAIL_FROM=\"$from\"
 POLY_INSTANCE=$instance"
+}
+
+# MAIL_FROM is not a host-wide setting (POLY-100 R11): only auth and worker, the two services that hold the Resend key, list this file.
+mail_env() { # file from
+  put_file "$1" 0644 "MAIL_FROM=\"$2\""
 }
 
 # The two edge networks (POLY-100 R9): fixed names and subnets, created here because all three compose files declare them external.
@@ -368,9 +372,11 @@ edge_networks() {
 # edge.env (POLY-100 R9): what the shared Caddy needs, read by the deploy's compose calls. Written only when all three flags are given.
 edge_env() {
   local allow=${staging_allow//,/ }
+  # S20: Caddy substitutes {$NAME} before it parses the Caddyfile, so a value with a brace, a newline or stray whitespace could add a directive
+  [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || die "--domain must be a plain host name" 2
   [[ "$bind_addr" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "--bind-addr must be an IPv4 address" 2
-  [[ "$acme_email" =~ ^[^[:space:]@\"\'\\]+@[^[:space:]@\"\'\\]+$ ]] || die "--acme-email must be an address" 2
-  [[ "$allow" =~ ^[0-9a-fA-F:./\ ]+$ ]] || die "--staging-allow must be a comma-separated list of addresses or CIDRs" 2
+  [[ "$acme_email" =~ ^[^[:space:]@{}\"\'\\]+@[^[:space:]@{}\"\'\\]+$ ]] || die "--acme-email must be an address with no brace or quote" 2
+  [[ "$allow" =~ ^[0-9a-fA-F:./]+( [0-9a-fA-F:./]+)*$ ]] || die "--staging-allow must be a comma-separated list of addresses or CIDRs" 2
   put_file "$ETC/edge.env" 0644 "POLY_DOMAIN=$domain
 POLY_BIND_ADDR=$bind_addr
 POLY_STAGING_ALLOW=\"$allow\"
@@ -379,10 +385,13 @@ POLY_TLS=$acme_email"
 
 effective_mail_from() {
   if [ -n "$mail_from" ]; then echo "$mail_from"; return; fi
-  local cur=''
-  if [ -f "$ETC/host.env" ]; then
-    cur=$(sed -n 's/^MAIL_FROM=//p' "$ETC/host.env" | head -1 | sed -e 's/^"//' -e 's/"$//')
-  fi
+  local cur='' f
+  for f in "$ETC/mail.env" "$ETC/host.env"; do # an old host.env still carries the key until the rerun drops it
+    if [ -f "$f" ]; then
+      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | head -1 | sed -e 's/^"//' -e 's/"$//')
+      [ -z "$cur" ] || break
+    fi
+  done
   if [ -n "$cur" ] && check_mail_from "$cur"; then echo "$cur"; else echo "Polycarpic <no-reply@mail.$domain>"; fi
 }
 
@@ -429,8 +438,10 @@ stage_host() {
   if [ "$b2_endpoint_set" = 1 ]; then ops_endpoint; fi
   install_units
   secrets_for "$ETC/staging-secrets" "$STAGING_SERVICES" "$STAGING_GENERATED"
-  host_env "$ETC/host.env" polycarpic-prod "https://app.$domain" "$mf"
-  host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain" "$mf"
+  host_env "$ETC/host.env" polycarpic-prod "https://app.$domain"
+  host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain"
+  mail_env "$ETC/mail.env" "$mf"
+  mail_env "$ETC/staging-mail.env" "$mf"
   if [ -n "$bind_addr$staging_allow$acme_email" ]; then edge_env; fi
   check_accounts
   if [ "$changes" = 0 ]; then echo "host stage: no changes"; else echo "host stage: $changes changes"; fi

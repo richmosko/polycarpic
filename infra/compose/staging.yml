@@ -69,7 +69,7 @@ services:
     image: *app-image
     user: "10107:10107"
     command: ["auth"]
-    env_file: [/etc/polycarpic/staging-host.env]
+    env_file: [/etc/polycarpic/staging-host.env, /etc/polycarpic/staging-mail.env]
     environment:
       APP_ENV: staging
       PLAID_ENV: sandbox
@@ -101,7 +101,7 @@ services:
     <<: *hardened
     image: *app-image
     user: "10102:10102"
-    env_file: [/etc/polycarpic/staging-host.env]
+    env_file: [/etc/polycarpic/staging-host.env, /etc/polycarpic/staging-mail.env]
     environment:
       APP_ENV: staging
       PLAID_ENV: sandbox

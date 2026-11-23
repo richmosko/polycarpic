@@ -73,7 +73,7 @@ services:
     image: *app-image
     user: "10007:10007"
     command: ["auth"]
-    env_file: [/etc/polycarpic/host.env]
+    env_file: [/etc/polycarpic/host.env, /etc/polycarpic/mail.env]
     environment:
       APP_ENV: production
       PLAID_ENV: production
@@ -105,7 +105,7 @@ services:
     <<: *hardened
     image: *app-image
     user: "10002:10002"
-    env_file: [/etc/polycarpic/host.env]
+    env_file: [/etc/polycarpic/host.env, /etc/polycarpic/mail.env]
     environment:
       APP_ENV: production
       PLAID_ENV: production

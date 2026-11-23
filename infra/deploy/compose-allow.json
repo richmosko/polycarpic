@@ -27,6 +27,11 @@
        "target": "/config"
       }
      ],
+     "env_exact": [
+      "POLY_DOMAIN",
+      "POLY_STAGING_ALLOW",
+      "POLY_TLS"
+     ],
      "image": "caddy",
      "keys": [
       "cap_drop",
@@ -50,6 +55,7 @@
       "edge-prod": [],
       "edge-staging": []
      },
+     "no_command": true,
      "ports": [
       {
        "protocol": "tcp",
@@ -115,7 +121,8 @@
    "services": {
     "auth": {
      "env_files": [
-      "/etc/polycarpic/host.env"
+      "/etc/polycarpic/host.env",
+      "/etc/polycarpic/mail.env"
      ],
      "image": "app",
      "keys": [
@@ -441,7 +448,8 @@
     },
     "worker": {
      "env_files": [
-      "/etc/polycarpic/host.env"
+      "/etc/polycarpic/host.env",
+      "/etc/polycarpic/mail.env"
      ],
      "image": "app",
      "keys": [
@@ -499,7 +507,8 @@
    "services": {
     "auth": {
      "env_files": [
-      "/etc/polycarpic/staging-host.env"
+      "/etc/polycarpic/staging-host.env",
+      "/etc/polycarpic/staging-mail.env"
      ],
      "image": "app",
      "keys": [
@@ -700,7 +709,8 @@
     },
     "worker": {
      "env_files": [
-      "/etc/polycarpic/staging-host.env"
+      "/etc/polycarpic/staging-host.env",
+      "/etc/polycarpic/staging-mail.env"
      ],
      "image": "app",
      "keys": [
