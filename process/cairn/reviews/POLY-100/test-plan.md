@@ -29,6 +29,14 @@ Unit file `tests/infra/ops/test_deploy.py`; it joins the existing provision-job 
    A gh outage logs event `transient`, no alert-free exit code is pinned. A candidate equal to `current` exits 0 touching nothing; a quarantined one exits 0 and logs `quarantined`.
    Staging's ancestry check needs both `current`'s commit and C in `tags.git` (fetch them both).
 
+10. **Compose fake** (`World._compose`): renders come from `tests/infra/ops/fixtures/compose/*.json` (regenerate with `fixtures/gen_compose.py`; the
+    real files do not render off-box because `env_file` paths are absolute). `config` is chosen by `-f` basenames and honours `--no-interpolate` (raw).
+    `compose … run --rm --no-deps -T <svc> <svc> <cmd…>`: the command is everything after the second `<svc>`; `--plan` in it answers `plan_code` (default 3).
+    `compose … exec -T web …` prints the HTTP status code alone on stdout (`200`). `compose up` sets each named service to the image of the `--env-file` it was given.
+    Guard cases (T8) edit the renders; rule names asserted exactly except where an earlier closed rule also refuses (a service `volumes`/`ports`/`configs` key
+    outside the key set may report `key`); the builder's own `compose_guard.check` was run against every case before this commit.
+11. Sibling refusal names are `sibling-postgres|tools|caddy`; a sibling label mismatch is `sibling-<name>` and quarantined.
+
 ## Groups (builder turns them green in order)
 
 - G0 slice 0 (this commit, green against a throwaway stub): V1 refusal.

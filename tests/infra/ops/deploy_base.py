@@ -72,6 +72,9 @@ class World(object):
         self.gh_down = False  # a network outage: gh exits 1 with a transport error
         self.docker_log, self.unhandled, self.pulled = [], [], []
         self.cids = {}
+        self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
+        self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
+        self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
         self._git_origin()
@@ -206,8 +209,126 @@ class World(object):
             return 0, cid + "\n", ""
         if sub == "rm":
             return 0, "", ""
+        if sub == "compose":
+            return self._compose(argv)
+        if sub == "inspect":
+            c = self.by_name.get(argv[2])
+            if c is None:
+                return 1, "[]", "No such object\n"
+            return 0, json.dumps([{"Id": "x", "Created": utc(), "Image": "sha256:" + "cd" * 32, "Config": {"Image": c["image"]}, "State": {"StartedAt": utc()}}]), ""
         self.unhandled.append(list(argv))
         return 1, "", "FAKE docker: unhandled %r\n" % (argv,)
+
+    # --- docker compose: renders from committed fixtures (gen_compose.py), containers scripted ---
+    APP_SVC = ("web", "auth", "worker", "migrate", "operator")
+    KEY = {"postgres": "POSTGRES", "caddy": "CADDY"}
+
+    def sleeps_total(self):
+        return sum(self.sleeps_ref) if self.sleeps_ref is not None else 0
+
+    def images_from(self, env_file):
+        out = {}
+        for line in Path(env_file).read_text().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                out[k] = v
+        return out
+
+    def render(self, argv, raw):
+        files = sorted(os.path.basename(argv[i + 1]) for i, a in enumerate(argv) if a == "-f")
+        name = {("prod.yml",): "prod", ("staging.yml",): "staging", ("edge.yml", "prod.yml"): "prod-edge"}[tuple(files)]
+        text = (Path(__file__).parent / "fixtures" / "compose" / ("%s.%s.json" % (name, "raw" if raw else "plain"))).read_text()
+        envs = {}
+        for i, a in enumerate(argv):
+            if a == "--env-file":
+                envs.update(self.images_from(argv[i + 1]))
+        sent = {"POSTGRES": "a", "TOOLS": "b", "CADDY": "c", "APP": "d"}
+        for k, ch in sent.items():
+            if "POLY_%s_IMAGE" % k in envs:
+                repo = {"POSTGRES": "polycarpic-postgres", "TOOLS": "polycarpic-tools", "CADDY": "polycarpic-caddy", "APP": "polycarpic"}[k]
+                text = text.replace("ghcr.io/richmosko/%s@sha256:%s" % (repo, ch * 64), envs["POLY_%s_IMAGE" % k])
+        pd = argv[argv.index("--project-directory") + 1] if "--project-directory" in argv else "/rel/infra/compose"
+        d = json.loads(text.replace("@@REL@@", pd[:-len("/infra/compose")]))
+        hook = self.render_hooks.get((name, raw)) or self.render_hooks.get((name, None))
+        if hook:
+            d = hook(d) or d
+        return json.dumps(d)
+
+    def _compose(self, argv):
+        i = 2
+        project, subcmd = None, None
+        while i < len(argv):
+            if argv[i] == "-p":
+                project = argv[i + 1]
+                i += 2
+            elif argv[i] in ("-f", "--env-file", "--project-directory"):
+                i += 2
+            elif argv[i].startswith("-"):
+                i += 1
+            else:
+                subcmd = argv[i]
+                break
+        self.compose_log.append(dict(argv=list(argv), project=project, cmd=subcmd, rest=argv[i + 1:]))
+        rest = argv[i + 1:]
+        if subcmd == "config":
+            return 0, self.render(argv, "--no-interpolate" in rest), ""
+        if subcmd == "ps":
+            self.polls += 1
+            rows = []
+            for svc, c in sorted(self.containers.get(project, {}).items()):
+                bad = c["image"].split("@")[1] in self.bad_apps and svc in self.APP_SVC
+                health = "unhealthy" if bad else "healthy"
+                rows.append(json.dumps({"Service": svc, "Name": c["name"], "State": "running", "Health": health, "ID": "id" + svc}))
+            return 0, "\n".join(rows) + "\n", ""
+        if subcmd == "up":
+            envs = {}
+            for j, a in enumerate(argv):
+                if a == "--env-file":
+                    envs.update(self.images_from(argv[j + 1]))
+            self.up_marks.append(self.sleeps_total())
+            svcs = [rest[k] for k in self._positionals(rest)] or ["postgres", "web", "auth", "worker"]
+            for svc in svcs:
+                key = self.KEY.get(svc, "APP")
+                ref = envs.get("POLY_%s_IMAGE" % key)
+                if ref is None:
+                    return 1, "", "FAKE compose up: no image for %s\n" % svc
+                self.set_container(project, svc, ref)
+            return 0, "", ""
+        if subcmd == "run":
+            pos = self._positionals(rest)
+            svc = rest[pos[0]]
+            tail = rest[pos[0] + 2:]
+            if "--plan" in tail:
+                return self.plan_code, "", ""
+            return self.run_codes.get((svc, tail[0] if tail else ""), 0), "", ""
+        if subcmd == "exec":
+            web = self.containers.get(project, {}).get("web")
+            bad = web and web["image"].split("@")[1] in self.bad_apps
+            return 0, ("503\n" if bad else "200\n"), ""
+        if subcmd in ("stop", "rm", "restart", "down", "kill"):
+            self.stopped.append((project, subcmd, rest))
+            return 0, "", ""
+        self.unhandled.append(list(argv))
+        return 1, "", "FAKE compose: unhandled %r\n" % (argv,)
+
+    @staticmethod
+    def _positionals(rest):
+        """Indexes of non-flag tokens, skipping the value of --pull (and --timeout)."""
+        out, skip = [], False
+        for k, a in enumerate(rest):
+            if skip:
+                skip = False
+            elif a in ("--pull", "--timeout", "-t"):
+                skip = True
+            elif not a.startswith("-"):
+                out.append(k)
+        return out
+
+    def set_container(self, project, svc, ref):
+        name = "%s-%s-1" % (project, svc)
+        c = {"name": name, "image": ref}
+        self.containers.setdefault(project, {})[svc] = c
+        self.by_name[name] = c
 
     def run_bytes(self, argv, stdin, timeout, env):
         self.runner._rec("run_bytes", argv, stdin, timeout, env)
@@ -274,7 +395,9 @@ class DeployTest(OpsTest):
             extra["resolve"] = w.resolve
         if ctx_seams and "run_bytes" in names:
             extra["run_bytes"] = w.run_bytes
-        r = self.host.go("deploy", *argv, runner=runner, ctx_extra=extra, **kw)
+        def ready(rr):
+            w.sleeps_ref = rr.sleeps
+        r = self.host.go("deploy", *argv, runner=runner, ctx_extra=extra, on_ready=ready, **kw)
         r.world = w
         return r
 

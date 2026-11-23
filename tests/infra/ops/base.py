@@ -228,7 +228,7 @@ class Host(object):
                     out[rel] = None
         return out
 
-    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None, getpass_impl=None, ctx_extra=None):
+    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None, getpass_impl=None, ctx_extra=None, on_ready=None):
         Ctx = ctx_class()
         r = Result()
         r.term, r.stdout, r.stderr = Term(), io.StringIO(), io.StringIO()
@@ -283,6 +283,8 @@ class Host(object):
                   tls_probe=fake_tls, statvfs=fake_statvfs, stdout=r.stdout, stderr=r.stderr,
                   trusted_uid=os.getuid() if trusted is None else trusted, **extra)
         r.ctx = ctx
+        if on_ready:
+            on_ready(r)  # POLY-100: lets a fake see the run's fake sleeps
         mod = dispatcher or load_dispatcher()
         try:
             r.rc = mod.main(list(argv), ctx)

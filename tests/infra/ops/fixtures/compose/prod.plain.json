@@ -1,0 +1,359 @@
+{
+  "name": "polycarpic-prod",
+  "networks": {
+    "backup-net": {
+      "name": "polycarpic-prod_backup-net",
+      "ipam": {
+        "config": [
+          {
+            "subnet": "10.201.10.0/29"
+          }
+        ]
+      },
+      "internal": true
+    },
+    "default": {
+      "name": "polycarpic-prod_default",
+      "ipam": {
+        "config": [
+          {
+            "subnet": "10.201.1.0/24"
+          }
+        ]
+      }
+    },
+    "edge-prod": {
+      "name": "polycarpic-edge-prod",
+      "ipam": {},
+      "external": true
+    }
+  },
+  "secrets": {
+    "auth_secret__auth": {
+      "name": "polycarpic-prod_auth_secret__auth",
+      "file": "/etc/polycarpic/secrets/auth/auth_secret"
+    },
+    "credential_keyring__worker": {
+      "name": "polycarpic-prod_credential_keyring__worker",
+      "file": "/etc/polycarpic/secrets/worker/credential_keyring"
+    },
+    "db_password_app__web": {
+      "name": "polycarpic-prod_db_password_app__web",
+      "file": "/etc/polycarpic/secrets/web/db_password_app"
+    },
+    "db_password_auth__auth": {
+      "name": "polycarpic-prod_db_password_auth__auth",
+      "file": "/etc/polycarpic/secrets/auth/db_password_auth"
+    },
+    "db_password_worker__worker": {
+      "name": "polycarpic-prod_db_password_worker__worker",
+      "file": "/etc/polycarpic/secrets/worker/db_password_worker"
+    },
+    "db_superuser_password__postgres": {
+      "name": "polycarpic-prod_db_superuser_password__postgres",
+      "file": "/etc/polycarpic/secrets/postgres/db_superuser_password"
+    },
+    "plaid_secret__web": {
+      "name": "polycarpic-prod_plaid_secret__web",
+      "file": "/etc/polycarpic/secrets/web/plaid_secret"
+    },
+    "resend_api_key__auth": {
+      "name": "polycarpic-prod_resend_api_key__auth",
+      "file": "/etc/polycarpic/secrets/auth/resend_api_key"
+    },
+    "resend_api_key__worker": {
+      "name": "polycarpic-prod_resend_api_key__worker",
+      "file": "/etc/polycarpic/secrets/worker/resend_api_key"
+    }
+  },
+  "services": {
+    "auth": {
+      "restart": "unless-stopped",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "auth"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "APP_ENV": "production",
+        "AUTH_PUBLIC_PORT": "3000",
+        "AUTH_SECRET_FILE": "/run/secrets/auth_secret",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_auth",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_auth",
+        "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mem_limit": "268435456",
+      "networks": {
+        "default": {},
+        "edge-prod": {
+          "aliases": [
+            "prod-auth"
+          ]
+        }
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_auth__auth",
+          "target": "db_password_auth"
+        },
+        {
+          "source": "auth_secret__auth",
+          "target": "auth_secret"
+        },
+        {
+          "source": "resend_api_key__auth",
+          "target": "resend_api_key"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10007:10007",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/auth/ok',{headers:{'x-forwarded-for':'127.0.0.1'}}).then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+        ],
+        "timeout": "5s",
+        "interval": "30s"
+      }
+    },
+    "postgres": {
+      "restart": "unless-stopped",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/db_superuser_password"
+      },
+      "image": "ghcr.io/richmosko/polycarpic-postgres@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mem_limit": "3221225472",
+      "networks": {
+        "backup-net": null,
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_superuser_password__postgres",
+          "target": "db_superuser_password"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp",
+        "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "999:999",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/pg-prod",
+          "target": "/var/lib/postgresql/data",
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "@@REL@@/infra/postgres/postgresql.prod.conf",
+          "target": "/etc/postgresql/postgresql.conf",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "@@REL@@/infra/postgres/pg_hba.prod.conf",
+          "target": "/etc/postgresql/pg_hba.conf",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "@@REL@@/infra/postgres/archive-wal.sh",
+          "target": "/usr/local/bin/archive-wal.sh",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/etc/polycarpic/age-recipients.txt",
+          "target": "/etc/postgresql/age-recipients.txt",
+          "read_only": true,
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/spool/wal",
+          "target": "/spool/wal",
+          "bind": {}
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -h /var/run/postgresql"
+        ],
+        "timeout": "5s",
+        "interval": "10s",
+        "retries": 6,
+        "start_period": "30s"
+      }
+    },
+    "web": {
+      "restart": "unless-stopped",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "APP_ENV": "production",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_app",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_app"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mem_limit": "805306368",
+      "networks": {
+        "default": {},
+        "edge-prod": {
+          "aliases": [
+            "prod-web"
+          ]
+        }
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_app__web",
+          "target": "db_password_app"
+        },
+        {
+          "source": "plaid_secret__web",
+          "target": "plaid_secret"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10001:10001",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+        ],
+        "timeout": "5s",
+        "interval": "30s"
+      }
+    },
+    "worker": {
+      "restart": "unless-stopped",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "APP_ENV": "production",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_worker",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_worker",
+        "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
+      },
+      "image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mem_limit": "805306368",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "db_password_worker__worker",
+          "target": "db_password_worker"
+        },
+        {
+          "source": "credential_keyring__worker",
+          "target": "credential_keyring"
+        },
+        {
+          "source": "resend_api_key__worker",
+          "target": "resend_api_key"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": {}
+      },
+      "user": "10002:10002",
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      }
+    }
+  },
+  "x-app-image": "ghcr.io/richmosko/polycarpic@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "x-hardened": {
+    "cap_drop": [
+      "ALL"
+    ],
+    "read_only": true,
+    "restart": "unless-stopped",
+    "security_opt": [
+      "no-new-privileges:true"
+    ],
+    "ulimits": {
+      "core": 0
+    }
+  }
+}
