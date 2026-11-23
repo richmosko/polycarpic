@@ -203,6 +203,15 @@ describe('F6(a): a check that did not run fails the verdict, whichever way it we
     expect(last(r.out)).toMatch(/^DRILL FAILED: .*\bDR10\b/);
     expect(r.out + r.err).toMatch(/DR10 did not run/);
   }, 300_000);
+  it('F8: a mutant that replaces DR10\'s block with `res SKIP DR10 "probe not run"`, on an otherwise clean real run, ends `DRILL FAILED: DR10` (exit 1): a SKIP on a run with no failure is itself a failure unless it is DR9; the happy run still ends `DRILL INCOMPLETE: not checked: DR9`', () => {
+    plant();
+    const m = lap.mutantInfra('drill.sh', /^if \[ "\$prc" != 0 \]; then[\s\S]*?^fi$/m, 'res SKIP DR10 "probe not run"');
+    const r = lap.run('drill.sh', DRILL(), { infra: m });
+    const c = checks(r.out);
+    expect(c.DR10?.kind).toBe('SKIP'); // the mutant did what it says
+    expect(Object.entries(c).filter(([id, v]) => id !== 'DR10' && id !== 'DR9' && v.kind === 'FAIL')).toEqual([]); // no other failure to hide behind
+    expect({ code: r.code, last: last(r.out) }).toEqual({ code: 1, last: expect.stringMatching(/^DRILL FAILED: .*\bDR10\b/) });
+  }, 600_000);
   it('a mutant whose DR5/DR6 loop silently skips the BASE instance, while both restores succeed, ends `DRILL FAILED` naming DR5 and DR6 (one result per instance is required)', () => {
     plant();
     const m = lap.mutantInfra('drill.sh', /for which in DUMP BASE; do/, 'for which in DUMP; do');
