@@ -16,8 +16,8 @@ MANIFEST = ["infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compos
             "infra/backup/backup.sh", "infra/backup/upload.sh"]
 
 
-def sibling_digests():
-    return {n: digest("sib-" + n) for n in ("postgres", "tools", "caddy")}
+def sibling_digests(seed=""):
+    return {n: digest("sib-" + n + seed) for n in ("postgres", "tools", "caddy")}
 
 
 def images_env_text(sibs=None):

@@ -37,6 +37,13 @@ Unit file `tests/infra/ops/test_deploy.py`; it joins the existing provision-job 
     outside the key set may report `key`); the builder's own `compose_guard.check` was run against every case before this commit.
 11. Sibling refusal names are `sibling-postgres|tools|caddy`; a sibling label mismatch is `sibling-<name>` and quarantined.
 
+12. **Flow pins** (`test_deploy_flow.py`; setup is the tool's own `first-deploy <project>`): a healthy run exits 0; a refusal exits 1 with last stderr
+    line `deploy: refused <name>`; an automatic rollback that comes up healthy exits 1 with `deploy: rolled-back` (alert `rolled-back`); no `previous`
+    or an unhealthy rollback exits 1 with `deploy: rollback-unhealthy`. Names: `migrate-<code>` (Q for 1 and 2, not 4), `plan-diverged` (Q), `plan-error`, `check-config` (Q).
+    first-deploy enables `systemctl enable --now polycarpic-deploy@<project>.timer` only when healthy. Compose `run`: `run --rm --no-deps -T <svc> <svc> <cmd>`
+    (migrate: `… migrate migrate`, plan: `… migrate migrate --plan`). Every compose `up`/`run` has `--pull never` and `--no-build`. Rollback `up` uses the previous release's
+    dir for `-f`/`--project-directory`/`--env-file`. Premigration is run as an argv ending `backup premigration`.
+
 ## Groups (builder turns them green in order)
 
 - G0 slice 0 (this commit, green against a throwaway stub): V1 refusal.

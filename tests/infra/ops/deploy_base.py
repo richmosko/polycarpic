@@ -75,6 +75,7 @@ class World(object):
         self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
         self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
+        self.systemctl_log, self.premigration_calls = [], []
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
         self._git_origin()
@@ -146,6 +147,8 @@ class World(object):
         runner.on(lambda a: a[0] == "docker", fn=self._docker)
         runner.on(lambda a: a[0] == "gh", fn=self._gh)
         runner.on(lambda a: a[0] in ("git", "ssh-keygen"), fn=self._real)
+        runner.on(lambda a: a[0] == "systemctl", fn=self._systemctl)
+        runner.on(lambda a: a[-2:] == ["backup", "premigration"], fn=lambda a, i: self._premigration(a))
         return runner
 
     def _real(self, argv, stdin):
@@ -158,6 +161,14 @@ class World(object):
 
     def _last_env(self, argv):
         return self.runner.calls[-1]["env"] if self.runner.calls else None
+
+    def _systemctl(self, argv, stdin):
+        self.systemctl_log.append(list(argv))
+        return 0, "", ""
+
+    def _premigration(self, argv):
+        self.premigration_calls.append(list(argv))
+        return self.premigration
 
     def _gh(self, argv, stdin):
         env = self._last_env(argv) or {}
@@ -236,7 +247,7 @@ class World(object):
 
     def render(self, argv, raw):
         files = sorted(os.path.basename(argv[i + 1]) for i, a in enumerate(argv) if a == "-f")
-        name = {("prod.yml",): "prod", ("staging.yml",): "staging", ("edge.yml", "prod.yml"): "prod-edge"}[tuple(files)]
+        name = {("prod.yml",): "prod", ("staging.yml",): "staging", ("edge.yml", "prod.yml"): "prod-edge", ("edge.yml",): "edge"}[tuple(files)]
         text = (Path(__file__).parent / "fixtures" / "compose" / ("%s.%s.json" % (name, "raw" if raw else "plain"))).read_text()
         envs = {}
         for i, a in enumerate(argv):
@@ -384,7 +395,7 @@ class DeployTest(OpsTest):
     def log_events(self, project):
         return [l.split()[1] for l in (self.state(project, "deploy.log") or "").splitlines()]
 
-    def deploy(self, *argv, world=None, ctx_seams=True, **kw):
+    def deploy(self, *argv, world=None, ctx_seams=True, cmd="deploy", **kw):
         w = world or self.world
         runner = kw.pop("runner", None) or Runner(None)
         w.runner = runner
@@ -397,7 +408,7 @@ class DeployTest(OpsTest):
             extra["run_bytes"] = w.run_bytes
         def ready(rr):
             w.sleeps_ref = rr.sleeps
-        r = self.host.go("deploy", *argv, runner=runner, ctx_extra=extra, on_ready=ready, **kw)
+        r = self.host.go(cmd, *argv, runner=runner, ctx_extra=extra, on_ready=ready, **kw)
         r.world = w
         return r
 

@@ -52,7 +52,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     edge_env = [("edge.env", "POLY_DOMAIN=example.com\nPOLY_BIND_ADDR=0.0.0.0\nPOLY_STAGING_ALLOW=10.0.0.0/8\nPOLY_TLS=internal\n")]
     sets = {"prod": (["prod.yml"], "polycarpic-prod", []), "staging": (["staging.yml"], "polycarpic-staging", []),
-            "prod-edge": (["prod.yml", "edge.yml"], "polycarpic-prod", edge_env)}
+            "prod-edge": (["prod.yml", "edge.yml"], "polycarpic-prod", edge_env), "edge": (["edge.yml"], "polycarpic-edge", edge_env)}
     for name, (files, project, envs) in sets.items():
         for raw in (True, False):
             text = render(files, project, envs, raw)
