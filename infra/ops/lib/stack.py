@@ -50,17 +50,24 @@ def up_argv(judged, project, services=(), extra=()):
     return base(judged, project) + ["up", "-d", "--pull", "never", "--no-build"] + list(extra) + list(services)
 
 
-def healthy_once(ctx, project, want_refs, services, timeout=30):
-    """One read of the project. A child that times out, dies or prints garbage is a failed read: not healthy (F2)."""
+def healthy_once(ctx, project, want_refs, services, budget=30):
+    """One read of the project. A child that times out, dies or prints garbage is a failed read: not healthy (F2).
+    `budget` is a number or a function giving min(30 s, what is left of the window) at the moment each child starts (G7);
+    with nothing left the read is "not healthy"."""
+    def child():
+        t = budget() if callable(budget) else budget
+        if t <= 0:
+            raise TimeoutError("the health window is spent")
+        return t
     try:
-        rows = compose.ps(ctx, "polycarpic-" + project, timeout=timeout)
+        rows = compose.ps(ctx, "polycarpic-" + project, timeout=child())
         if rows is None:
             return False
         for svc in services:
             row = compose.running(rows, svc)
             if not row or row.get("Health") != "healthy":
                 return False
-            if svc in want_refs and compose.image_ref(compose.inspect(ctx, row.get("Name", ""), timeout=timeout)) != want_refs[svc]:
+            if svc in want_refs and compose.image_ref(compose.inspect(ctx, row.get("Name", ""), timeout=child())) != want_refs[svc]:
                 return False
     except (TimeoutError, OSError, ValueError, KeyError, TypeError, AttributeError):
         return False
@@ -74,14 +81,19 @@ def wait_healthy(ctx, project, rdir, services, wait=HEALTH_WAIT, check_http=True
     want = {"postgres": env["POLY_POSTGRES_IMAGE"], "web": env["POLY_APP_IMAGE"], "auth": env["POLY_APP_IMAGE"], "worker": env["POLY_APP_IMAGE"],
             "caddy": env["POLY_CADDY_IMAGE"]}
     start = ctx.epoch()
+
+    def child():  # each health child gets min(30 s, what is left of the window), worked out just before it starts (G7)
+        return min(30, int(wait - (ctx.epoch() - start)))
+
     while True:
-        left = max(1, int(wait - (ctx.epoch() - start)))  # each health child gets min(30 s, what is left of the window)
-        child = min(30, left)
         if healthy_once(ctx, project, want, services, child):
             ok = True
             if check_http:
                 try:
-                    code, out, _ = ctx.run(base(judged, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=child)
+                    t = child()
+                    if t <= 0:
+                        raise TimeoutError("the health window is spent")
+                    code, out, _ = ctx.run(base(judged, project) + ["exec", "-T", "web", "node", "-e", FETCH], timeout=t)
                     ok = code == 0 and out.strip() == "200"
                 except (TimeoutError, OSError):
                     ok = False
