@@ -23,8 +23,8 @@ INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh a
 - [x] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running. Proved by `test_deploy_flow.py` (`test_t10_unhealthy_rolls_back_from_the_previous_bundle_without_migrating_and_is_quarantined_once`, `test_t11_a_failing_migrate_never_touches_the_running_containers`), `test_deploy_probe.py`, `test_deploy_hang.py`.
 - [x] The script never rewrites itself. Proved by `test_deploy_flow.py::test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release` and `test_deploy_render.py` (every compose call names the saved render; a `releases/` path only as `config`'s inputs).
 - [x] The bad-migration rollback runbook's inputs are proven: `backup premigration`, then a restore from the pre-migration backup on the operator's laptop (T13). The 60-minute timing is measured in the restore drill, POLY-116. Proved by `test_deploy_t13.py` (`test_the_set_a_deploy_logs_is_the_set_list_premigration_offers`, `test_fetch_premigration_gives_the_same_bytes`, `test_the_fake_box_and_the_real_list_print_the_same_bytes`).
-- [ ] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction).
-- [ ] Two migrate runs started together: the second waits on the advisory lock and then applies nothing.
+- [x] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction). Proved by `tests/db/runner.test.ts` `a failing file leaves schema and tracking unchanged (one transaction)` (green in the db job, 44/44 locally).
+- [x] Two migrate runs started together: the second waits on the advisory lock and then applies nothing. Proved by `tests/db/runner.test.ts` `T-lock: two migrate runs together` > `both exit 0, one applies and one finds nothing, one tracking row, the second was seen waiting on Lock/advisory`.
 
 ## Comments
 
