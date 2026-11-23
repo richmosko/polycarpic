@@ -353,6 +353,9 @@ def _oneoff(ctx, project, rdir, svc, command, timeout=600):
     """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released."""
     name = stack.oneoff_name(project, svc)
     ctx.run(["docker", "rm", "-f", name], timeout=60)
+    still, _, _ = ctx.run(["docker", "inspect", name], timeout=30)
+    if still == 0:  # a stale one that will not go: a later run refuses while it exists
+        raise Refusal("oneoff-stuck", True)
     try:
         return ctx.run(stack.run_argv(rdir, project, svc, command), timeout=timeout)
     except TimeoutError:
