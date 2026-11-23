@@ -832,3 +832,17 @@ fallback if the comparison fails. Conditions kept:
 
 **F16: met for Compose** (R3, T14, real `--help`). Still owed from F16: the same flag check for plain `docker`, `gh` and `git` argv, where the runner has them. The fakes accept any
 flag there too.
+
+### Two points on the saved render (lead's questions on `8a4eae45`)
+
+**(a) What the saved, judged file may hold.** Only what uid 65534 could read when it was rendered: the release's own compose values, image digests, secret file **paths** (never
+contents), and the inlined `host.env`, `mail.env` (staging's own for staging) and, for edge, `edge.env` values. Those are non-secret by rule (provision-check H10, H19) and already 0644. **S35:**
+- Root 0600, in the root-owned project state directory, written by temp file and rename, followed through no link, mounted by nothing (the guard and the lint refuse the state path). Readers: root's tool, and
+  the `docker compose` it runs as root. Nobody receives it on stdin for the second render and gets nothing it had not produced.
+- Its content is never logged, printed, put in an alert, or sent. A refusal names the rule, never a value.
+- *Tests:* file mode and owner; a fixture secret value for every service is in no saved render, log or alert (swept); red on a mutant rendering as root with a root-only env file, and on mode 0644.
+- *Advisory A18:* uid 65534 is shared: another process with that uid could interfere with the render. No service of ours uses it (the policy pins every uid). A dedicated uid would close it.
+
+**(b) Judge and start need the same bytes, not a lossless form.** The correction is applied first, the guard judges the corrected JSON, and the same bytes start (hash re-read). A zero lost between the
+bundle and the render changes what both the guard and Docker see, so nothing unjudged can start. It can change behaviour, which the `create` comparison is there to catch. One thing must be shown, not inferred:
+that a non-zero or unlimited `core` never prints as `{}`, or the correction would turn it into zero. The error would be on the safe side.
