@@ -301,6 +301,7 @@ faked, subprocess and sockets raise); `ctx.run` dispatches on `argv[0]` and logs
 | fake gh | `api` (runs, releases) and `run download` from fixtures; `attestation verify` passes or fails per (digest, `--source-digest`) |
 | real git | `git` and `ssh-keygen` in the temp root for V4 and the staging ancestry check; two keys, one in `allowed_signers` |
 | resolver | new `ctx.resolve(name)` seam (getaddrinfo in production), scripted per name |
+| bytes child | new `ctx.run_bytes(argv, timeout=, extra_env=) -> (code, bytes, err_text)` with `fixed_env`, as qa pinned (test-plan Pins 1): R4's `docker cp <cid>:/app/infra -` is read through it, since `ctx.run` is text-mode; the tool refuses `bundle` when the tar exceeds 64 MiB `(unmeasured bundle size; today's `infra/` is far smaller)` |
 | premigration | `polycarpic-ops backup premigration` scripted exit and stdout (the command is POLY-99's, tested there) |
 | box fixture (vitest, provision job) | the POLY-97 box with the real ops bundle and `fakes-ops/` extended with the same fakes; at most three cases: a staging deploy end to end, one refusal, units and paths under a real root |
 
