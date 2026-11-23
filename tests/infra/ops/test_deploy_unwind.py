@@ -20,7 +20,7 @@ def enospc(*a, **k):
     raise OSError(errno.ENOSPC, "No space left on device")
 
 
-class Unwind(Hang):
+class Helpers(Hang):
     def patch(self, **names):
         """Replace functions of lib.release for this test: name -> replacement; restored at cleanup."""
         rel = release_mod()
@@ -52,6 +52,8 @@ class Unwind(Hang):
         self.assertEqual(last(r), "deploy: rolled-back", r.err)
         return self.alert_name("staging")
 
+
+class Unwind(Helpers):
     # ---- G2: restore first, whatever a record raises ----
     def test_a_full_disk_at_each_record_still_restores_the_old_release_and_the_exit_is_not_zero(self):
         for target in ("quarantine", "log", "alert"):
