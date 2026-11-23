@@ -392,3 +392,34 @@ only account store.
 | A9 CAA `accounturi` | Advisory, as I filed it. |
 
 **Gate: open.** S1–S15 are met at `569f8798`. D1(b), D2(a), D3(a): I recommend each, with the plain-language text above.
+
+## R12(a) narrowing (backend-100's measurement): sweep `dbid IN (0, current)`, exempt exact-CONNECT `pg_database` rows
+
+**Accept.** Each project's deploy catching its own database is enough, for the reasons below.
+
+- **Where other databases exist.** Staging is a separate cluster, with its own `postgres` service and data directory, so
+  "staging beside prod" holds only for the test cluster. On the box, prod's cluster holds `polycarpic` plus `postgres`,
+  `template1` and `template0`.
+- **What a grant in a sibling database reaches: nothing a poly_backup login can use.**
+  - `pg_hba.prod.conf` admits poly_backup only to `polycarpic` and to `replication`, from the backup net. The next line
+    is `host all poly_backup all reject`.
+  - A grant or an owned object in `postgres` or `template1` is therefore unusable by a poly_backup session.
+  - Replication is not widened by it either: REPLICATION already reads the whole cluster by design (C-79).
+  - The dependency is pinned: `compose-policy.mjs` (lines 139–147) requires exactly those lines, and `reject` for every
+    other database.
+- **Who could plant such a grant.** Only the superuser (local peer) or a role connected to that database. pg_hba admits
+  no service role to any database but `polycarpic`, so this is root or superuser drift. Neither the preflight nor any
+  control on the box answers that (R-29).
+- **What the narrowed sweep still sees.**
+  - Every shared-object row (`dbid 0`): databases, tablespaces, roles. A TEMPORARY, CREATE or grant-option entry on
+    **any** database is still refused, because only an entry that is exactly CONNECT without grant option is exempt.
+  - Every row in the current database.
+  - The explicit reads backend-100 measured as missing from `pg_shdepend`: the current database's `datacl`, settings,
+    attributes, and memberships in both directions.
+- **One residual, advisory (A10).** `template1` objects are copied into any database later created from it. The prod
+  cluster creates `polycarpic` once at provision, and restores happen on the laptop, so nothing is created from it today.
+  If a later loop creates databases on the box, its preflight sweeps `template1` too.
+- **Wording I agree to:** "sweep `pg_shdepend` rows with `dbid` in (0, the current database's oid); exempt only a
+  `pg_database` `a` row whose `datacl` entry for poly_backup is exactly CONNECT, not grantable; refuse every other row."
+  T-pre keeps each case red in the current database, and adds one case: TEMPORARY granted to poly_backup on a
+  **sibling** database is refused (a `dbid 0` row). Red on a mutant that exempts every `pg_database` row.
