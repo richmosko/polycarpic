@@ -260,3 +260,17 @@ Mutants not made: S35's secret-in-render check (the build never saves a secret v
 | S35 ruled mutant (rendering as root with a root-only env file) | tests/infra/render-isolation.test.ts cases 1 and 2 | Linux only; CI's lint job is the first run |
 | lint-poly99: allowlist is now ten names (POLY_STAGING_ALLOW, POLY_TLS are edge.env keys in F10's check; seceng-100 approved) | lint-poly99.test.ts | 31 pass |
 | R13: F1 built-image test must not build a second image in CI | tests/infra/image/release-bundle.test.ts | red on the fault: `CI=true` with `POLY_APP_TEST_IMAGE` unset fails at once with the R13 message and starts no build (3 skipped); ci.yml sets `polycarpic:ci` (devops-100, 42a9cb3f); locally the test still builds its own |
+
+## Section G (ruling 822a05a9; seceng re-review c02f16ee), red on the 2825b6f7 build, before devops-100's fixes (tests at 92479469 and the H23 split after)
+
+| Row | Tests | Red today because | Passes today, no mutant yet (UNTESTED until its mutant is red) |
+|---|---|---|---|
+| G1/S37 unit | `test_deploy_paths.py` (5) | dirs 0700 under umask 077 (`makedirs(mode=)`); no repair; link/file in the way gives `postgres-major`, not `render-path`; a 0600 env file and a non-`o+x` parent are not checked | — |
+| G2/G6 | `test_deploy_unwind.py`, `test_deploy_unwind_more.py` | quarantine first: ENOSPC at the quarantine leaves the bad release up; a Refusal after `up` goes to `refuse`; alert, log, quarantine order is log, quarantine, alert; the alert/log failures raise out; manual edge rollback writes the quarantine before the restore and a failed record gives exit 0 | every-write ENOSPC for the project and edge; `in-progress` cleared after the quarantine; `in-progress` unwritable before `up` |
+| S36 | `RestoreNeedsNoWrite` (3) | the broken-hash saved pair gives `internal`, not `rollback-unhealthy` | the restore with an unchanged render and the saved-pair fallback |
+| G3 | `test_deploy_ps_once.py` (4) | a second failing `ps` starts the candidate's Postgres; a first failing `ps` exits 0; two `ps` before step 5 | down-Postgres from current's render |
+| G4 | `test_deploy_gone.py` (7) | a daemon error, an exit-1 with no message and a timed-out inspect all read as gone (`migrate-timeout`/`internal`); no 5 s re-check | the real message forms read as gone; a container that goes away during the re-check |
+| G5 | `test_deploy_sidecar.py` (5) | no `.sha256` sidecar; a failed fixed point leaves a saved file; `upload` uses a render whose bytes are not its hash | failed re-judge of `current` leaves the old pair |
+| G7 | `test_deploy_budget.py` (2) | 29 s children: the rollback starts 145 s after the `up` (child budget computed once per poll) | the slow healthy child |
+| G8 | `host.test.ts` H23 ×3 | today's check filters on the string `docker compose`: a real render shape FAILs and a script named with the words PASSes | the right executable with other arguments (FAILs today by the same string match) |
+| G1 Linux, G2 prod-with-edge | not written: wait for devops-100's helper name | | |
