@@ -16,13 +16,13 @@ PREMIGRATION = re.compile(r"premigration-set [0-9]{8}T[0-9]{6}Z dump-[^ =]+\.age
 APP_SERVICES = ("migrate", "web", "auth", "worker")
 
 
-def base(rdir, project, edge_env=False):
-    """The fixed head of every compose call for a release directory."""
+def base(rdir, project, edge_env="/etc/polycarpic/edge.env"):
+    """The fixed head of every compose call for a release directory. The shared edge project also reads /etc/polycarpic/edge.env."""
     cdir = "%s/infra/compose" % rdir
     argv = ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project),
             "--env-file", "%s/images.env" % rdir]
-    if edge_env:
-        argv += ["--env-file", "/etc/polycarpic/edge.env"]
+    if project == "edge":
+        argv += ["--env-file", edge_env]
     return argv
 
 
@@ -44,8 +44,8 @@ def run_argv(rdir, project, svc, command):
     return base(rdir, project) + ["--profile", "*", "run", "--rm", "--no-deps", "-T"] + ["--pull", "never", "--no-build"] + [svc] + command
 
 
-def up_argv(rdir, project, services=(), extra=()):
-    return base(rdir, project) + ["up", "-d", "--pull", "never", "--no-build"] + list(extra) + list(services)
+def up_argv(rdir, project, services=(), extra=(), edge_env="/etc/polycarpic/edge.env"):
+    return base(rdir, project, edge_env) + ["up", "-d", "--pull", "never", "--no-build"] + list(extra) + list(services)
 
 
 def healthy_once(ctx, project, want_refs, services):
