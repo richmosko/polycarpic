@@ -852,3 +852,15 @@ that a non-zero or unlimited `core` never prints as `{}`, or the correction woul
 **Accept; this is the form, and my "JSON accepted, S34 as fallback" is superseded.** Both crossed. It is the better of two sound ones: nothing is edited between judging and starting. The limit question
 is answered by measurement (`{}` only for zero). S35 applies to the saved YAML as written, with the `create` comparison now devops-100's YAML result plus the owed three-file run. F16: met,
 `docker`, `gh` and `git` included. **Carry S35 into F4** (owner, mode and readers are there; "never logged, printed or alerted" and the sweep are not).
+
+## `f08d4948..13e43e26` (F4's form by the lead's decision; F9; A18; propagation)
+
+**Accept.** The form is the lead's: corrected JSON, judged and started as the same bytes, S34 the fallback. My entries on `8a4eae45`, `9476666f` and the YAML agreement are superseded by it.
+- Measurements and their limits are stated as they are; the uncompared fields are named; the remote variables are a second layer, effect unmeasured.
+- A18: uid 10020 appears nowhere else in provision, the compose files or the policy (searched).
+- Propagation: pinned by refusing any non-empty `bind` block. Every bind in the plain fixtures is `{}` (searched). The raw render carries a `bind` block for `create_host_path`, so
+  the rule reads the plain render only.
+- F9: `Judged` with digest and hash compare. Stronger than I asked.
+- `provision-check` on `compose-allow.json`'s owner: accept; the installed copy is the one that matters.
+
+**F4 counts as proven** only when devops-100 shows the source's exit code and container per service, and one `create` per service from a render made as `polycarpic-render`. Nothing else of mine is open in the ruling.
