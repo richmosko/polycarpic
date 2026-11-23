@@ -177,13 +177,13 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
     expect(runArchive('/tmp/seg5', f).code).toBe(0);
     expect(s.root(`ls -A ${walDir()}/.inflight | wc -l`).out).toBe('0'); // red: stale temp never cleaned
   });
-  it('an age failure (unreadable recipients file) -> non-zero, no .age, .inflight empty', () => {
+  it('an age failure (a recipients file age cannot use) -> non-zero, no .age, .inflight empty', () => {
     const f = '000000010000000000000045';
     const rec = s.root('ls /w/etc/polycarpic | grep -i age').out.split('\n')[0]!;
-    s.root(`chown 0:0 /w/etc/polycarpic/${rec} && chmod 0600 /w/etc/polycarpic/${rec}`);
+    s.root(`cp /w/etc/polycarpic/${rec} /w/etc/polycarpic/${rec}.keep && printf 'not-a-recipient\\n' > /w/etc/polycarpic/${rec}`); // not a permission fault: Docker Desktop bind mounts do not enforce modes
     expect(mkSeg('/tmp/seg4', 4096, 'E').code).toBe(0);
     const r = runArchive('/tmp/seg4', f);
-    s.root(`chmod 0644 /w/etc/polycarpic/${rec}`);
+    s.root(`cp /w/etc/polycarpic/${rec}.keep /w/etc/polycarpic/${rec} && rm /w/etc/polycarpic/${rec}.keep`);
     expect(r.code).not.toBe(0); // red: set -e / pipefail missing, age error swallowed
     expect(s.root(`ls ${walDir()}/${T(f)} 2>&1; ls -A ${walDir()}/.inflight | wc -l`).out).toMatch(/No such file[\s\S]*0$/); // red: temp left or target created
     s.root(`printf stale > ${walDir()}/.inflight/${T(f)}.77777 && chown 999:999 ${walDir()}/.inflight/${T(f)}.77777`);
