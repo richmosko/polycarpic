@@ -62,7 +62,7 @@ export const TABLE = {
   // POLY-97: infra/hetzner/ and infra/operator/ and the dry-run test files belong to the `provision` job. infra/provision*.sh and the
   // box helpers (Dockerfile, fakes, box.ts, pg.ts) stay here too, because tests/infra/image/provision-db.test.ts runs them.
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/|hetzner\/|operator\/|ops\/)/, /^bin\//,
-    /^infra\/ci\/(image|install-trivy)\.sh$/, /^infra\/ops\/lib\/release\.py$/, // POLY-100 F1: the built-image test feeds the bundle to the installed `read_tar`
+    /^infra\/ci\/(image|install-trivy)\.sh$/, /^infra\/ops\/lib\/(release|compose_guard|ts)\.py$/, /^tests\/infra\/ops\/fixtures\//, // POLY-100: F1's built-image test feeds the bundle to the installed `read_tar`; the lint fixtures run guard_real.py (guard, release, ts) on real renders
     /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
   ],
   // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run, shellcheck and the operator-tool unit tests. Reads the compose
