@@ -39,7 +39,7 @@ export const point = (prod: string | null, staging: string | null) => [
   prod ? `echo ${prod} > /var/fake-state/pg-prod-host; ln -sf /etc/polycarpic/secrets/postgres/db_superuser_password /var/fake-state/pg-prod-password` : '',
   staging ? `echo ${staging} > /var/fake-state/pg-staging-host; ln -sf /etc/polycarpic/secrets/postgres/db_superuser_password /var/fake-state/pg-staging-password` : '',
 ].filter(Boolean).join('\n');
-export const OPS = 'mkdir -p /tmp/ops; cp /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/packages/db/sql/roles.sql /tmp/ops/;';
+export const OPS = 'mkdir -p /tmp/ops/backup; cp /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/packages/db/sql/roles.sql /tmp/ops/; cp -r /repo/infra/backup/systemd /tmp/ops/backup/;'; // H16 compares the installed units with $here/backup/systemd
 export const CHECK_OPS = `POLY_NTP_WAIT=2 bash /tmp/ops/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 export const asSuper = (cmd: string) => `export PGPASSWORD=$(cat /etc/polycarpic/secrets/postgres/db_superuser_password); ${cmd}`;
 export const STAGE = (host: string, project = 'prod') => `${OPS} ${point(host, null).replace(/pg-prod/g, `pg-${project}`).trim()}; bash /tmp/ops/provision.sh --stage database --project ${project}`;

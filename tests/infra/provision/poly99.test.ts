@@ -56,9 +56,10 @@ describe('R10 the spool ACLs (C3): the uploader reads, root deletes', () => {
   it('as 10005 on the real filesystem: opening a published file for write fails EACCES, creating in dump/ fails, listing .inflight/ fails', () => {
     const mk = `setpriv --reuid=10004 --regid=10004 --clear-groups python3 -c 'import os,sys; os.close(os.open(sys.argv[1], os.O_CREAT|os.O_WRONLY, 0o666))'`;
     const as5 = 'setpriv --reuid=10005 --regid=10005 --clear-groups';
-    const r = run(`${mk} /srv/polycarpic/spool/dump/c.age; cat /srv/polycarpic/spool/dump/c.age > /dev/null; ${as5} bash -c 'cat /srv/polycarpic/spool/dump/c.age >/dev/null && echo read-ok; echo x >> /srv/polycarpic/spool/dump/c.age 2>&1; touch /srv/polycarpic/spool/dump/new 2>&1; rm /srv/polycarpic/spool/dump/c.age 2>&1; ls /srv/polycarpic/spool/dump/.inflight 2>&1'`, { image: HOST });
+    const ops = [['WRITE', 'echo x >> /srv/polycarpic/spool/dump/c.age'], ['CREATE', 'touch /srv/polycarpic/spool/dump/new'], ['DELETE', 'rm /srv/polycarpic/spool/dump/c.age'], ['LISTINFLIGHT', 'ls /srv/polycarpic/spool/dump/.inflight']];
+    const r = run(`${mk} /srv/polycarpic/spool/dump/c.age; ${as5} bash -c 'cat /srv/polycarpic/spool/dump/c.age >/dev/null && echo read-ok'; ${ops.map(([k, c]) => `${as5} bash -c '${c}' >/dev/null 2>&1 && echo ALLOWED-${k} || echo DENIED-${k}`).join('; ')}`, { image: HOST });
     expect(r.out).toContain('read-ok');
-    expect((r.out.match(/Permission denied/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    for (const [k] of ops) { expect(r.out, k).toContain(`DENIED-${k}`); expect(r.out, k).not.toContain(`ALLOWED-${k}`); }
   });
   it('RED ON THE FAULT: today\'s `rwx` default ACL lets 10005 write a published file (what C3 forbids), shown on the same filesystem', () => {
     const r = run(`setfacl -d -m u:10005:rwx /srv/polycarpic/spool/dump; setpriv --reuid=10004 --regid=10004 --clear-groups python3 -c 'import os,sys; os.close(os.open(sys.argv[1], os.O_CREAT|os.O_WRONLY, 0o666))' /srv/polycarpic/spool/dump/d.age; setfacl -m u:10005:rwx /srv/polycarpic/spool/dump; setpriv --reuid=10005 --regid=10005 --clear-groups bash -c 'echo x >> /srv/polycarpic/spool/dump/d.age && echo write-ok'`, { image: HOST });

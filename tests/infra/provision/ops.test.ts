@@ -6,12 +6,12 @@ import { COMPLETE, HOST, b2Fixture, build, check, failLine, find, last, makeComp
 import { BASE_IMAGE, CHECK_OPS, NETS_GOOD, OPS, STAGE, checkAll, namesFor, nets, point, startPg, superPassword, waitPg } from './pg.ts';
 
 const BUCKET = 'polycarpic-hetzner-backups';
-const EXEC = ['infra/ops/polycarpic-ops', 'infra/ops/install_box.py', 'infra/provision.sh', 'infra/provision-check.sh', 'infra/postgres/gate-check.sh'];
+const EXEC = ['infra/ops/polycarpic-ops', 'infra/ops/install_box.py', 'infra/provision.sh', 'infra/provision-check.sh', 'infra/postgres/gate-check.sh', 'infra/backup/backup.sh', 'infra/backup/upload.sh', 'infra/postgres/archive-wal.sh']; // POLY-99: the scripts the runner starts are executable in the bundle too
 
 // A laptop checkout inside the box (bundle paths copied from /repo, committed), a fake ssh that runs the remote command as polyops, and `bump` to make a new commit.
 const LAP = `
 rm -rf /tmp/lap /tmp/bin; mkdir -p /tmp/lap /tmp/bin
-(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql /tmp/lap/)
+(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql infra/backup infra/postgres/archive-wal.sh /tmp/lap/)
 find /tmp/lap -name __pycache__ -prune -exec rm -rf {} +
 (cd /tmp/lap && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm one)
 cat > /tmp/bin/ssh <<'SSH'

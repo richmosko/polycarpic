@@ -126,7 +126,7 @@ describe('provision.sh host stage (R5)', () => {
     const r = run(`for d in pg-prod pg-staging spool/wal spool/dump spool/premigration; do stat -c "$d %a %u:%g" /srv/polycarpic/$d; done; for d in spool/wal spool/dump spool/premigration; do echo "== $d"; getfacl -cp /srv/polycarpic/$d | grep -v '^$'; done`, { image: HOST });
     expect(r.out).toMatch(/^pg-prod 700 999:999$/m);
     expect(r.out).toMatch(/^pg-staging 700 999:999$/m);
-    // `stat %a` shows the ACL mask in the group position (setfacl -m u:10005:rwx makes it rwx), so the 0700 of R5 is the base entries below.
+    // `stat %a` shows the ACL mask in the group position (setfacl -m u:10005:r-x makes it r-x), so the 0700 of R5 is the base entries below.
     expect(r.out).toMatch(/^spool\/wal \d+ 999:999$/m);
     expect(r.out).toMatch(/^spool\/dump \d+ 10004:10004$/m);
     expect(r.out).toMatch(/^spool\/premigration \d+ 10004:10004$/m);
@@ -134,16 +134,16 @@ describe('provision.sh host stage (R5)', () => {
       expect(sec).toMatch(/^user::rwx$/m);
       expect(sec).toMatch(/^group::---$/m);
       expect(sec).toMatch(/^other::---$/m);
-      expect(sec).toMatch(/^user:10005:rwx$/m);
+      expect(sec).toMatch(/^user:10005:r-x$/m); // POLY-99 R10: the uploader reads and lists, root deletes
       expect(sec).toMatch(/^default:user::rwx$/m);
       expect(sec).toMatch(/^default:group::---$/m);
       expect(sec).toMatch(/^default:other::---$/m);
-      expect(sec).toMatch(/^default:user:10005:rwx$/m);
+      expect(sec).toMatch(/^default:user:10005:r-x$/m);
       expect(sec).not.toMatch(/^group:\d+:/m); // never a shared gid
     }
   });
 
-  it('M1: files written by 999 (WAL) and 10004 (dump) under umask 077 stay readable, siblingable and deletable by 10005; a chmod 0600 removes the read', () => {
+  it('M1 (POLY-99 R10): files written by 999 (WAL) and 10004 (dump) under umask 077 stay READABLE by 10005, who can neither add a sibling nor delete (root deletes); a chmod 0600 removes the read', () => {
     const as = (uid: number, cmd: string) => `setpriv --reuid=${uid} --regid=${uid} --clear-groups bash -c '${cmd}'`;
     const r = run([
       as(999, 'umask 077; echo wal > /srv/polycarpic/spool/wal/0001.age'),
@@ -151,20 +151,23 @@ describe('provision.sh host stage (R5)', () => {
       as(10004, 'umask 077; echo dump > /srv/polycarpic/spool/dump/b.age; chmod 0600 /srv/polycarpic/spool/dump/b.age'),
       as(10005, 'cat /srv/polycarpic/spool/wal/0001.age && echo WALREAD'),
       as(10005, 'cat /srv/polycarpic/spool/dump/a.age && echo DUMPREAD'),
-      as(10005, 'echo h > /srv/polycarpic/spool/wal/0001.age.sha256 && echo SIBLING'),
-      as(10005, 'rm /srv/polycarpic/spool/wal/0001.age && echo WALRM'),
+      as(10005, 'echo h > /srv/polycarpic/spool/wal/0001.age.sha256 2>&1 && echo SIBLING || echo NOSIBLING'),
+      as(10005, 'rm /srv/polycarpic/spool/wal/0001.age 2>&1 && echo WALRM || echo NORM'),
+      'test -e /srv/polycarpic/spool/wal/0001.age && echo STILLTHERE',
       as(10005, 'cat /srv/polycarpic/spool/dump/b.age 2>&1 | grep -c "Permission denied" || true'),
     ].join('\n'), { image: HOST });
-    for (const t of ['WALREAD', 'DUMPREAD', 'SIBLING', 'WALRM']) expect(r.out, t).toContain(t);
+    for (const t of ['WALREAD', 'DUMPREAD', 'NOSIBLING', 'NORM', 'STILLTHERE']) expect(r.out, t).toContain(t);
+    for (const t of ['\nSIBLING', '\nWALRM']) expect(r.out, t).not.toContain(t);
     expect(r.out.trim().split('\n').pop()).toBe('1');
   });
 
-  it('state: /var/lib/polycarpic/state root 0755; last-upload owned 10005, last-dump and jobs.log owned 10004, 0644, created empty', () => {
+  it('state (POLY-99 R9): /var/lib/polycarpic/state root 0755; last-upload, jobs.log and spool.sha256 are root-written (0:0 0644, created empty); last-dump is gone', () => {
     const r = run(`stat -c '%n %a %u:%g %s' /var/lib/polycarpic/state /var/lib/polycarpic/state/*`, { image: HOST });
     expect(r.out).toMatch(/^\/var\/lib\/polycarpic\/state 755 0:0/m);
-    expect(r.out).toMatch(/last-upload 644 10005:\d+ 0$/m);
-    expect(r.out).toMatch(/last-dump 644 10004:\d+ 0$/m);
-    expect(r.out).toMatch(/jobs\.log 644 10004:\d+ 0$/m);
+    expect(r.out).toMatch(/last-upload 644 0:0 0$/m);
+    expect(r.out).toMatch(/jobs\.log 644 0:0 0$/m);
+    expect(r.out).toMatch(/spool\.sha256 644 0:0 0$/m);
+    expect(r.out).not.toMatch(/last-dump/);
   });
 
   const GIDS: Record<string, number> = { postgres: 999, web: 10001, worker: 10002, migrate: 10003, backup: 10004, uploader: 10005, operator: 10006, auth: 10007, caddy: 10010 };
