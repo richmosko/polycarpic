@@ -1,35 +1,40 @@
-# POLY-100 gate (qa-100) — current as of the commit that carries it
+# POLY-100 gate (qa-100) — local set at 2825b6f7 (build complete); CI's Linux result to be added
 
-Plan: `test-plan.md` (pins), `red-run.md` (mutants). Numbers are this Mac, my worktree, one suite at a time. Linux CI is the authority for the container suites.
+Plan: `test-plan.md` (pins), `red-run.md` (every test shown red on the build before its fix, and every security test on a mutant). Numbers are this Mac, my worktree, one suite at a time. Linux CI is the authority for the container suites and for the Linux-only cases. **Not signed off: sign-off needs CI green at one sha.**
 
-## Results by CI job
+## Results by job
 
-| Job / command | Result | Wall time | Budget (ruling R13) |
+| Job / command | Result | Wall time | Control and budget |
 |---|---|---|---|
-| ops unit: `unittest discover -p 'test_deploy_*.py'` + `test_staging_auth.py` | 148 tests green | 38 s earlier, 52 s on a busy machine (other teammates' suites) | 40 s (architect-100, 52910589): re-measure on a quiet machine |
-| ops unit: the other `tests/infra/ops/test_*.py` (POLY-98/99 pins), file by file | green | — | — |
-| lint: `vitest run -c tests/infra/vitest.config.ts` | 539/539 | 23.4 s vs control (main, 390 tests) 13.7 s = **+9.7 s** | ≤ 15 s |
-| ci: `vitest run -c tests/ci/vitest.config.ts` | 587/587 | — | — |
-| db: `tests/db/runner.test.ts` | 44/44 | 21.2 s vs control (main's file) 13.2 s = **+8 s** | ≤ 10 s |
-| provision: `vitest.provision.config.ts` | **189/189** | ≈ 83 s vs control (main, 171 tests) 72.4 s = **+10.6 s** | ≤ 60 s box fixture |
-| image: `vitest.image.config.ts` | 88/90 | — | 0 s added (no new file; harness fixed for the required image variables) |
-| backup: `vitest.backup.config.ts` | 93/112 on this Mac | ≈ 11 min | — |
+| ops unit: `unittest discover -p 'test_*.py'` in tests/infra/ops | 469/469 | 76 s (busy Mac); CI Linux 12.3 s at d9547d58 | budget 46 s (architect-100); the Mac figure is load, the CI figure is the measure |
+| lint: `vitest run -c tests/infra/vitest.config.ts` | 572 passed, 3 skipped (render-isolation: needs Linux), 0 red | 19.7 s | control (main, 390 tests) 13.7 s = +6 s; budget ≤ 20 s total: met |
+| db: `tests/db/runner.test.ts` | 44/44 | 21.1 s | control (main's file) 13.2 s = +7.9 s; budget ≤ 10 s: met |
+| provision: `vitest.provision.config.ts` | 190/190 | 85.5 s | control (main, 171 tests) 72.4 s = **+13.1 s**; budget was ≤ 60 s for the box fixture. OVER by the delta: the added tests are the box fixtures (host H23, ops, edge-net, sauth-box); the budget needs the lead's/architect-100's reading, not mine |
+| image: `vitest.image.config.ts` | 91/93 | 109 s | the three F1 built-image tests are new (one image build, ≈ 25 s of it); budget ≤ 5 s added: **over** unless CI's cached build says otherwise |
+| backup: `vitest.backup.config.ts` | 112/112 | 348 s | quiet machine; infra/backup unchanged on the branch |
+| ci: `vitest run -c tests/ci/vitest.config.ts` | 581/587 | — | the 6 reds are `generated-freshness.test.ts` (drizzle-kit): `node_modules/.bin/drizzle-kit` is absent in this worktree, "cannot-run: generator failed"; this branch changes no schema or config. Environment; CI decides |
 
 Reds, with my reading:
-- image `postgres.test.ts` ×2 (0440 file ownership refusals): Docker Desktop does not enforce bind-mount uid/gid; CI on Linux decides.
-- backup: uploader hook and backup/restore timeouts, `drill` ×5, "no mode exits 0": `infra/backup` is unchanged on the branch, so I read these as this Mac's load; CI decides.
+- image `postgres.test.ts` ×2 (0440 file ownership refusals): Docker Desktop does not enforce bind-mount uid/gid; CI Linux was green for them.
+- `tests/ci` freshness ×6: as above, worktree without drizzle-kit.
 
-## Acceptance criteria
+## Acceptance criteria and the proving test
 
-1. Pull-based deploy: T1–T5, T7, T14, T15, T16 (`test_deploy_*.py`).
-2. Rollback inside 120 s: T10 (`test_deploy_flow.py`), T-probe, T10q.
-3. Quarantine: T10, T10q (S18), T11.
-4. Timers and units: `deploy-wiring.test.ts`.
-5. Runbook inputs: T12, T13 (`test_deploy_t13.py`); the 60 minutes is POLY-116's.
-6. Failing migration file leaves schema unchanged: `tests/db/runner.test.ts` "a failing file leaves schema and tracking unchanged" (already green).
+1. Pull-based deploy, verified chain, bundle as data, compose guard, strict edge: `test_deploy*.py` (flow, candidate, bundle, guard, probe, quarantine, secrets, token_lock, edge, help, t13, sauth_gate, policy, state, faults, shared_release, render, render_users, render_prune, judged, hang, oneoff, flags).
+2. Rollback within 120 s: T10 (`test_deploy_flow.py`), T-probe, T10q; F2 `test_deploy_hang.py` for a hanging health read.
+3. Quarantine: T10, T10q (S18), T11, F11 (`current-guard-<rule>`).
+4. Timers and units: `deploy-wiring.test.ts`, `env-wiring.test.ts`.
+5. Runbook inputs: T12 (`test_deploy_prod.py`), T13 (`test_deploy_t13.py`); the 60-minute run is POLY-116's.
+6. A failing migration file leaves the schema unchanged: `tests/db/runner.test.ts` "a failing file leaves schema and tracking unchanged".
 7. Concurrent migrate: T-lock (`runner.test.ts`).
+8. Build review F1–F16: one test file per finding (red-run.md, F-table); F1 also built-image (`tests/infra/image/release-bundle.test.ts`).
+9. A18 render user: `test_deploy_render.py` RenderUser, `host.test.ts` H23.
+10. Option validity of every docker/compose/gh argv (F16/T14): `test_deploy_flags.py`, `tests/infra/flags-real.test.ts`.
 
-## Open
+## What stays unmeasured, and where it is
 
+- `tests/infra/render-isolation.test.ts` (S31 on the real tools): needs Linux with `unshare`, `setpriv`, root or sudo; written and skipped here; CI's lint job is its first run (ci.yml run 45288873465 at 2825b6f7). Its case 3 control (a remote include connects when not isolated) is unmeasured on CI's Compose.
+- The swap-between-two-renders case is a unit case only; the `-f -` re-render as the real render user has no Linux test beyond case 1 to 3.
 - T13 as a container case against POLY-99's fake ssh and real restore: not written; the unit version holds the line's grammar against restore's own regexes.
-- The ruling's real-render drift check runs in the lint job (`compose-real.test.ts`); it fails, never skips, without the compose plugin only by virtue of the `docker compose` call failing.
+- F4's `up` from the saved file on Linux (a container run, the lead's go-ahead): not run by me.
+- S35: no natural mutant for a secret *file* value (secret values never enter a render); the baked-value mutants (print, log) are red.
