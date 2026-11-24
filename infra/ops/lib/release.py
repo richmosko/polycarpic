@@ -27,7 +27,7 @@ SIBLINGS = ("postgres", "tools", "caddy")
 IMAGE_KEYS = ("POLY_POSTGRES_IMAGE", "POLY_TOOLS_IMAGE", "POLY_CADDY_IMAGE")
 LABEL = "org.opencontainers.image.revision"
 EVENTS = ("candidate", "verified", "refused", "transient", "busy", "quarantined", "not-newer", "premigration-set", "migrated", "up", "healthy",
-          "rolled-back", "rollback-unhealthy", "edge-probe-baseline", "help")
+          "rolled-back", "rollback-unhealthy", "edge-probe-baseline", "help", "render-error")
 
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 SHA = re.compile(r"[0-9a-f]{40}")

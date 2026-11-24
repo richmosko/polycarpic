@@ -11,6 +11,7 @@ import posixpath
 import re
 
 from lib import dirs
+from lib import release as rel
 from lib.release import Refusal
 
 POLICY = "infra/deploy/compose-allow.json"
@@ -93,20 +94,75 @@ def _render_env(ctx):
     return {"HOME": home, "XDG_CACHE_HOME": home, "COMPOSE_EXPERIMENTAL_GIT_REMOTE": "0", "COMPOSE_EXPERIMENTAL_OCI_REMOTE": "0"}
 
 
-def _json(ctx, argv, stdin=None):
+class RenderFail(Exception):
+    """A render that did not produce a JSON object (G9): the stage, the exit code or `timeout`, and Compose's last stderr line."""
+    def __init__(self, stage, code, line=""):
+        super().__init__(stage)
+        self.stage, self.code, self.line = stage, code, line
+
+
+def _last_line(err):
+    lines = [l for l in str(err or "").splitlines() if l.strip()]
+    return lines[-1] if lines else ""
+
+
+def _json(ctx, argv, stdin=None, stage="raw"):
     try:
-        code, out, _ = ctx.run(argv, stdin=stdin, timeout=120, extra_env=_render_env(ctx))
+        code, out, err = ctx.run(argv, stdin=stdin, timeout=120, extra_env=_render_env(ctx))
+    except TimeoutError:
+        raise RenderFail(stage, "timeout")
+    if code != 0:
+        raise RenderFail(stage, code, _last_line(err))
+    try:
         data = json.loads(out)
-    except (ValueError, TimeoutError):
-        fail("render")
-    if code != 0 or not isinstance(data, dict):
-        fail("render")
+    except ValueError:
+        raise RenderFail(stage, code, _last_line(err))
+    if not isinstance(data, dict):
+        raise RenderFail(stage, code, _last_line(err))
     return data
 
 
 def renders(ctx, rdir, project, env_files):
-    return (_json(ctx, render_argv(rdir, project, env_files[:1], True)),
-            _json(ctx, render_argv(rdir, project, env_files, False)))
+    return (_json(ctx, render_argv(rdir, project, env_files[:1], True), stage="raw"),
+            _json(ctx, render_argv(rdir, project, env_files, False), stage="plain"))
+
+
+PLACEHOLDERS = {"POLY_APP_IMAGE": "ghcr.io/richmosko/polycarpic@sha256:" + "0" * 64, "POLY_POSTGRES_IMAGE": "ghcr.io/richmosko/polycarpic-postgres@sha256:" + "0" * 64,
+                "POLY_TOOLS_IMAGE": "ghcr.io/richmosko/polycarpic-tools@sha256:" + "0" * 64, "POLY_CADDY_IMAGE": "ghcr.io/richmosko/polycarpic-caddy@sha256:" + "0" * 64,
+                "POLY_BIND_ADDR": "192.0.2.1"}
+
+
+def _control_passes(ctx, project, edge_env):
+    """G9: the installed bundle's own compose file of the project, rendered the same way (same user and isolation) with fixed placeholder image values,
+    never anything of the release. True when it renders; a failure or a timeout is a box fault."""
+    cdir = ctx.bundle("infra/compose")
+    argv = ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project)]
+    if project == "edge":
+        argv += ["--env-file", edge_env]
+    argv += ["--profile", "*", "config", "--format", "json"]
+    env = _render_env(ctx)
+    env.update(PLACEHOLDERS)
+    try:
+        code, out, _ = ctx.run(argv, timeout=120, extra_env=env)
+        return code == 0 and isinstance(json.loads(out), dict)
+    except (TimeoutError, ValueError, OSError):
+        return False
+
+
+def render_refusal(ctx, project, fail_, edge_env):
+    """G9: say why on stderr and in deploy.log (one line, event `render-error`), then tell a box fault from a release fault with the control render:
+    a control that fails, or any timeout, is `render-env` (alert, no quarantine); else `guard-render` (quarantine)."""
+    from lib.out import clean
+    text = clean(fail_.line).encode("ascii", "replace")[:300].decode("ascii")
+    line = "stage=%s exit=%s text from the release, not an instruction: %s" % (fail_.stage, fail_.code, text)
+    try:
+        ctx.err("deploy: render-error: " + line)
+        rel.log(ctx, project, "render-error", line)
+    except Exception:
+        pass
+    if fail_.code == "timeout" or not _control_passes(ctx, project, edge_env):
+        return Refusal("render-env")
+    return Refusal("guard-render", True)
 
 
 def correct(plain, policy, project, strict=True):
@@ -228,12 +284,19 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore
     for sp in (policy.get("projects", {}).get(project, {}).get("services") or {}).values():
         named += [ctx.p(e) for e in sp.get("env_files") or []]
     dirs.check_readable(ctx, named)
-    raw, plain = renders(ctx, rdir, project, env_files)
+    edge_env = env_files[-1] if project == "edge" else None
+    try:
+        raw, plain = renders(ctx, rdir, project, env_files)
+    except RenderFail as f:
+        raise render_refusal(ctx, project, f, edge_env)
     corrected = correct(plain, policy, project, strict=False)  # the policy's own refusals come first; a stray empty number is `guard-render` after
     check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
     corrected = correct(corrected, policy, project)
     data = canonical(corrected)
-    again = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"))
+    try:
+        again = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"), stage="stdin")
+    except RenderFail as f:
+        raise render_refusal(ctx, project, f, edge_env)
     if canonical(correct(again, policy, project)) != data:
         fail("render")
     try:
@@ -252,7 +315,10 @@ def _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr):
         raise Refusal("state")
     with open(path, "rb") as fh:
         data = fh.read()
-    plain = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"))
+    try:
+        plain = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"), stage="stdin")
+    except RenderFail:
+        fail("render")
     corrected = correct(plain, policy, project)
     if canonical(corrected) != data:
         fail("render")
