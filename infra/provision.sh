@@ -268,7 +268,7 @@ state_files() {
 # The directories every deploy run shares (POLY-100 G1): root, exactly 0755, so the unprivileged render user can reach what it must read.
 deploy_dirs() {
   local d
-  for d in /opt/polycarpic /opt/polycarpic/releases "$STATE/deploy" "$STATE/deploy/render-home"; do
+  for d in /opt/polycarpic /opt/polycarpic/releases "$STATE/deploy"; do
     ensure_dir "$d" 0755 0:0
     [ "$(stat -c %a "$d")" = 755 ] || { chmod 0755 "$d"; change "mode of $d set to 0755"; }
   done

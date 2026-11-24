@@ -385,11 +385,10 @@ report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates
 
 # ------------------------------------------------------------------ H24 shared deploy directories (POLY-100 G1)
 h24=''
-for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy /var/lib/polycarpic/state/deploy/render-home; do
+for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy; do
   if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
   else [ "$(stat -c '%a %u:%g' "$d")" = "755 0:0" ] || h24="$h24 $d is $(stat -c '%a %u:%g' "$d") (want 755 0:0);"; fi
 done
-[ -z "$(ls -A /var/lib/polycarpic/state/deploy/render-home 2> /dev/null)" ] || h24="$h24 render-home is not empty;"
 report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... creates them; a link or a file in the way must be removed by hand"
 
 # ------------------------------------------------------------------ H9 service gids
