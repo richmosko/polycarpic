@@ -160,7 +160,10 @@ class Unwind(Helpers):
         order = []
         for name in ("alert", "log", "quarantine"):
             real = getattr(rel, name)
-            self.patch(**{name: (lambda real, name: lambda *a, **k: (order.append(name), real(*a, **k))[1])(real, name)})
+            self.patch(**{name: (lambda real, name: lambda *a, **k: (order.append((name, a[3:] and a[2:4])), real(*a, **k))[1])(real, name)})
         self.deploy("staging")
-        firsts = [n for i, n in enumerate(order) if n not in order[:i]]
-        self.assertEqual(firsts, ["alert", "log", "quarantine"], order)
+        # `candidate` is logged before any refusal: the order is read from the refusal on (the first `refused` log line, the alert, the quarantine)
+        names = [n for n, extra in order]
+        start = next(i for i, (n, extra) in enumerate(order) if n == "alert")
+        after = [n for n in names[start:]]
+        self.assertEqual([n for i, n in enumerate(after) if n not in after[:i]], ["alert", "log", "quarantine"], order)

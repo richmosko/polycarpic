@@ -297,6 +297,8 @@ class Host(object):
 
 class OpsTest(unittest.TestCase):
     def setUp(self):
+        if getattr(self, "_patches", None):  # a test that calls setUp again (a loop of cases) must stop the earlier patches: only the last list is stopped by the cleanup
+            self._stop()
         self._tmp = tempfile.TemporaryDirectory()
         self.tmp = Path(self._tmp.name)
         self.host = Host(self.tmp)
@@ -312,8 +314,7 @@ class OpsTest(unittest.TestCase):
         for p in self._patches:
             p.start()
         self.addCleanup(self._stop)
-        self._umask = os.umask(0o022)
-        os.umask(self._umask)
+        self._umask = os.umask(0o022)  # held for the test body (restored in _stop): a test that sets 077 must not leave fixtures 0600 for the next one
 
     def _stop(self):
         for p in self._patches:

@@ -136,7 +136,6 @@ class F8(DeployTest):
             ("a group-writable file", lambda: os.chmod(victim, 0o664), lambda: os.chmod(victim, 0o644), {}),
             ("a world-writable file", lambda: os.chmod(victim, 0o666), lambda: os.chmod(victim, 0o644), {}),
             ("a group-writable directory", lambda: os.chmod(os.path.dirname(victim), 0o775), lambda: os.chmod(os.path.dirname(victim), 0o755), {}),
-            ("a world-writable releases/ parent", lambda: os.chmod(os.path.dirname(prev), 0o777), lambda: os.chmod(os.path.dirname(prev), 0o755), {}),
             ("a foreign owner", lambda: None, lambda: None, {"trusted": os.getuid() + 1}),
         )
         for label, brk, fix, kw in cases:
@@ -148,6 +147,23 @@ class F8(DeployTest):
                 self.assertEqual([c for c in r.world.compose_log[mark:] if c["cmd"] == "up"], [], label)
             finally:
                 fix()
+
+    def test_a_world_writable_releases_parent_is_repaired_by_the_shared_directory_helper_and_a_link_in_its_place_is_refused(self):
+        """G1 (ruling 822a05a9) supersedes F8's case for the shared parent: a root-owned `releases/` that is world-writable is repaired to 0755 before any run (so the rollback goes on); a link or a
+        non-directory in its place is `render-path` and is never repaired."""
+        x1 = self.two_releases()
+        releases = os.path.dirname(self.hex_dir(x1))
+        os.chmod(releases, 0o777)
+        r = self.deploy("staging", cmd="rollback")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(oct(os.stat(releases).st_mode & 0o777), "0o755", "repaired")
+        parked = releases + ".parked"
+        os.rename(releases, parked)
+        os.symlink(parked, releases)
+        mark = len(self.world.compose_log)
+        r = self.deploy("staging", cmd="rollback")
+        self.assertNotEqual(r.rc, 0, "a link in place of releases/ must refuse: " + r.err)
+        self.assertEqual([c for c in r.world.compose_log[mark:] if c["cmd"] == "up"], [])
 
     def test_a_clean_previous_rolls_back(self):
         self.two_releases()
