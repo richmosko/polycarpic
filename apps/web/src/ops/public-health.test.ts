@@ -114,9 +114,15 @@ describe('G15: the public health listener (real sockets)', () => {
     const logs: string[] = [];
     const w1 = vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => { logs.push(String(c)); return true; });
     const w2 = vi.spyOn(process.stderr, 'write').mockImplementation((c: unknown) => { logs.push(String(c)); return true; });
+    // vitest routes `console.*` through its own reporter, not process.stdout.write: spy on the console too (verdict C1)
+    const cons = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation((...a: unknown[]) => { logs.push(a.map(String).join(' ') + '\n'); }));
+    console.log('control-console-MARK');
+    process.stdout.write('control-stdout-MARK\n');
+    process.stderr.write('control-stderr-MARK\n');
     const res = (await raw(port, `GET /planted-path-MARK HTTP/1.1\r\nHost: planted-host-MARK\r\nCookie: sid=planted-cookie-MARK\r\nX-Forwarded-For: 203.0.113.99\r\n\r\n`)).data;
     const res2 = (await raw(port, `GET /api/v1/health HTTP/1.1\r\nHost: planted-host-MARK\r\nCookie: sid=planted-cookie-MARK\r\nX-Forwarded-For: 203.0.113.99\r\n\r\n`)).data;
-    w1.mockRestore(); w2.mockRestore();
+    w1.mockRestore(); w2.mockRestore(); for (const c of cons) c.mockRestore();
+    for (const c of ['control-console-MARK', 'control-stdout-MARK', 'control-stderr-MARK']) expect(logs.join(''), `control: the capture sees ${c}`).toContain(c);
     for (const mark of ['planted-path-MARK', 'planted-host-MARK', 'planted-cookie-MARK', '203.0.113.99']) {
       expect(res + res2, `${mark} echoed`).not.toContain(mark);
       expect(logs.join(''), `${mark} logged`).not.toContain(mark);
