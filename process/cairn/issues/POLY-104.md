@@ -57,3 +57,7 @@ From the POLY-100 ruling (`process/cairn/reviews/POLY-100/ruling.md` R9, §L5; s
 ### @team-lead — 2026-11-23
 
 Correction to my comment above (2026-11-23): the rule "create the `app.` DNS record only after `first-deploy prod`" is withdrawn. It belonged to the staging-only edge exception, which the Principal replaced the same day with the strict rule: staging never deploys Caddy on any host (`process/DECISIONS.md` 2026-11-23; POLY-100 ruling R9, §L5 at d634da53). There is no DNS-order rule and no `edge-prod-name-early` refusal. What POLY-104 needs instead: `provision.sh` creates the two edge networks, and Caddy is brought up from a signed release before staging is served; which signed release (a signed `edge-<n>` tag, or prod first) is the Principal's open choice, ruling §L6. Either way the tag-signing key and `RELEASE_SIGNERS` come before the first staging deploy.
+
+### @team-lead — 2026-11-23
+
+From POLY-100 (seceng advisory A19, `process/cairn/reviews/POLY-100/ruling-review.md`): the deploy's render step parses a release's compose files on the box that runs prod, as the unprivileged render user with no network, but with no memory cap. A cap was left out of POLY-100 because nobody has measured whether `docker compose config` runs correctly under one. Measure it on the first staging box (the render under a memory limit, on all three files), then add the cap with its test in the next ops loop. Until then a hostile or malformed release could exhaust memory during the render; it cannot read secrets or reach the network there.
