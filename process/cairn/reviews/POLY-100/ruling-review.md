@@ -886,3 +886,18 @@ The render home stays empty and unwritable by 10020. *Tests:* a symlink and a fo
 **Met.** S36 and S37 are whole. T-real carries my limits and stays unruled until the Principal decides; the workflow's permissions are `contents: read`. Budgets: no security objection.
 **One wording:** G1's "provision creates the first three" counts each release tree as the third. It must name `/opt/polycarpic`, `releases` and `state/deploy`. Nothing else is open.
 If T-real is chosen: the `image` job's limit is 20 minutes and the architect's 2.5 to 4 is unmeasured, so measure before it lands.
+
+## `8635f525`, `8cc747eb` (G1's final rule): **met**
+
+## Draft: T-real's path list and limits (architect-100, not yet in the ruling)
+
+**Agree, with S38.** The list covers the named faults: `Dockerfile` (F1), `infra/ops` (F16, G1), `infra/compose` and `packages/config/src` (`PLAID_ENV`, `MAIL_FROM`), `infra/provision.sh` and `infra/compose` (networks, G1, `MAIL_FROM`).
+Leaving out the lockfile and the rest of `apps/` is a fair price for a narrow trigger and is written down. The one real `git fetch` is anonymous, of a public commit: no objection; say it in the test. The corrected time is
+the architect's estimate too; the 17-minute rule decides.
+
+**S38.**
+- *(a)* The trigger also has the suite's own vitest config and any helper it imports from outside `tests/infra/deploy-real/`; the classifier test walks its imports, as `tests/ci` does for the db battery.
+- *(b)* Everything it puts on the runner is undone in the `always()` step: hosts line, CA, the fake `gh` (in `/usr/local/sbin`, never over the real one), users, networks, mounts, containers, `/opt/polycarpic`, `/etc/polycarpic`, state.
+- *(c)* The kept log is a named list: the step's own output and `deploy.log`. Never `/etc/polycarpic`, `state/deploy` as a whole, a saved render or an environment dump: artifacts of a public repository are public.
+- *(d)* Fixture secrets are random per run, and a sweep at the end finds none of them in the kept log.
+- *(e)* No token reaches the step: no `GH_TOKEN`, `persist-credentials: false` as now.
