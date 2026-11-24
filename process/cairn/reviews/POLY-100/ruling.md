@@ -478,20 +478,41 @@ All eight are in this loop. Where an earlier rule differs, this table rules.
 | G7 | Each health child gets min(30 s, what is left) computed just before it starts; with nothing left the poll ends as "not healthy" | six children each taking 29 s: rollback starts ≤ 120 s fake time | mutant computing once per poll |
 | G8 | H23 allows a process of uid 10020 only when its executable is `docker` or `docker-compose` (`/proc/<pid>/exe`) and its arguments hold `compose` and `config` | a script named with the words: refused; a real render: passes | mutant on the command line alone |
 
-**The one test that would have caught G1, F1 and F16 together (for the Principal, §L7; not ruled in until they decide)**
+## T-real — one real deploy in CI (Principal: in this loop, narrow trigger, with the rollback case; seceng `a39fc4c6`, S38)
 
-**T-real:** one real `first-deploy staging` on the CI runner, as real root, with the real dispatcher, real umask, real `install_box.py` install, real Docker and Compose, and the job's own images.
-- **Faked: GitHub only.** A `gh` on `PATH` (run list, `digest.txt`, attestation answer). The registry is a local one answering as `ghcr.io` over TLS (an `/etc/hosts` line, a CA in `/etc/docker/certs.d/ghcr.io`), holding `polycarpic:ci`,
-  `polycarpic-postgres:ci`, `polycarpic-caddy:ci` and a tools image, so `docker pull <name>@sha256:…` is real. The staging first deploy needs no git.
-- **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users, networks, env files, fixture secrets. `provision.sh` itself stays with the box fixture.
-- **Steps:** `first-deploy staging` → exit 4 `roles-missing`; `provision --stage database`; again → healthy; containers on the digests; a second poll does nothing; then an image whose web never answers → rolled back, quarantined.
-- **Would have caught:** F1 (the real tar), F16 (`run`'s options), G1 (umask and uid 10020), and the `PLAID_ENV`, `MAIL_FROM` and edge-network faults. Not G2–G4, which need faults injected.
-- **Where:** the `image` job, as its last step (seceng: after the backup suite, which is torn down by then; read-only permissions; never in `build.yml`; the hosts line and the CA are removed even on failure, no later step pulls; the fake `gh` is written by the test and in no shipped path). Runs when Dockerfile, infra, apps or packages change.
-- **Cost, all estimates `(unmeasured)`:** about 250 lines of harness; 2.5 to 4 minutes of the `image` job (push and pull of four images, Postgres start, health windows, the 120 s rollback case; without that last case about 1.5 to 2).
-  Risk: it edits the runner's `/etc/hosts`; it can be flaky where Docker is slow.
-- **Not covered:** systemd timers, real GitHub, a prod deploy (premigration backup, edge). POLY-104 and the first prod deploy.
+It would have caught F1 (the real tar), F16 (`run`'s options), G1 (umask and uid 10020) and the `PLAID_ENV`, `MAIL_FROM` and edge-network faults. Not G2–G4, which need faults injected. qa writes it from here.
 
-**Recommendation:** in this loop, with the rollback case. Three faults of one kind passed 100 % of a green suite. seceng recommends it too.
+- **Real:** root, the installed dispatcher and its umask, `install_box.py`, Docker, Compose, the job's own images, Postgres, and a local registry answering as `ghcr.io` over TLS (an `/etc/hosts` line, a CA in `/etc/docker/certs.d/ghcr.io`) holding the app, Postgres,
+  Caddy and tools images, so `docker pull <name>@sha256:…` is real. **Faked:** GitHub's API (`gh`). The second candidate's ancestry check makes one real anonymous `git fetch` of the PR's public commit, said in the test.
+- **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users (10020 included), networks, env files, secrets. `provision.sh` stays with the box fixture.
+- **Steps:** `first-deploy staging` → exit 4 `roles-missing`; `provision --stage database`; again → healthy, containers on the digests, modes as G1; a second poll changes nothing; then a second release whose web never answers → rolled back within the window, quarantined,
+  the first release healthy again; the next poll skips it. No argv names edge.
+- **Not covered:** systemd timers, real GitHub, a prod deploy (premigration backup, edge): POLY-104 and the first prod deploy.
+
+**New `deploy` key in `changes.mjs`** gating that one step; the `image` job's `if` gains it, and the builds it needs run on it too.
+
+| Path (regex) | Why |
+|---|---|
+| `^Dockerfile$`, `^\.dockerignore$`, `^bin\/polycarpic$` | F1; the entrypoint |
+| `^infra\/(ops|deploy|compose|caddy|postgres|backup)\/`, `^infra\/postgres-major$`, `^infra\/provision(-check)?\.sh$`, `^infra\/ci\/(image|images-env)\.sh$` | F1, F16, G1, edge networks, the tool and what the bundle holds |
+| `^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)` | `PLAID_ENV`, `MAIL_FROM`: the settings contract |
+| `^packages\/db\/(migrations|sql)\/`, `^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$` | migrations and the runner |
+| `^apps\/migrate\/src\/(cli|run|index)\.ts$`, `^apps\/(web|worker)\/src\/(main|startup)\.ts$`, `^apps\/auth\/src\/(main|bind|http)\.ts$`, `^apps\/worker\/src\/jobs\/index\.ts$`, `^apps\/web\/src\/ops\/(health|probe)\.ts$` | startup code and the health route |
+| `^tests\/infra\/deploy-real\/`, the suite's vitest config and every helper it imports from elsewhere (S38 a), `^infra\/ci\/changes\.mjs$`, `^\.github\/workflows\/ci\.yml$` | the test, its trigger, its job |
+
+Not in the list, on purpose: the rest of `apps/` and `packages/`, `pnpm-lock.yaml` and manifests (a dependency bump that breaks startup is seen by POLY-104 and staging).
+
+**Classifier test:** each row has a path that sets `deploy`; every fault is pinned by the path that held it (`Dockerfile` F1; `infra/ops/lib/stack.py` F16; `infra/ops/lib/release.py` and `infra/provision.sh` G1; `infra/compose/staging.yml`, `packages/config/src/check.ts`
+`PLAID_ENV`; `infra/provision.sh` `MAIL_FROM`; `infra/compose/edge.yml` networks); a route, a component, a `packages/ledger` file and a `*.test.ts` leave it false. `ci.yml`'s outputs and the dispatch line carry the key. The test walks the suite's imports, as `tests/ci` does for the db battery. Red on a mutant dropping any row, and on an unlisted import.
+
+**Job.** Last step of `image`, after the backup suite's teardown; `contents: read`; never in `build.yml`; an `always()` step undoes everything put on the runner (hosts line, CA, the fake `gh`, which sits in `/usr/local/sbin` and is never written over the real one, users, networks, mounts, containers, `/opt/polycarpic`, `/etc/polycarpic`, state), and no later step pulls (S38 b). No `GH_TOKEN` and no persisted credentials reach the step (S38 e). The log it keeps is the step's own output and `deploy.log` alone, never `/etc/polycarpic`, state, a saved render or an environment dump, because artifacts of a public repository are public (S38 c). Fixture secrets are random per run, and a sweep at the end finds none in the kept log (S38 d).
+
+**Time.** My earlier 2.5–4 min was wrong: our healthchecks first report after their interval (web, auth 30 s; worker 60 s), and the rollback case waits 120 s and then for the restored worker. About **5 to 7 minutes** `(unmeasured)`. The job took 10 min 26 s in
+run 45288873465, backup suite included, so about 16 to 18 against 20. **Required:** qa reports the measured step and job time from the first CI run; the job's worst case must stay ≤ 17 min. Over it, T-real moves to its own job (`deploy-real`, same gate, 15 min limit, it
+builds the images itself, about 3 min more of machine time, no wall time); the 20 min limit is not raised.
+
+**Flakes.** Waits on the registry, the daemon and Postgres are bounded and fail with their own name; a product assertion is never retried, and the step has no automatic retry. A red run is read before a rerun, with the log kept as an artifact. Two reruns that pass
+with no change within ten runs: an issue on the named cause, and the step stays required. Only the lead may make the rollback case optional; the first-deploy half stays.
 
 ## R13 — The tests
 
@@ -561,7 +582,7 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 
 | Job | May add | Holds |
 |---|---|---|
-| image | ≤ 5 s added on CI, where F1's case uses the image the job already builds: the step sets `POLY_APP_TEST_IMAGE=polycarpic:ci`, and the test fails on CI when it is unset instead of building a second image (today it builds one, about 25 s locally). A local run builds its own, outside the budget | F1's real-tar case only; the POLY-99 backup suite (386 s) stays as it is |
+| image | T-real: measured by qa, the job's worst case ≤ 17 min (section T-real). Otherwise ≤ 5 s added on CI, where F1's case uses the image the job already builds: the step sets `POLY_APP_TEST_IMAGE=polycarpic:ci`, and the test fails on CI when it is unset instead of building a second image (today it builds one, about 25 s locally). A local run builds its own, outside the budget | F1's real-tar case only; the POLY-99 backup suite (386 s) stays as it is |
 | provision | ≤ 46 s unit (29 s measured; the 25 s predates T-edge, T-take, T-sauth, T-help, T-probe and T-net, and V4's git and ssh-keygen are real), plus ≤ 60 s **added** by the box fixture and provision config over the same-day control (measured +13.1 s: 85.5 against 72.4; met) | T1–T18, T-edge, T-take, T-sauth |
 | db | ≤ 10 s after the restructure below; if qa then measures more, ≤ 15 s stands with no case dropped. Today: +12 to +20 s (qa, same day; main 13.1–13.4 s) | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 20 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
@@ -593,7 +614,6 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | L1 | Criterion 5 says "measured in the restore drill"; drill and timing are POLY-116's. Amend to "the runbook's inputs are proven (T13)", or say otherwise |
 | L2 | `self-update` has no issue; suggest the ops follow-up umbrella |
 | L4 | User steps, in order: the token and its one-call check; the SSH tag-signing key and `RELEASE_SIGNERS` (needed before staging is **served**); `allowed-signers install` on the box with the same key; after the first `build.yml` run, confirm the three new GHCR packages are public `(unmeasured)`; sign and push `edge-1` on a `main` commit built in the last 90 days and wait for its Release |
-| L7 | T-real (section G): in this loop, with or without its rollback case, or a named follow-up. The Principal's |
 | L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and `staging-auth`, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
 
 ## E — Doc passages (owners, at the verdict)
@@ -604,7 +624,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S37 (seceng `ruling-review.md`): met by
+## S1–S38 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -620,4 +640,4 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
 | S28 | R9 edge step 2; T-edge | S29 (a, b), S30 | R11 `staging-auth`; T-sauth |
-| A13 | R7; T-probe | S31–S37 | F4, F2, R4 R-b, G1, G2 |
+| A13 | R7; T-probe | S31–S38 | F4, F2, R4 R-b, G1, G2, T-real |
