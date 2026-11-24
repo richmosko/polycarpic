@@ -496,7 +496,7 @@ def _check_roles(project, ctx, pj):
     except (TimeoutError, OSError):
         raise Refusal("roles-read")
     lines = [l.strip() for l in out.splitlines() if l.strip()]
-    answer = lines[-1] if code == 0 and lines else None
+    answer = lines[0] if code == 0 and len(lines) == 1 else None  # exactly one line and a clean exit; two lines, garbage or a failing exit are `roles-read`
     if answer == "1":
         return
     if answer == "0":

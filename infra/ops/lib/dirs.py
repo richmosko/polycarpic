@@ -56,8 +56,9 @@ def ensure(ctx, logical, project=None, check_empty_env=False):
             os.fchmod(fd, 0o755)
     finally:
         os.close(fd)
-    if check_empty_env and os.path.lexists(os.path.join(real, ".env")):  # a `.env` there would feed every compose call (G11)
-        _fail(ctx, logical + "/.env", project)
+    if check_empty_env:  # the render home holds nothing: a `.env` there would feed every compose call (G11), and any other file is not ours
+        for name in os.listdir(real):
+            _fail(ctx, logical + "/" + name, project)
     return real
 
 

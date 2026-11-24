@@ -100,7 +100,7 @@ def pinned_version(ctx):
 
 def _version_of(ctx, argv, env=None):
     try:
-        code, out, _ = ctx.run(argv + ["docker", "compose", "version", "--short"], timeout=30, extra_env=env)
+        code, out, _ = ctx.run(argv + ["docker", "compose"] + compose.opts(ctx) + ["version", "--short"], timeout=30, extra_env=env)
     except (TimeoutError, OSError):
         return None
     return out.strip() if code == 0 and out.strip() else None
@@ -115,7 +115,7 @@ def check_compose_version(ctx, warn_only=False):
     as_user = _version_of(ctx, ISOLATION[3:], _render_env(ctx))  # setpriv … -- (the render user; no network namespace is needed to ask)
     if want is not None and as_root == want and as_user == want:
         return
-    msg = "compose: pinned %s, root's is %s, the render user's is %s; fix: sudo bash provision.sh --stage host" % (want or "unreadable", as_root or "unreadable", as_user or "unreadable")
+    msg = "compose: pinned %s, root's is %s, the render user's is %s; fix: sudo polycarpic-ops provision --stage host" % (want or "unreadable", as_root or "unreadable", as_user or "unreadable")
     if warn_only:
         ctx.err("warning: " + msg)
         return
