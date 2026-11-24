@@ -52,7 +52,7 @@ class Staging(DeployTest):
         pull = first_docker(r, "pull")
         self.assertIsNotNone(pull, "a verified candidate is pulled (V2); got %s" % r.err)
         self.assertLess(r.runner.calls.index(v[0]), pull)
-        self.assertEqual([c["argv"][1] for c in r.runner.calls[:r.runner.calls.index(v[0])] if c["argv"][0] == "docker"], [])
+        self.assertEqual([c["argv"][1] for c in r.runner.calls[:r.runner.calls.index(v[0])] if c["argv"][0] == "docker" and "--short" not in c["argv"]], [])  # G10 (f5a62e3c): the pinned Compose version is asked first, before any network call; it is not a pull
 
     def test_t2_a_label_alone_does_not_bind_the_image(self):
         # labelled with main's head B, but attested only at A: V1's --source-digest B refuses it, the label check would have passed

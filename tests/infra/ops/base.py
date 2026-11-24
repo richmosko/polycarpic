@@ -121,11 +121,27 @@ class Runner:
         self.unexpected.append(list(argv))
         raise AssertionError("FAKE: unexpected child process %r" % (argv,))
 
+    @staticmethod
+    def g11_stripped(argv):
+        """G11 (ruling 3b62bbe6): every `docker compose` call names `--project-directory <dir>` and `--env-file <file>`. The older pins (POLY-98/99/100) match the REST of the argv, so rules and `calls[i]["argv"]` see the call
+        without those two pairs; the full argv is `calls[i]["argv_full"]`, and test_deploy_cwd.py, test_deploy_flags.py and the render tests assert the two options on it."""
+        a = list(argv)
+        if "docker" not in a or "compose" not in a or a.index("docker") + 1 != a.index("compose"):
+            return a
+        out, i = [], 0
+        while i < len(a):
+            if a[i] in ("--project-directory", "--env-file") and i + 1 < len(a):
+                i += 2
+                continue
+            out.append(a[i])
+            i += 1
+        return out
+
     def _rec(self, kind, argv, stdin, timeout, env):
         if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
             raise AssertionError("argv must be a list of str, got %r" % (argv,))
-        self.calls.append(dict(kind=kind, argv=list(argv), stdin=stdin, timeout=timeout, env=None if env is None else dict(env)))
-        return self._find(argv)
+        self.calls.append(dict(kind=kind, argv=self.g11_stripped(argv), argv_full=list(argv), stdin=stdin, timeout=timeout, env=None if env is None else dict(env)))
+        return self._find(self.g11_stripped(argv))
 
     def __call__(self, argv, stdin=None, timeout=None, env=None):
         r = self._rec("run", argv, stdin, timeout, env)
