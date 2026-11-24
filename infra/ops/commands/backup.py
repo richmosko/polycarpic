@@ -75,7 +75,7 @@ def _run_locked(mode, ctx, image, d, kinds, timeout):
     except compose.ComposeError:
         ctx.err("backup: refused state (no saved render of current)")
         return 1
-    argv = ["docker", "compose", "-p", PROJECT, "-f", cfile] + cenv + ["--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
+    argv = ["docker", "compose", "-p", PROJECT] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "backup", "/usr/local/bin/backup.sh", mode]
     ok, out = True, ""
     env = {"POLY_POSTGRES_IMAGE": image}

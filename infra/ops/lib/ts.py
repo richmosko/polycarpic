@@ -35,8 +35,9 @@ def age(seconds):
 
 def psql(ctx, project, sql, timeout=10):
     """SQL on stdin (it sets the session read-only first) through the project's postgres container. -> (code, stdout text)."""
+    from lib import compose  # lazily: compose imports modules that import this one
     stdin = sql  # the query text starts with the read-only SET itself (K10)
-    code, out, _ = ctx.run(["docker", "compose", "-p", "polycarpic-" + project, "exec", "-T", "postgres", "psql", "-U", "postgres",
+    code, out, _ = ctx.run(["docker", "compose", "-p", "polycarpic-" + project] + compose.opts(ctx) + ["exec", "-T", "postgres", "psql", "-U", "postgres",
                             "-d", "polycarpic", "-XAtq", "-v", "ON_ERROR_STOP=1"], stdin=stdin, timeout=timeout)
     return code, out
 

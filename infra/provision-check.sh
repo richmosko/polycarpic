@@ -263,6 +263,7 @@ report H8 "spool contents" "$h8" "a stale or stray spool file means an interrupt
 # The four unit files equal the bundle's copies. Whether the timers are enabled is the first deploy's line, not this check's.
 h16=''
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd / # G11: the caller's directory decides nothing (`here` is absolute)
 for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
   inst=/etc/systemd/system/$u
   if [ ! -f "$inst" ]; then h16="$h16 $u is not installed;"; continue; fi
@@ -551,7 +552,7 @@ done < <(getent passwd)
 report H15 "operator access" "$h15" "remove the extra account or its authorized_keys; the sudoers drop-in is written by cloud-init (infra/hetzner/cloud-init.yaml)"
 
 # ------------------------------------------------------------------ database checks
-dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" "$@"; }
+dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null "$@"; }
 running() { dc "$1" ps --status running --services < /dev/null 2> /dev/null | grep -qx postgres; }
 q() { local proj=$1; shift; dc "$proj" exec -T postgres psql -X -tA -U postgres -d polycarpic -c "$1" < /dev/null 2>&1; }
 up_prod=0 up_staging=0
@@ -603,7 +604,7 @@ d3_probe() { # svc mode -> PROBE_OUT, PROBE_RC. The password is read inside the 
   case "$svc" in
     web)
       local wid
-      wid=$(docker compose -p polycarpic-prod ps -q web < /dev/null 2> /dev/null | head -1)
+      wid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q web < /dev/null 2> /dev/null | head -1)
       if [ -z "$wid" ]; then PROBE_OUT="no running web container of polycarpic-prod"; PROBE_RC=125; return; fi
       net="container:$wid" ;;
     backup) net=polycarpic-prod_backup-net ;;
@@ -624,7 +625,7 @@ if [ "$2" = replication ]; then psql "$1" -tAc IDENTIFY_SYSTEM; else psql "$1" -
 d3() {
   local out='' svc mode first pgid t0 t1
   # The probe runs the image the running postgres container uses: no default tag, nothing pulled.
-  pgid=$(docker compose -p polycarpic-prod ps -q postgres < /dev/null 2> /dev/null | head -1)
+  pgid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q postgres < /dev/null 2> /dev/null | head -1)
   PROBE_IMAGE=$([ -n "$pgid" ] && docker inspect --format '{{.Config.Image}}' "$pgid" 2> /dev/null)
   if [ -z "$PROBE_IMAGE" ]; then echo " cannot read the image of the running postgres container;"; return; fi
   t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)

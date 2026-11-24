@@ -47,7 +47,7 @@ def run(args, ctx):
     except compose.ComposeError:
         ctx.err("cli: refused state (no saved render of current)")
         return 1
-    argv = ["docker", "compose", "-f", cfile] + cenv + ["-p", name, "--profile", "operator",
+    argv = ["docker", "compose"] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["-p", name, "--profile", "operator",
             "run", "--rm", "-T", "--pull", "never", "--no-deps", "operator", "user", "invite", email]
     if len(words) == 4:
         argv.append("--bootstrap")

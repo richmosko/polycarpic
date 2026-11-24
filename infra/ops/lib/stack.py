@@ -20,7 +20,8 @@ def base(judged, project=None):
     """The fixed head of every compose call that starts or reads containers: the project and the SAVED, judged render (F4); never a bundle's file.
     The file's sha256 is re-read first (a changed file is the refusal `unjudged`)."""
     compose_guard.verify(judged, project)
-    return ["docker", "compose", "-p", "polycarpic-" + judged.project, "-f", judged.path]
+    home = os.path.join(os.path.dirname(os.path.dirname(judged.path)), "render-home")  # G11: the render home beside the project's state, checked by `judge`
+    return ["docker", "compose", "-p", "polycarpic-" + judged.project, "--project-directory", home, "--env-file", "/dev/null", "-f", judged.path]
 
 
 def refs(rdir):

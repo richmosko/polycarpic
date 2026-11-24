@@ -78,7 +78,7 @@ def _locked(ctx):
     except compose.ComposeError:
         ctx.err("upload: refused state (no saved render of current)")
         return 1
-    argv = ["docker", "compose", "-p", PROJECT, "-f", cfile] + cenv + ["--profile", "uploader", "run", "--rm", "--no-deps", "-T", "--name",
+    argv = ["docker", "compose", "-p", PROJECT] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["--profile", "uploader", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "uploader", "/usr/local/bin/upload.sh"]
     ok, out = True, ""
     try:

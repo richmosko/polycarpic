@@ -30,7 +30,7 @@ def fixed_env(extra=None):
 
 def _real_run(argv, stdin=None, timeout=None, env=None):
     try:
-        p = subprocess.run(argv, input=stdin, capture_output=True, text=True, errors="replace", timeout=timeout, env=env, shell=False, check=False)  # non-UTF-8 output is data, not a crash (F2)
+        p = subprocess.run(argv, input=stdin, capture_output=True, text=True, errors="replace", timeout=timeout, env=env, shell=False, check=False, cwd="/")  # G11: the caller's directory decides nothing; non-UTF-8 output is data, not a crash (F2)
     except subprocess.TimeoutExpired:
         raise TimeoutError(argv[0])
     except OSError as err:
@@ -46,7 +46,7 @@ def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
     import threading
     try:
         p = subprocess.Popen(argv, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, env=env, shell=False)
+                             stderr=subprocess.PIPE, env=env, shell=False, cwd="/")
     except OSError as err:
         return 127, b"", "%s: %s\n" % (argv[0], err.strerror or err.__class__.__name__)
     errbuf = []
@@ -105,7 +105,7 @@ def _real_https_status(host, addr, path):
 
 def _real_run_inherit(argv, env=None, timeout=None):
     try:
-        return subprocess.run(argv, env=env, shell=False, check=False, timeout=timeout).returncode
+        return subprocess.run(argv, env=env, shell=False, check=False, timeout=timeout, cwd="/").returncode
     except OSError as err:
         sys.stderr.write("%s: %s\n" % (argv[0], err.strerror or err.__class__.__name__))
         return 127

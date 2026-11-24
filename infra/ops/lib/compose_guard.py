@@ -10,7 +10,7 @@ import os
 import posixpath
 import re
 
-from lib import dirs
+from lib import compose, dirs
 from lib import release as rel
 from lib.release import Refusal
 
@@ -123,8 +123,8 @@ def check_compose_version(ctx, warn_only=False):
     raise Refusal("render-env")
 
 
-def stdin_render(project):
-    return ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "-f", "-", "--profile", "*", "config", "--format", "json"]
+def stdin_render(ctx, project):
+    return ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project] + compose.opts(ctx) + ["-f", "-", "--profile", "*", "config", "--format", "json"]
 
 
 def _render_env(ctx):
@@ -175,8 +175,7 @@ def _control_passes(ctx, project, edge_env):
     never anything of the release. True when it renders; a failure or a timeout is a box fault."""
     cdir = ctx.bundle("infra/compose")
     argv = ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "--project-directory", cdir, "-f", "%s/%s.yml" % (cdir, project)]
-    if project == "edge":
-        argv += ["--env-file", edge_env]
+    argv += ["--env-file", edge_env if project == "edge" else "/dev/null"]
     argv += ["--profile", "*", "config", "--format", "json"]
     env = _render_env(ctx)
     env.update(PLACEHOLDERS)
@@ -332,7 +331,7 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore
     corrected = correct(corrected, policy, project)
     data = canonical(corrected)
     try:
-        again = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"), stage="stdin")
+        again = _json(ctx, stdin_render(ctx, project), stdin=data.decode("utf-8"), stage="stdin")
     except RenderFail as f:
         raise render_refusal(ctx, project, f, edge_env)
     if canonical(correct(again, policy, project)) != data:
@@ -354,7 +353,7 @@ def _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr):
     with open(path, "rb") as fh:
         data = fh.read()
     try:
-        plain = _json(ctx, stdin_render(project), stdin=data.decode("utf-8"), stage="stdin")
+        plain = _json(ctx, stdin_render(ctx, project), stdin=data.decode("utf-8"), stage="stdin")
     except RenderFail:
         fail("render")
     corrected = correct(plain, policy, project)

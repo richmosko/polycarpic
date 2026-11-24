@@ -34,6 +34,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" = 0 ] || die "run as root (sudo bash provision.sh ...)" 2
+cd / # G11: the caller's directory decides nothing
 
 # Service gids (F6, POLY-146). The same set the compose files mount secrets for.
 gid_of() {
@@ -536,7 +537,7 @@ stage_database() {
   # poly_backup has a password only where the backup service exists (prod).
   [ "$project" = prod ] && pairs+=(poly_backup:backup/db_password_backup)
 
-  local dc=(docker compose -p "polycarpic-$project")
+  local dc=(docker compose -p "polycarpic-$project" --project-directory "$STATE/deploy/render-home" --env-file /dev/null)
   "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 

@@ -28,7 +28,7 @@ def run(args, ctx):
             return 1
     start = ctx.epoch()
     for svc in args.service:
-        code, _, _ = ctx.run(["docker", "compose", "-p", _project(svc, args.staging), "restart", svc], timeout=WAIT)
+        code, _, _ = ctx.run(["docker", "compose", "-p", _project(svc, args.staging)] + compose.opts(ctx) + ["restart", svc], timeout=WAIT)
         if code != 0:
             ctx.err("restart: docker compose restart %s failed (exit %d)" % (svc, code))
             return 1

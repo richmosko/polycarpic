@@ -31,7 +31,7 @@ def _fail(ctx=None, path=None, project=None):
     raise Refusal("render-path")
 
 
-def ensure(ctx, logical, project=None):
+def ensure(ctx, logical, project=None, check_empty_env=False):
     """Create `logical` (and any missing parent) as root 0755 and keep it exactly 0755. -> the real path."""
     real = ctx.p(logical)
     parent = os.path.dirname(real)
@@ -56,6 +56,8 @@ def ensure(ctx, logical, project=None):
             os.fchmod(fd, 0o755)
     finally:
         os.close(fd)
+    if check_empty_env and os.path.lexists(os.path.join(real, ".env")):  # a `.env` there would feed every compose call (G11)
+        _fail(ctx, logical + "/.env", project)
     return real
 
 
@@ -64,7 +66,7 @@ def ensure_shared(ctx, project=None):
     for d in SHARED:
         ensure(ctx, d, project)
     for name in ((project,) if project else ()) + ("render-home",):
-        ensure(ctx, "%s/%s" % (STATE, name), project)
+        ensure(ctx, "%s/%s" % (STATE, name), project, check_empty_env=(name == "render-home"))
 
 
 def check_readable(ctx, real_files):

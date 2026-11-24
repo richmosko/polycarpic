@@ -15,6 +15,20 @@ class ComposeError(Exception):
     pass
 
 
+def opts(ctx, project_dir=None):
+    """G11: the two options every compose call names, so neither the caller's directory nor a `.env` anywhere decides anything: `--project-directory`
+    (the render home, root 0755 and empty, or a bundle file's own directory) and an explicit `--env-file /dev/null` where no file is ruled."""
+    from lib import dirs
+    return ["--project-directory", project_dir or dirs.ensure(ctx, dirs.RENDER_HOME, check_empty_env=True), "--env-file", "/dev/null"]
+
+
+def file_opts(ctx, cfile):
+    """The options for a call that names `-f cfile`: the render home for a saved render, the file's own directory for a bundle's file."""
+    if "/state/deploy/" in cfile and os.path.basename(cfile).startswith("render-"):
+        return opts(ctx)
+    return opts(ctx, os.path.dirname(cfile))
+
+
 def release_current(ctx, project):
     """R-b: the compose directory of the project's current release (`releases/<project>-current`, a root symlink), else None."""
     link = ctx.p("/opt/polycarpic/releases/%s-current" % project)
@@ -69,7 +83,11 @@ def parse_secrets(ctx, project):
 
 def ps(ctx, compose_project, timeout=10):
     """Containers of a compose project: a list of dicts (Service, Name, State, Health). None when compose fails."""
-    code, out, _ = ctx.run(["docker", "compose", "-p", compose_project, "ps", "-a", "--format", "json"], timeout=timeout)
+    try:
+        argv = ["docker", "compose", "-p", compose_project] + opts(ctx) + ["ps", "-a", "--format", "json"]
+    except Exception:  # a render home that is not as ruled (S37): no answer is a failed `ps`
+        return None
+    code, out, _ = ctx.run(argv, timeout=timeout)
     if code != 0:
         return None
     rows = []
