@@ -32,3 +32,7 @@ Items placed here from the POLY-100 loop, 2026-11-24, beyond seceng's third-revi
 - **A wrong `current` after a failed state save** (architect finding 1; seceng: FOLLOW-UP, shown on the harness): a later rollback can bring up a quarantined release; and on a first deploy the release runs with its timers, prod's backup timers included, not enabled and a rerun refused `already-deployed`. Fix before the first prod deploy.
 - **A post-`up` refusal that does not quarantine is retried every poll** (seceng), so `up` and rollback repeat every five minutes.
 - **T-real's undo script is not in T-real's trigger list** (architect's omission).
+
+### @team-lead — 2026-11-23
+
+Principal's decision of 2026-11-24 (`process/DECISIONS.md`): two of the items above are gates before any real household data, not optional follow-ups. (1) An automatic PR when a new Compose version is released (a Renovate rule on `infra/deploy/compose-version`), proven by T-real on that PR. (2) Measured on a real box: automatic security updates cover Docker's own apt repository for the engine and runc; if not, make them. seceng also owes a written assessment of the alternative the Principal did not have time to weigh: pin the minor version and let patch releases install automatically.

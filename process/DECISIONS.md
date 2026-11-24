@@ -977,3 +977,11 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Keep fixing every finding before the merge, with no bound on rounds.
 **Approved by:** Mosko
+
+### 2026-11-24 — The Compose plugin is pinned to one exact version; two gates before real data
+**Decision:** The box runs exactly one version of the Docker Compose plugin (5.7.1), held, installed by `provision.sh`; CI uses the same version (POLY-100 ruling G10, S40). Only that plugin is held: the Docker engine and container runtime stay free to update. Two conditions must be met before any real household data is on a box, both on POLY-160: an automatic PR when a new Compose version is released, which the end-to-end deploy test then proves; and confirmation, measured on a real box, that automatic security updates cover Docker's own repository for the engine and runtime.
+**Why:** The compose guard depends on Compose's exact output, and on 2026-11-24 two Compose versions were found to render the same files differently, one of them refusing every release; unpinned, a box would run a version nobody tested, changing whenever Docker publishes one. The cost is that a security fix to the Compose plugin waits for a PR and the operator's install step. Compose reads a release's own files only as an unprivileged user with no network; as root it reads only the file the guard already judged. The Principal raised the exposure, said the implications were not fully clear to them, and chose this option to keep the work moving; it can be revisited, and seceng has not yet assessed the alternative below in writing.
+**Alternatives considered:**
+- Pin the minor version only and let patch releases install automatically; a patch that changes Compose's output would stop deploys with an alert and no quarantine (not assessed by seceng).
+- No pin (today's `provision.sh`): the newest Compose, whatever it is.
+**Approved by:** Mosko
