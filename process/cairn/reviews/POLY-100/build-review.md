@@ -228,3 +228,9 @@ unwind, `BaseException` included, in `_deploy` and `edge.deploy`. *Tests:* R1, R
 G1, G3, G4, G5, G7, G8, G9, G11, G12, S36, S37, S39, S40, `dirs.peek`: met in code; mutants recorded red, or equivalent with the reason. G2: met in the run itself; H1 is the run after it. G6: the answer counts; H1 covers the order. G10: met, but for H1's R1.
 S31-S35, A17, A18: unchanged but for the checked render home. Filters: the `deploy` key gates builds only. `install-compose.sh`: version and sha256 checked before install, in `ci.yml` only; `build.yml` runs no install of it. **SECURITY 1.20.0**: C-83 says the
 path is not shown end to end, the one Compose version and the fixed directory; no health listener is claimed. **B-note:** the merge is the first real run of `siblings` and `release-lint`: read it. `build.yml` uses the runner's own Compose for its lint.
+
+## Verdict of record @ `a9d35481`: **PASS WITH FOLLOW-UPS**
+
+**H1 is accepted by the Principal, not met** (`process/DECISIONS.md` 2026-11-24, @ `53cbf119`). It stays in class 4, "leaves a bad release running", and is a gate on POLY-160, which POLY-104 waits on. Everything else above stands as written: H2-H10 are
+follow-ups, H3 before the first prod deploy; no real deploy has completed; T-real runs in no CI step; what was not re-read is not covered. SECURITY 1.20.1 states H1 as R-32 and in C-83.
+One wording: the decision calls the release left running "unjudged". It has passed verification and the guard; what it has not shown is health.
