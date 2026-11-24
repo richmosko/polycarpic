@@ -1,0 +1,20 @@
+
+ RUN  v5.1.1 /work
+
+ ✓ tests/infra/deploy-real/1-first-deploy.test.ts (8 tests) 99450ms
+   ✓ T-real part 1: first-deploy staging, for real (8)
+     ✓ the tool is installed by install_box.py alone: nothing of /opt/polycarpic existed before it, and every shared directory is root 0755 after 765ms
+     ✓ the first release is built, pushed to the local ghcr.io, and offered by the fake GitHub 26565ms
+     ✓ first-deploy staging: exit 4 roles-missing, with the command that fixes it 5860ms
+     ✓ provision --stage database: the real roles.sql and the login passwords, on the real Postgres 365ms
+     ✓ first-deploy staging again: exit 0, healthy, the containers run the digests of the release, the real timer is enabled (then stopped, and its service waited out) 65703ms
+ ✓ tests/infra/deploy-real/2-rollback.test.ts (4 tests) 198743ms
+   ✓ T-real part 2: a release whose web never answers is rolled back (4)
+     ✓ the second release (web never answers) is offered and polled: exit 1, rolled back within the window, quarantined, an alert 198511ms
+ ✓ tests/infra/deploy-real/3-sweep.test.ts (4 tests) 8ms
+
+ Test Files  3 passed (3)
+      Tests  16 passed (16)
+   Start at  22:28:56
+   Duration  298.55s (tests 100%)
+

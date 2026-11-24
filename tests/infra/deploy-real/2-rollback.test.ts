@@ -23,7 +23,7 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     offer(rel2, 102);
     const r = step('rollback poll', () => ops(['deploy', 'staging'], 'deploy staging (release 2: web never answers)'));
     expect(r.code, r.err).toBe(1);
-    expect(r.err.trim().split('\n').pop(), r.err).toBe('deploy: rolled-back');
+    expect(r.err.split('\n--- deploy.log ---')[0]!.trim().split('\n').pop(), r.err).toBe('deploy: rolled-back'); // the harness appends deploy.log to a failed run's err
     expect(r.secs, 'the rollback window is 120 s; the restored worker needs its own first health report (60 s): 6 minutes at most').toBeLessThanOrEqual(360);
     expect((stateFile('current') ?? '').split(' ')[0], 'the first release is current again').toBe(first);
     expect(stateFile('quarantine') ?? '', 'the second digest is quarantined').toContain(second);
