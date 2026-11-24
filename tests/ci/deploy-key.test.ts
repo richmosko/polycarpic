@@ -95,6 +95,22 @@ const walk = (d: string): string[] => (existsSync(d) ? readdirSync(d).flatMap((n
 const spec = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g;
 const withExt = (p: string): string | null => [p, `${p}.ts`, join(p, 'index.ts')].find((c) => existsSync(c) && statSync(c).isFile()) ?? null;
 
+describe('T-real is switched off until POLY-162 (Principal, scope closed)', () => {
+  const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+  const lines = ci.split('\n');
+
+  it('exactly three steps carry the literal `if: false`: the real deploy, its undo and its log, in that order, each naming POLY-162, with a comment above', () => {
+    const off = lines.map((l, i) => [l, i] as const).filter(([l]) => /^\s+if: false\b/.test(l));
+    expect(off.length, 'steps with `if: false`').toBe(3);
+    const names = off.map(([, i]) => { for (let j = i; j >= 0; j--) { const m = /^\s+- name: (.*)$/.exec(lines[j]!); if (m) return m[1]!; } return ''; });
+    expect(names[0]).toMatch(/^Real deploy \(T-real/);
+    expect(names[1]).toMatch(/^Undo what the real deploy put on the runner/);
+    expect(names[2]).toMatch(/^Keep the real deploy's log/);
+    for (const [l] of off) expect(l, 'each switch names POLY-162').toContain('POLY-162');
+    expect(ci, 'a comment above the steps names POLY-162').toMatch(/T-real is switched off until POLY-162/);
+  });
+});
+
 describe('the suite does not import what the key cannot see', () => {
   const roots = [...walk(join(ROOT, 'tests', 'infra', 'deploy-real')), join(ROOT, 'tests', 'infra', 'vitest.deploy-real.config.ts')].filter((f) => existsSync(f));
   const closure = (): string[] => {
