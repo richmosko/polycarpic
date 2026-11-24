@@ -62,6 +62,28 @@ def ensure(ctx, logical, project=None, check_empty_env=False):
     return real
 
 
+def peek(ctx, logical):
+    """The read-only counterpart of `ensure` (status, gate-check, list-secrets and the other commands that change nothing): creates and repairs nothing.
+    -> the real path when the directory is as ruled (root-owned, not a link, no bit beyond 0755, empty), None when it does not exist yet; a link,
+    another owner, a loose mode or an entry is the refusal `render-path`, reported by the caller and left as found."""
+    real = ctx.p(logical)
+    try:
+        fd = os.open(real, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        _fail()
+    try:
+        st = os.fstat(fd)
+        if st.st_uid != ctx.trusted_uid or stat.S_IMODE(st.st_mode) & ~0o755:
+            _fail()
+        if os.listdir(real):
+            _fail()
+    finally:
+        os.close(fd)
+    return real
+
+
 def ensure_shared(ctx, project=None):
     """Every shared directory, the project's state directory and the render home, before anything else of a run."""
     for d in SHARED:

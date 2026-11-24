@@ -62,7 +62,7 @@ def env_files(argv):
 def compose_argvs(calls):
     out = []
     for a in calls:
-        if a[:2] == ["docker", "compose"] and a[2:4] != ["version", "--short"]:
+        if a[:2] == ["docker", "compose"] and not ("version" in a and "--short" in a):
             out.append(a)
         elif "docker" in a and "compose" in a and a.index("docker") + 1 == a.index("compose"):  # unshare/setpriv ... docker compose ...
             out.append(a[a.index("docker"):])
@@ -89,7 +89,7 @@ class Layers23(DeployTest):
         self.staging_candidate()
         r = self.deploy("staging")
         self.assertEqual(r.rc, 0, r.err)
-        argvs = compose_argvs([c["argv"] for c in r.runner.calls])
+        argvs = compose_argvs([c["argv_full"] for c in r.runner.calls])
         self.assertGreater(len(argvs), 8)
         for a in argvs:
             self.assertIn("--project-directory", a, "a compose call that lets the caller's directory decide: %r" % (a,))
@@ -100,7 +100,7 @@ class Layers23(DeployTest):
         self.staging_candidate()
         r = self.deploy("staging")
         home = str(self.host.p(HOME))
-        for a in compose_argvs([c["argv"] for c in r.runner.calls]):
+        for a in compose_argvs([c["argv_full"] for c in r.runner.calls]):
             f = [a[i + 1] for i, t in enumerate(a) if t == "-f"]
             if f == ["-"] or (f and f[0].endswith(".json")) or not f:
                 self.assertEqual(project_dir(a), home, "the render home, not the caller's directory: %r" % (a,))
@@ -136,10 +136,20 @@ class ReadersAndOthers(ProdBase):
         r.on(lambda a: True, out="")
         return r
 
+    def test_read_only_commands_leave_a_missing_render_home_missing(self):
+        """devops-100's `dirs.peek` (1785ff6a): `status`, `list-secrets`, `gate-check` and the other read-only commands check the render home and create or repair nothing (POLY-99: status changes no file)."""
+        import shutil
+        self.first_prod("v1.0.0")
+        home = self.host.p(HOME)
+        for args in (("status",), ("list-secrets",), ("gate-check",), ("restart", "web"), ("backup", "list-premigration"), ("upload",), ("cli", "user", "invite", "ops@example.com")):
+            shutil.rmtree(str(home), ignore_errors=True)
+            self.host.go(*args, runner=self.recording(), ctx_extra={"owner_of": self.world.owner_of})
+            self.assertFalse(home.exists(), "%s created the render home" % (args,))
+
     def test_backup_upload_cli_restart_and_status_name_both_options_on_every_compose_call(self):
         self.first_prod("v1.0.0")
         for args in (("backup", "nightly"), ("backup", "premigration"), ("upload",), ("cli", "user", "invite", "ops@example.com"), ("restart", "web"), ("status",)):
             r = self.host.go(*args, runner=self.recording(), ctx_extra={"owner_of": self.world.owner_of})
-            for a in compose_argvs([c["argv"] for c in r.runner.calls]):
+            for a in compose_argvs([c["argv_full"] for c in r.runner.calls]):
                 self.assertIn("--project-directory", a, "%s: %r" % (args, a))
                 self.assertTrue(env_files(a), "%s: %r" % (args, a))

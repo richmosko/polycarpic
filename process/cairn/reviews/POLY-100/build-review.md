@@ -177,3 +177,60 @@ creates what the source would. It was rendered as 65534, not 10020: the bytes do
 
 **Workflows:** unchanged but for a safer count in `release-scan`; B1-B3, S22, S25 stand. **Staging exception:** still none. **`owner_of`:** the fake now answers the two paths only (qa's word).
 **SECURITY 1.19.0:** C-82, C-83, C-70, T-64, R-4, the token and `staging_basic_auth` rows, in this commit. They state the design; G1-G3 must be fixed for them to be true.
+
+---
+
+# Third review, limited @ `a9d35481`
+
+**Verdict: FAIL, on one finding (H1) by the letter of class 4, "leaves a bad release running".** It takes an interruption and a second fault, the fix is small, and nothing is deployed. If the Principal prefers it in POLY-160, the verdict is PASS WITH
+FOLLOW-UPS; I do not make that choice. Classes 1 to 3: nothing found.
+
+**No real deploy has completed, and T-real runs in no CI step** (searched the workflows: its name is in a comment and in shellcheck's file list). POLY-104 is blocked by POLY-160, 161 and 162 in the tracker. CI run 45343856328 is green on every
+job at this sha (checked).
+
+**Read:** the whole product delta `2825b6f7..a9d35481` (26 files), the ruling edits since `4ba7386b`, `red-run.md`'s additions. **Ran, no containers:** the Q probes again and two new sets on the harness. Q1-Q6 now as ruled (Q4: the first `up` follows
+the backup, from a healthy run). Docker and GitHub are fakes there. **Not run:** any suite, mutant or container.
+**Not re-read, so not covered by this verdict:** everything unchanged since `2825b6f7` (V1-V7's order, `read_tar`, the guard's rules, `sauth`, `allowed_signers`, `set_secret`, migrate, `build.yml`, `release.yml`), the Caddyfile, the test files, `tests/infra/deploy-real`,
+ARCH and INFRA.
+
+## BLOCKING
+
+**H1. After an interrupted deploy, the recovery can be refused before it starts, or its mark can be lost.**
+
+| Shown | Result |
+|---|---|
+| R0 control: power cut after `up`, next poll | recovered: old release back |
+| R1: the same, and Compose differs from the pin | `refused render-env`; **the bad release keeps running**, mark kept, alert RED, every poll the same |
+| R2: the same, and the token file is missing | `refused token`; **the bad release keeps running**, every poll the same |
+| R4: Ctrl-C during the health wait of a run by hand | the `finally` clears the mark: **bad release running, no mark, no alert**. On prod and staging the next poll rolled it back. `edge-deploy` has no timer (by reading) |
+
+`_deploy_checked` asks for the Compose version and the token before `_handle_interrupted`; G10 itself says a rollback warns and goes on. By reading, `_handle_interrupted` also writes its alert, log, quarantine or `interrupted` file before the
+restore, and `token-expiry` is written before it, so a full disk stops it as G2 did (R3 did **not** show this: the tool repaired the mode I set, so no claim).
+*Required:* with the mark present, the restore runs first: before the Compose check (warn only, as a rollback), the token, the network and `transient-since`; its records after it, each in its own `try`. The mark is kept on any exit that is not a finished
+unwind, `BaseException` included, in `_deploy` and `edge.deploy`. *Tests:* R1, R2, R4, edge's R4, and `ENOSPC` on every write; mutants: the check first; `except Exception` alone.
+
+## FOLLOW-UP
+
+| # | To | Finding |
+|---|---|---|
+| H2 | POLY-160 | A save that fails after `current` is written: the unwind brings back the old release but `current` names the new one. Shown: no backup skipped, no downgrade, alert RED; a later failed release restores a quarantined digest. Put the pointers back |
+| H3 | POLY-160, **before the first prod deploy** | The same on a first deploy: the release runs, timers (prod: backup timers too) are not enabled, a rerun is `already-deployed`. By reading |
+| H4 | POLY-160 | A refusal after `up` that does not quarantine (`unjudged`) is retried every poll: up and rollback repeat |
+| H5 | POLY-160 | The architect's 2 to 5: a double crash quarantines the running digest; a slow `check-config` quarantines; `rel.log` in the transient handler can raise; `deploy-real-undo.sh` outside the trigger |
+| H6 | POLY-160 | H23's glob cannot match `compose config` written adjacent (fails closed); provision-check's `--project-directory` may not exist before the first deploy (unmeasured) |
+| H7 | POLY-160 | CI runs GitHub's Compose binary, the box Docker's apt package: same version, other builds. The checksum came from the same release: it guards later change, not a bad release |
+| H8 | POLY-160 | Whether engine and runc fixes reach the box by themselves (Docker's repository and unattended-upgrades); A19 |
+| H9 | POLY-162 | G13 (S41), G14, G15 (S42), T-real. Until G14 the worker, which holds the keyring, runs the image's default `web` |
+| H10 | POLY-160 | Mutants not made: G10's order and box cases, the control render with the candidate's env file. `gate.md` is still signed at `2825b6f7`; qa's gate follows |
+
+## The delta, item by item
+
+G1, G3, G4, G5, G7, G8, G9, G11, G12, S36, S37, S39, S40, `dirs.peek`: met in code; mutants recorded red, or equivalent with the reason. G2: met in the run itself; H1 is the run after it. G6: the answer counts; H1 covers the order. G10: met, but for H1's R1.
+S31-S35, A17, A18: unchanged but for the checked render home. Filters: the `deploy` key gates builds only. `install-compose.sh`: version and sha256 checked before install, in `ci.yml` only; `build.yml` runs no install of it. **SECURITY 1.20.0**: C-83 says the
+path is not shown end to end, the one Compose version and the fixed directory; no health listener is claimed. **B-note:** the merge is the first real run of `siblings` and `release-lint`: read it. `build.yml` uses the runner's own Compose for its lint.
+
+## Verdict of record @ `a9d35481`: **PASS WITH FOLLOW-UPS**
+
+**H1 is accepted by the Principal, not met** (`process/DECISIONS.md` 2026-11-24, @ `53cbf119`). It stays in class 4, "leaves a bad release running", and is a gate on POLY-160, which POLY-104 waits on. Everything else above stands as written: H2-H10 are
+follow-ups, H3 before the first prod deploy; no real deploy has completed; T-real runs in no CI step; what was not re-read is not covered. SECURITY 1.20.1 states H1 as R-32 and in C-83.
+One wording: the decision calls the release left running "unjudged". It has passed verification and the guard; what it has not shown is health.

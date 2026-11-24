@@ -1,7 +1,7 @@
 ---
 id: POLY-100
 title: Pull-based deploy + timers
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
@@ -9,9 +9,9 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, infra/deploy/**, infra/ops/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/caddy/**, infra/README.md, infra/lint/**, infra/ci/**, packages/db/**, packages/config/**, apps/worker/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore, Dockerfile]
 labels: [ops, deploy, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/152
 created: 2026-11-08
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -87,3 +87,11 @@ From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8; ruling R
 ### @team-lead — 2026-11-23
 
 Criterion 5 reworded with the Principal's agreement (2026-11-23), at the architect's request (ruling §L1): this loop proves the runbook's inputs (T13); the 60-minute timing is POLY-116's, where the timed drill lives. The old text read "within 60 minutes (measured in the restore drill)".
+
+### @team-lead — 2026-11-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/152. Gate signed at a9d35481, seceng PASS WITH FOLLOW-UPS (H1 accepted into POLY-160 by the Principal), architect verdict at 82b8b1c2. Awaiting the Principal's merge.
+
+### @team-lead — 2026-11-24
+
+Validate passed; merging via PR #152. Closing. No real deploy has completed: POLY-160, POLY-161 and POLY-162 carry the rest.

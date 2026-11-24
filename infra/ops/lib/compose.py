@@ -19,7 +19,9 @@ def opts(ctx, project_dir=None):
     """G11: the two options every compose call names, so neither the caller's directory nor a `.env` anywhere decides anything: `--project-directory`
     (the render home, root 0755 and empty, or a bundle file's own directory) and an explicit `--env-file /dev/null` where no file is ruled."""
     from lib import dirs
-    return ["--project-directory", project_dir or dirs.ensure(ctx, dirs.RENDER_HOME, check_empty_env=True), "--env-file", "/dev/null"]
+    # read-only: the render home is checked, never created or repaired here (only the commands that deploy do that); before the first deploy it does not
+    # exist yet, and `/` stands in, with the explicit empty env file that keeps any `.env` out of it
+    return ["--project-directory", project_dir or dirs.peek(ctx, dirs.RENDER_HOME) or "/", "--env-file", "/dev/null"]
 
 
 def file_opts(ctx, cfile):

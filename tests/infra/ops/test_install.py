@@ -15,7 +15,7 @@ from pathlib import Path
 from base import OPS, REPO, need
 
 BUNDLE_PATHS = ["infra/ops", "infra/provision.sh", "infra/provision-check.sh", "infra/postgres/gate-check.sh", "infra/postgres/gate-check.sql",
-                "infra/operator/b2-capabilities.json", "infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compose/edge.yml", "packages/db/sql/roles.sql", "infra/backup", "infra/postgres/archive-wal.sh", "infra/deploy/compose-allow.json", "infra/deploy/systemd", "infra/postgres/pg_hba.prod.conf", "infra/postgres/pg_hba.staging.conf"]  # POLY-99: the runner and the scripts it starts
+                "infra/operator/b2-capabilities.json", "infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compose/edge.yml", "packages/db/sql/roles.sql", "infra/backup", "infra/postgres/archive-wal.sh", "infra/deploy/compose-allow.json", "infra/deploy/compose-version", "infra/deploy/systemd", "infra/postgres/pg_hba.prod.conf", "infra/postgres/pg_hba.staging.conf"]  # POLY-99: the runner and the scripts it starts
 REAL_GIT = shutil.which("git")
 ENV_GIT = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
 

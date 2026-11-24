@@ -1000,3 +1000,10 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Keep going in POLY-100 until T-real passes.
 **Approved by:** Mosko
+
+### 2026-11-24 — seceng's blocking finding H1 is accepted into POLY-160; POLY-100 merges with it open
+**Decision:** POLY-100's PR goes ahead although seceng's limited third review failed it on one finding in a class the Principal had set to hold the PR. H1: after an interrupted deploy, a Compose-version mismatch or a missing token makes the next run refuse before it restores, so the new release, which passed verification and the compose guard but was never shown healthy, keeps running (alert red); Ctrl-C in a hand run clears the `interrupted` mark, and `edge-deploy` has no poll to recover. H1 is a gate on POLY-160, which the first staging deploy (POLY-104) waits on. seceng's verdict is PASS WITH FOLLOW-UPS on that basis; the architect's verdict names the class as accepted, not met, and ARCH says so.
+**Why:** It takes two faults together, on a box with a release running, and no box has one; nothing can be deployed until POLY-160 is done. Fixing it in POLY-100 would have cost a further round on an issue the Principal had closed to new work. The architect and seceng leaned to fixing it in the PR as small; the lead first recommended accepting it, then leaned to the fix; the Principal chose to accept it.
+**Alternatives considered:**
+- Fix H1 in POLY-100 (recovery first, the mark kept), about an hour and one more CI run.
+**Approved by:** Mosko

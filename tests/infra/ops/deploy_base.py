@@ -354,7 +354,8 @@ class World(object):
             self.bad_flags.append((list(argv), bad))
             return 1, "", "unknown flag: %s\n" % bad[0][1]
         sub = argv[1]
-        if argv[:4] == ["docker", "compose", "version", "--short"]:  # G10: the pinned Compose, asked as root and as the render user (setpriv, its own HOME)
+        if argv[:2] == ["docker", "compose"] and "version" in argv[2:] and "--short" in argv[2:]:  # G10: the pinned Compose, asked as root and as the render user (setpriv, its own HOME)
+            self.docker_log.pop()  # the version query is not a container operation: "no docker compose call was made" pins ignore it
             who = "render" if self._isolated else "root"
             got = self.compose_versions[who]
             self.version_asks.append(who)

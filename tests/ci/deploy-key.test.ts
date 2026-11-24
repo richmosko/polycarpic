@@ -95,6 +95,17 @@ const walk = (d: string): string[] => (existsSync(d) ? readdirSync(d).flatMap((n
 const spec = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g;
 const withExt = (p: string): string | null => [p, `${p}.ts`, join(p, 'index.ts')].find((c) => existsSync(c) && statSync(c).isFile()) ?? null;
 
+describe('T-real is switched off until POLY-162 (Principal, scope closed; actionlint rejects a literal `if: false`)', () => {
+  const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+  it('no step runs the deploy-real config, and a comment names POLY-162  [red if: the real-deploy step is back before POLY-162 gets it to pass]', () => {
+    expect(ci, 'a step runs vitest.deploy-real.config.ts').not.toContain('vitest.deploy-real.config.ts');
+    expect(ci, 'a step executes infra/ci/deploy-real-undo.sh (naming it for shellcheck is fine)').not.toMatch(/(bash|sh|sudo)\s+(\.\/)?infra\/ci\/deploy-real-undo\.sh/);
+    expect(ci, 'a comment names POLY-162 where the steps were').toMatch(/#[^\n]*POLY-162/);
+    expect(ci).not.toMatch(/^\s+if: false\b/m); // the form actionlint rejects
+  });
+});
+
 describe('the suite does not import what the key cannot see', () => {
   const roots = [...walk(join(ROOT, 'tests', 'infra', 'deploy-real')), join(ROOT, 'tests', 'infra', 'vitest.deploy-real.config.ts')].filter((f) => existsSync(f));
   const closure = (): string[] => {

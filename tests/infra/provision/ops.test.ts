@@ -172,7 +172,8 @@ awk '/^--ENV/{blk=""} {blk=blk"\\n"$0} /^POLY_POSTGRES_IMAGE=/{print "ENVHAS " $
     expect(r.out).toContain('OUT=https://app.example.com/accept?t=FAKELINK');
     expect(r.out).toContain('ERR=invitation recorded (bootstrap), expires');
     expect(r.out).toContain('LEAKS=0');
-    expect(r.out).toMatch(/RUN ARGV compose -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
+    // G11 (ruling 3b62bbe6): every compose call names --project-directory (a bundle file's own directory here) and --env-file /dev/null
+    expect(r.out).toMatch(/RUN ARGV compose --project-directory \S+\/infra\/compose --env-file \/dev\/null -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
     expect(r.out).toContain(`ENVHAS POLY_APP_IMAGE=${app}`);
     expect(r.out).toContain(`ENVHAS POLY_POSTGRES_IMAGE=${pg}`);
   });
