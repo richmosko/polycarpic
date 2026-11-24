@@ -1,6 +1,6 @@
 // POLY-96 `app` aggregate (ruling §1). env NEEDS = toJSON(needs). Exit 0 = green. Anything unexpected is red.
 // Every job whose job-level `if:` names the filter output; tests/ci ties this to ci.yml.
-export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci: ['lint'], image: ['lint', 'unit', 'image'], db: ['db'], e2e: ['unit'], provision: ['provision'], backup: ['image'] };
+export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci: ['lint'], image: ['lint', 'unit', 'image'], db: ['db'], e2e: ['unit'], provision: ['provision'], backup: ['image'], deploy: ['image'] };
 import { ALL_KEYS, AREA_KEYS } from './changes.mjs';
 const OK = new Set(['success', 'skipped']);
 

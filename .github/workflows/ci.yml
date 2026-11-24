@@ -157,6 +157,7 @@ jobs:
       ci: ${{ steps.filter.outputs.ci }}
       provision: ${{ steps.filter.outputs.provision }}
       backup: ${{ steps.filter.outputs.backup }}
+      deploy: ${{ steps.filter.outputs.deploy }}
       e2e: ${{ steps.filter.outputs.e2e }}
       db_auth: ${{ steps.filter.outputs.db_auth }}
       db_tenancy: ${{ steps.filter.outputs.db_tenancy }}
@@ -185,7 +186,7 @@ jobs:
           # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_BASE" ]; then
-              printf '%s\n' node=true layers=true db=true image=true ci=true provision=true backup=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
+              printf '%s\n' node=true layers=true db=true image=true ci=true provision=true backup=true deploy=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
@@ -597,7 +598,7 @@ jobs:
   image:
     name: image
     needs: changes
-    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.backup == 'true'
+    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.backup == 'true' || needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -612,29 +613,29 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Set up Node
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "26"
 
       - name: Install pnpm
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
 
       - name: Locate pnpm store
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         id: store
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.store.outputs.path }}
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build the image (local, no push)
@@ -652,7 +653,7 @@ jobs:
         run: bash infra/ci/image.sh scan polycarpic:ci
 
       - name: Build the Postgres and Caddy derivatives
-        if: needs.changes.outputs.image == 'true'
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         run: |
           docker build -t polycarpic-postgres:ci infra/postgres
           docker build -t polycarpic-caddy:ci infra/caddy
@@ -678,6 +679,17 @@ jobs:
         if: needs.changes.outputs.backup == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.backup.config.ts
 
+      - name: Real deploy (T-real, first-deploy and the rollback case on one real box)
+        if: needs.changes.outputs.deploy == 'true'
+        # No GH_TOKEN and no persisted credentials reach this step (S38 e): the checkout above persists none, and nothing here sets a token.
+        env:
+          POLY_APP_TEST_IMAGE: polycarpic:ci
+          DEPLOY_REAL_LOG: ${{ runner.temp }}/deploy-real/log
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/deploy-real"
+          sudo --preserve-env=POLY_APP_TEST_IMAGE,DEPLOY_REAL_LOG env "PATH=$PATH" pnpm exec vitest run -c tests/infra/vitest.deploy-real.config.ts 2>&1 | tee "$RUNNER_TEMP/deploy-real/log"
+
       - name: Record timing
         if: always()
         run: node infra/ci/job-report.mjs
@@ -695,6 +707,19 @@ jobs:
           path: ${{ runner.temp }}/ci-test-runs.jsonl
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Undo what the real deploy put on the runner
+        if: always() && needs.changes.outputs.deploy == 'true'
+        run: bash infra/ci/deploy-real-undo.sh
+
+      - name: Keep the real deploy's log (the step's own output and deploy.log only)
+        if: always() && needs.changes.outputs.deploy == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deploy-real-log
+          path: ${{ runner.temp }}/deploy-real/log
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Job report
         if: always()
@@ -747,7 +772,7 @@ jobs:
         run: docker build -t poly97-box:test tests/infra/provision
 
       - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
-        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh /repo/infra/ci/images-env.sh
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh /repo/infra/ci/images-env.sh /repo/infra/ci/deploy-real-undo.sh
 
       - name: Operator tool tests (Python stdlib, injected transports, no network)
         run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
