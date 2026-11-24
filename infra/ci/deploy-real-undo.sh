@@ -6,8 +6,12 @@ set -u
 
 as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 
-# the systemd timer, if the run enabled it (systemctl is not faked)
+# the systemd timer and service, if the run enabled or started them (systemctl is not faked): stopped, the units removed, systemd reloaded,
+# all before the fake gh goes, and on a failed run too
 as_root systemctl disable --now polycarpic-deploy@staging.timer > /dev/null 2>&1 || true
+as_root systemctl stop polycarpic-deploy@staging.service > /dev/null 2>&1 || true
+as_root rm -f /etc/systemd/system/polycarpic-deploy@.timer /etc/systemd/system/polycarpic-deploy@.service || true
+as_root systemctl daemon-reload > /dev/null 2>&1 || true
 
 # containers, the local registry, the staging project, the edge network
 as_root docker rm -f poly-deploy-real-registry > /dev/null 2>&1 || true
