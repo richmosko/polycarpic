@@ -96,3 +96,10 @@ Product tip `a975ba56`; after it only gate records. **By reading**, nothing run 
 - **U4** is done here (`install-compose.sh` is in the trigger).
 - **gitleaks:** five fixture fingerprints reviewed (`bf79faf6`); clean over `origin/main..HEAD` on the lead's re-run.
 - **CI condition met:** run 45507656076 at `a975ba56` concluded success, every job green; `deploy-real` (T-real, sweep, undo, upload) took 419 s of its 15 min. Void if the product tip moves.
+
+## Delta `a975ba56..08a3f3a5` (verdict C1): **re-confirmed, PASS; CI at `08a3f3a5` OPEN**
+
+By reading. Outside records only `public-health.test.ts` changed; the product is untouched.
+**Correction to my table:** I marked S42's "nothing echoed or logged" met by test. The log half was not: the case did not see `console.*`, so a listener logging the URL passed. The architect found it; I did not. The product never logged it (read). It is now met by test, with a control for each channel and the URL mutant red (`g15-mutants.md`, qa's run).
+**Left, accepted until POLY-161 removes the file:** the capture turns a logged object into `[object Object]`, so `console.log(req.headers)` would still pass; string forms are caught. Four limits are held by the server's properties, not by behaviour.
+**CI:** the condition was met at `a975ba56`; it is open at `08a3f3a5` until that run concludes success.
