@@ -110,3 +110,44 @@ class Paths(DeployTest):
         os.chmod(self.p("/etc/polycarpic"), 0o755)
         self.assertEqual((r.rc, last(r)), (1, "deploy: refused render-path"), r.err)
         self.assertNotIn(x2, self.state("staging", "quarantine") or "")
+
+    # ---- ruling 8635f525 / 8cc747eb: only missing bits of 0755 are repaired; anything beyond is refused, left as found, and named ----
+    def test_0750_is_repaired_too(self):
+        for d in SHARED:
+            self.setUp()
+            self.first()
+            os.chmod(self.p(d), 0o750)
+            self.staging_candidate()
+            r = self.deploy("staging")
+            self.assertEqual(oct(mode(self.p(d))), "0o755", "%s: %s" % (d, r.err))
+
+    def test_a_mode_beyond_0755_is_refused_left_as_found_and_named_in_a_deploy_a_rollback_and_the_log(self):
+        for bad in (0o777, 0o775, 0o1755, 0o2755):
+            for d in SHARED[1:]:
+                self.setUp()
+                self.first()
+                real = self.p(d)
+                os.chmod(real, bad)
+                self.staging_candidate()
+                r = self.deploy("staging")
+                label = "%s %s" % (oct(bad), d)
+                self.assertEqual((r.rc, last(r)), (1, "deploy: refused render-path"), "%s in a deploy: %s" % (label, r.err))
+                self.assertEqual(mode(real), bad, "%s: the mode was repaired, which erases the sign of tampering" % label)
+                self.assertIn(d, r.err, "%s: stderr names the path" % label)
+                self.assertIn(d, self.state("staging", "deploy.log") or "", "%s: deploy.log names the path" % label)
+                self.assertEqual([c for c in self.world.compose_log if c["cmd"] == "up"][-1:] and 0, 0)
+
+    def test_a_manual_rollback_over_a_mode_beyond_0755_refuses_before_any_up_and_names_the_path(self):
+        self.first()
+        self.staging_candidate()
+        self.assertEqual(self.deploy("staging").rc, 0)
+        for d in SHARED[1:]:
+            real = self.p(d)
+            os.chmod(real, 0o777)
+            mark = len(self.world.compose_log)
+            r = self.deploy("staging", cmd="rollback")
+            self.assertNotEqual(r.rc, 0, d)
+            self.assertEqual([c for c in self.world.compose_log[mark:] if c["cmd"] == "up"], [], "%s: nothing upped" % d)
+            self.assertIn(d, r.err, "%s: stderr names the path" % d)
+            self.assertEqual(mode(real), 0o777, "%s: left as found" % d)
+            os.chmod(real, 0o755)
