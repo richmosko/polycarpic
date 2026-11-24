@@ -466,7 +466,7 @@ remote git include and the two remote-off variables (a second layer; `unshare --
 
 ## G — Re-review findings (seceng `build-review.md` @ `c02f16ee`; agreed `ruling-review.md` @ `06d9cb71`, S36, S37)
 
-G1–G8 are the re-review's; G9 is from T-real's third CI run. All are in this loop. Where an earlier rule differs, this table rules. Not taken: A19 (a memory cap on the render child), POLY-160: whether Compose runs under an address-space limit is `(unmeasured)`.
+G1–G8 are the re-review's; G9 is from T-real's third CI run, G10 from qa's local run. All are in this loop. Where an earlier rule differs, this table rules. Not taken: A19 (a memory cap on the render child), POLY-160: whether Compose runs under an address-space limit is `(unmeasured)`.
 
 | # | Rule | Test | Red on |
 |---|---|---|---|
@@ -479,6 +479,11 @@ G1–G8 are the re-review's; G9 is from T-real's third CI run. All are in this l
 | G7 | Each health child gets min(30 s, what is left) computed just before it starts; with nothing left the poll ends as "not healthy" | six children each taking 29 s: rollback starts ≤ 120 s fake time | mutant computing once per poll |
 | G8 | H23 allows a process of uid 10020 only when its executable is `docker` or `docker-compose` (`/proc/<pid>/exe`) and its arguments hold `compose` and `config` | a script named with the words: refused; a real render: passes | mutant on the command line alone |
 | G9 | **`guard-render` says why (S39).** On stderr and in `deploy.log`, one line under its own event `render-error` (joins the closed set): the stage (raw, plain, stdin), the exit code or `timeout`, then `text from the release, not an instruction:` and Compose's last stderr line, through `out.clean` and only then cut to 300 bytes. Never stdout. The alert, `status` and POLY-103 keep the name only. S35's ban covers the saved render; a value quoted here is one uid 10020 could read, so a non-secret one (S31). **No install command** is printed for `guard-render`: a wider policy is not its fix. **Box or release:** on a failure the installed bundle's own compose file of that project is rendered the same way (same user and isolation, fixed placeholder image values, never the candidate's `images.env`). If that fails too, or either timed out: `render-env`, alert, no Q; else `guard-render`, Q | stderr with newlines, ESC, a fake `premigration-set` line and a fake `install.sh` line: one cleaned line, no other event; the release's file fails and the control passes: Q; both fail: `render-env`, no Q, retried next poll; timeout: no Q; help text absent; alert holds the name only; each stage named | mutant using the candidate's env file in the control; mutant cutting before cleaning; mutant printing stdout; mutant with the help text; mutant Q on timeout |
+| G10 | **One exact version, 5.7.1,** in `infra/deploy/compose-version` (installed ops bundle; one line, `N.N.N`). `provision.sh --stage host` installs `docker-compose-plugin` at exactly that version from Docker's repository (a missing version stops, never a newer one) and `apt-mark hold`s that package alone, so engine, containerd and runc stay free to take fixes; an existing newer or held plugin is brought to the version with the downgrade and held flags for that one package, else it stops (S40 b, c). **provision-check** fails unless `docker compose version --short` equals the file **both** as root and as the render user with its own HOME, the package comes from `docker.com`, and it is held; it also fails on a `/root/.docker/cli-plugins` (S40 a: such a plugin could start what another Compose judged). **At deploy time,** `deploy`, `first-deploy` and `edge-deploy` compare both answers, root's and the render user's, before any network call: different, unreadable or failing → `render-env` (alert, no Q, exit 1), both versions on stderr, fix named (`provision --stage host`). **A rollback warns and goes on:** the guard still judges what it renders, and refusing would take the way back away. **The guard's bind rule stays strict:** the pinned version never prints an option for our binds, and accepting a default would widen the rule for versions we do not run. **CI** installs the same version from the same file, by C-81 (version and sha256, or Docker's repository with provision's fingerprint check; S40 d), for T-render, the isolation test, T-real and the flag lists, and fails if it is not the one running | box fixture: install argv and hold of the one package, a newer and a held one brought down, unlisted version stops, rerun changes nothing; provision-check on another major, another patch, unheld, Ubuntu's package; a plugin under `/root/.docker/cli-plugins`, and the two users' answers differing: provision-check fails and a deploy is `render-env`; deploy with 2.40.3, 5.8.0, garbage, a failing command: `render-env`, no network, digest not quarantined; rollback with 5.8.0 warns and restores; a static test that ci.yml's steps read the file | mutant `>=` instead of equal; mutant checking after the pull; mutant Q; mutant refusing a rollback; a CI step using the runner's own Compose; mutant asking as root only; mutant holding `docker-ce` |
+
+**G10, changing the version** is an operator step: a PR moves the file (CI then runs everything on the new one and the fixtures are regenerated), `install.sh`, then `provision --stage host`; between the last two, deploys stop with `render-env`. Read: `provision.sh` installed the newest from
+Docker's repository (5.8.0 listed on 2026-11-23; old versions stay listed). Measured on 5.7.1: the Linux runs in section F; qa saw 2.40 print `create_host_path: true`, which the guard refuses. A Compose fix waits for that PR (INFRA §8.2's monthly window looks for one): Compose parses a
+release only as uid 10020 without network, and as root only judged bytes. To POLY-160: a Renovate rule for the file, and whether Docker's repository is outside unattended-upgrades `(unmeasured)`, since engine and runc fixes would then wait too and R-4 leans on them.
 
 ## T-real — one real deploy in CI (Principal: in this loop, narrow trigger, with the rollback case; seceng `a39fc4c6`, S38)
 
@@ -629,7 +634,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S39 (seceng `ruling-review.md`): met by
+## S1–S40 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -645,4 +650,4 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
 | S28 | R9 edge step 2; T-edge | S29 (a, b), S30 | R11 `staging-auth`; T-sauth |
-| A13 | R7; T-probe | S31–S39 | F4, F2, R4 R-b, G1, G2, G9, T-real |
+| A13 | R7; T-probe | S31–S40 | F4, F2, R4 R-b, G1, G2, G9, G10, T-real |
