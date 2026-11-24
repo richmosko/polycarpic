@@ -37,9 +37,9 @@ export function up(): Stack {
   if (b.code !== 0) throw new Error(`docker build infra/postgres failed: ${b.err.slice(-500)}`);
   const dir = mkdtempSync(join(tmpdir(), 'poly95-stack-'));
   chmodSync(dir, 0o755);
-  const env = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1' };
+  const env = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1', POLY_APP_IMAGE: 'ghcr.io/richmosko/polycarpic@sha256:' + '1'.repeat(64), POLY_TOOLS_IMAGE: 'ghcr.io/richmosko/polycarpic-tools@sha256:' + '2'.repeat(64), POLY_CADDY_IMAGE: 'ghcr.io/richmosko/polycarpic-caddy@sha256:' + '3'.repeat(64) }; // POLY-100: every image variable is required (no default digest anywhere)
   const base = join(ROOT, 'infra', 'compose', 'prod.yml');
-  const cfg = JSON.parse(sh('docker', ['compose', '-f', base, 'config', '--format', 'json'], { env }).out) as any;
+  const cfg = JSON.parse(sh('docker', ['compose', '-f', base, 'config', '--no-env-resolution', '--format', 'json'], { env }).out) as any;
   const pg = cfg.services.postgres;
   // root-owned fixtures are made through a throwaway container (no sudo; works on Linux CI and Docker Desktop)
   const rootRun = (script: string) => sh('docker', ['run', '--rm', '-v', `${dir}:/w`, '--entrypoint', 'sh', IMG, '-c', script]);
@@ -76,7 +76,9 @@ export function up(): Stack {
     }
   }
   const ovFile = join(dir, 'override.yml');
-  writeFileSync(ovFile, stringify(ov));
+  // POLY-100 R11: the five app services read /etc/polycarpic host and mail env files; a harness has none and starts none of them, so its override drops the lists
+  for (const s of ['web', 'auth', 'worker', 'migrate', 'operator']) (ov.services[s] ??= {}).env_file = '__RESET__';
+  writeFileSync(ovFile, stringify(ov).replace(/'__RESET__'|__RESET__/g, '!reset []'));
   rootRun(['chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv', ...chowns].join(' && '));
   const compose = (...a: string[]) => sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, ...a], { env });
   const u = compose('up', '-d', '--wait', '--wait-timeout', '120', 'postgres');

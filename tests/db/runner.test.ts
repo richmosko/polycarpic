@@ -2,7 +2,7 @@
 // runner exits non-zero with the specific error, and NOTHING from the run is applied (tracking rows + tables unchanged).
 // Error tokens (E.*) are the contract with backend-lead's runner messages; reconcile in this table only.
 import { spawn } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { MIGRATE_CLI, applied, dbEnv, freshDb, journalOf, migrateCli, migrateRun, rewrite, setJournal, tableExists, writeMigrations } from './helpers/api';
 import { must, psql, psqlSession } from './helpers/pg';
 
@@ -171,7 +171,7 @@ describe('journal when edited on an applied entry (review 1 R4)', () => {
 describe('role preflight, reverse direction (seceng M-2)', () => {
   const pre = (db: string) => writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
   // Addendum 2: --plan runs the preflight too. poly_backup's privilege grants are pgTAP-only in POLY-83 (01_roles.sql);
-  // the runner refusal below is pinned `it.fails` until POLY-100 adds the ACL check to the preflight: it turns red then, flip it.
+  // POLY-100 R12 added the ACL check: its cases are the T-pre table below.
   for (const args of [[], ['--plan']]) {
     it(`a stray member of a definer-owner role (GRANT poly_authz TO poly_app): ${args.join(' ') || 'apply'} exits 2 naming it`, async () => {
       const db = freshDb();
@@ -187,17 +187,11 @@ describe('role preflight, reverse direction (seceng M-2)', () => {
       const db = freshDb();
       must('GRANT poly_app TO poly_backup');
       try {
-        refused(await migrateRun(db, pre(db), args), /unexpected role memberships.*poly_backup/i);
+        refused(await migrateRun(db, pre(db), args), /refused \(backup-acl\).*unexpected role memberships.*poly_backup/is);
         expect(tableExists(db, 'public.ta')).toBe(false);
       } finally {
         must('REVOKE poly_app FROM poly_backup');
       }
-    });
-    it.fails(`POLY-100: an extra privilege grant to poly_backup (GRANT CREATE ON SCHEMA public): ${args.join(' ') || 'apply'} exits 2 naming the role`, async () => {
-      const db = freshDb();
-      must('GRANT CREATE ON SCHEMA public TO poly_backup', db);
-      refused(await migrateRun(db, pre(db), args), /poly_backup/i);
-      expect(tableExists(db, 'public.ta')).toBe(false);
     });
   }
 });
@@ -291,5 +285,121 @@ describe('--plan', () => {
     } finally {
       release();
     }
+  });
+});
+
+// POLY-100 R12 / T-pre: poly_backup is exactly roles.sql's read-only role. Ruling 52910589: all faults share one database and one sibling; each stays its own `it`; each
+// refusal matches the pattern of ITS OWN fault as well as backup-acl (so a leftover fault cannot satisfy a later case); the table checks after each mode are one query;
+// and a last case proves every undo (--plan 3, then apply 0).
+describe('T-pre: backup-acl preflight (R12)', () => {
+  type Fault = { name: string; setup: (db: string, other: string) => string; undo: (db: string, other: string) => string; pat: (db: string, other: string) => RegExp };
+  const BA = /refused \(backup-acl\)/;
+  const OBJ = /owns or holds privileges on objects/;
+  const faults: Fault[] = [
+    { name: 'GRANT CREATE ON SCHEMA public', setup: () => 'GRANT CREATE ON SCHEMA public TO poly_backup', undo: () => 'REVOKE CREATE ON SCHEMA public FROM poly_backup', pat: () => OBJ },
+    { name: 'GRANT UPDATE (c) on a table', setup: () => 'GRANT UPDATE (c) ON public.tcol TO poly_backup', undo: () => 'REVOKE UPDATE (c) ON public.tcol FROM poly_backup', pat: () => OBJ },
+    { name: 'EXECUTE on a definer function', setup: () => 'GRANT EXECUTE ON FUNCTION public.fdef() TO poly_backup', undo: () => 'REVOKE EXECUTE ON FUNCTION public.fdef() FROM poly_backup', pat: () => OBJ },
+    { name: 'TEMPORARY on the database', setup: (db) => `GRANT TEMPORARY ON DATABASE ${db} TO poly_backup`, undo: (db) => `REVOKE TEMPORARY ON DATABASE ${db} FROM poly_backup`, pat: (db) => new RegExp(`not exactly CONNECT.*${db}: TEMPORARY`) },
+    { name: 'CONNECT WITH GRANT OPTION on the database', setup: (db) => `GRANT CONNECT ON DATABASE ${db} TO poly_backup WITH GRANT OPTION`, undo: (db) => `REVOKE GRANT OPTION FOR CONNECT ON DATABASE ${db} FROM poly_backup`, pat: (db) => new RegExp(`not exactly CONNECT.*${db}: CONNECT WITH GRANT OPTION`) },
+    { name: 'TEMPORARY on a sibling database (ruling cc8f5ba6: every database entry must be exactly CONNECT)', setup: (_d, o) => `GRANT TEMPORARY ON DATABASE ${o} TO poly_backup`, undo: (_d, o) => `REVOKE TEMPORARY ON DATABASE ${o} FROM poly_backup`, pat: (_d, o) => new RegExp(`not exactly CONNECT.*${o}: TEMPORARY`) },
+    { name: 'CONNECT WITH GRANT OPTION on a sibling database', setup: (_d, o) => `GRANT CONNECT ON DATABASE ${o} TO poly_backup WITH GRANT OPTION`, undo: (_d, o) => `REVOKE GRANT OPTION FOR CONNECT ON DATABASE ${o} FROM poly_backup`, pat: (_d, o) => new RegExp(`not exactly CONNECT.*${o}: CONNECT WITH GRANT OPTION`) },
+    { name: 'ALTER DEFAULT PRIVILEGES ... TO poly_backup', setup: () => 'ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner IN SCHEMA public GRANT SELECT ON TABLES TO poly_backup',
+      undo: () => 'ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner IN SCHEMA public REVOKE SELECT ON TABLES FROM poly_backup', pat: () => OBJ },
+    { name: 'ALTER TABLE ... OWNER TO poly_backup', setup: () => 'ALTER TABLE public.town OWNER TO poly_backup', undo: () => 'ALTER TABLE public.town OWNER TO poly_owner', pat: () => OBJ },
+    { name: 'ALTER ROLE poly_backup SET default_transaction_read_only = off', setup: () => 'ALTER ROLE poly_backup SET default_transaction_read_only = off', undo: () => 'ALTER ROLE poly_backup SET default_transaction_read_only = on', pat: () => /role settings are not exactly/ },
+    { name: 'a per-database role setting for poly_backup', setup: (db) => `ALTER ROLE poly_backup IN DATABASE ${db} SET work_mem = '64MB'`, undo: (db) => `ALTER ROLE poly_backup IN DATABASE ${db} RESET ALL`, pat: () => /role settings are not exactly/ },
+    { name: 'GRANT poly_owner TO poly_backup', setup: () => 'GRANT poly_owner TO poly_backup', undo: () => 'REVOKE poly_owner FROM poly_backup', pat: () => /unexpected role memberships.*poly_backup in poly_owner/ },
+    { name: 'GRANT pg_write_all_data TO poly_backup', setup: () => 'GRANT pg_write_all_data TO poly_backup', undo: () => 'REVOKE pg_write_all_data FROM poly_backup', pat: () => /unexpected role memberships.*poly_backup in pg_write_all_data/ },
+    { name: 'poly_backup ADMIN on pg_read_all_data', setup: () => 'GRANT pg_read_all_data TO poly_backup WITH ADMIN OPTION', undo: () => 'REVOKE ADMIN OPTION FOR pg_read_all_data FROM poly_backup', pat: () => /poly_backup in pg_read_all_data with admin/ },
+    { name: 'GRANT poly_backup TO poly_app (S5)', setup: () => 'GRANT poly_backup TO poly_app', undo: () => 'REVOKE poly_backup FROM poly_app', pat: () => /unexpected role memberships.*poly_app in poly_backup/ },
+    { name: 'NOLOGIN', setup: () => 'ALTER ROLE poly_backup NOLOGIN', undo: () => 'ALTER ROLE poly_backup LOGIN', pat: () => /attributes differ/ },
+    { name: 'CONNECTION LIMIT 5', setup: () => 'ALTER ROLE poly_backup CONNECTION LIMIT 5', undo: () => 'ALTER ROLE poly_backup CONNECTION LIMIT 3', pat: () => /attributes differ/ },
+    { name: 'NOBYPASSRLS', setup: () => 'ALTER ROLE poly_backup NOBYPASSRLS', undo: () => 'ALTER ROLE poly_backup BYPASSRLS', pat: () => /attributes differ/ },
+    { name: 'CREATEDB', setup: () => 'ALTER ROLE poly_backup CREATEDB', undo: () => 'ALTER ROLE poly_backup NOCREATEDB', pat: () => /attributes differ/ },
+  ];
+  let db = '';
+  let other = '';
+  const dir = () => writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
+  let migrations = '';
+  beforeAll(() => {
+    db = freshDb();
+    other = freshDb();
+    migrations = dir();
+    must('CREATE TABLE public.tcol (id int, c int); CREATE TABLE public.town (id int); CREATE FUNCTION public.fdef() RETURNS int LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$; REVOKE EXECUTE ON FUNCTION public.fdef() FROM PUBLIC;', db);
+  });
+  /** nothing was applied: no `ta`, no tracking table, in one query */
+  const untouched = () => expect(must(`SELECT to_regclass('public.ta') IS NULL AND to_regclass('drizzle.__drizzle_migrations') IS NULL`, db).rows[0][0]).toBe('t');
+
+  for (const f of faults) {
+    it(`${f.name}: apply and --plan each exit 2 refused (backup-acl) naming this fault, nothing applied`, async () => {
+      must(f.setup(db, other), db);
+      try {
+        for (const args of [[], ['--plan']]) {
+          const r = await migrateRun(db, migrations, args);
+          refused(r, BA);
+          refused(r, f.pat(db, other));
+          untouched();
+        }
+      } finally {
+        must(f.undo(db, other), db);
+      }
+    });
+  }
+
+  it('every undo held: --plan finds the one pending file (exit 3), apply succeeds (exit 0)', async () => {
+    expect((await migrateRun(db, migrations, ['--plan'])).code).toBe(3);
+    ok(await migrateRun(db, migrations));
+    expect(tableExists(db, 'public.ta')).toBe(true);
+  });
+
+  it('roles.sql\'s own state passes on a fresh database: --plan exits 3 (pending), apply exits 0, then --plan exits 0', async () => {
+    const d = freshDb();
+    const m = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
+    expect((await migrateRun(d, m, ['--plan'])).code).toBe(3);
+    ok(await migrateRun(d, m));
+    expect((await migrateRun(d, m, ['--plan'])).code).toBe(0);
+  });
+
+  it('exact CONNECT on a sibling database is exempt (ruling cc8f5ba6): a second database with poly_backup CONNECT only passes', async () => {
+    const d = freshDb();
+    const o = freshDb();
+    must(`GRANT CONNECT ON DATABASE ${o} TO poly_backup`, d);
+    try {
+      const m = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
+      expect((await migrateRun(d, m, ['--plan'])).code).toBe(3);
+      ok(await migrateRun(d, m));
+      expect((await migrateRun(d, m, ['--plan'])).code).toBe(0);
+    } finally {
+      must(`REVOKE CONNECT ON DATABASE ${o} FROM poly_backup`, d);
+    }
+  });
+});
+
+// T-lock (criterion 7): two real runs of the CLI together on one slow file serialise on the advisory lock.
+describe('T-lock: two migrate runs together', () => {
+  it('both exit 0, one applies and one finds nothing, one tracking row, the second was seen waiting on Lock/advisory', async () => {
+    const db = freshDb();
+    const dir = writeMigrations([{ tag: '0000_slow', sql: 'SELECT pg_sleep(2);\n' + T('ts') }]);
+    const run = () => {
+      const child = spawn('node', ['--experimental-strip-types', MIGRATE_CLI], { env: { ...process.env, ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: dir } });
+      const r = { out: '', code: -1, done: new Promise<void>((res) => child.on('close', (c) => { r.code = c ?? -1; res(); })) };
+      child.stdout.on('data', (d) => (r.out += d));
+      child.stderr.on('data', (d) => (r.out += d));
+      return r;
+    };
+    const a = run();
+    const b = run();
+    let seen = false;
+    for (let i = 0; i < 60 && !seen; i++) {
+      seen = must(`SELECT count(*) FROM pg_stat_activity WHERE datname='${db}' AND wait_event_type='Lock' AND wait_event='advisory'`).rows[0][0] === '1';
+      if (!seen) await new Promise((r) => setTimeout(r, 100));
+    }
+    await Promise.all([a.done, b.done]);
+    expect([a.code, b.code], a.out + b.out).toEqual([0, 0]);
+    const outs = [a.out, b.out];
+    expect(outs.filter((o) => /applied: 0000_slow/.test(o))).toHaveLength(1);
+    expect(outs.filter((o) => /nothing to apply/.test(o))).toHaveLength(1);
+    expect(applied(db)).toHaveLength(1);
+    expect(seen, 'the second run was seen waiting on Lock/advisory').toBe(true);
   });
 });

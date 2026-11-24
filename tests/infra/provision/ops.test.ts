@@ -11,7 +11,7 @@ const EXEC = ['infra/ops/polycarpic-ops', 'infra/ops/install_box.py', 'infra/pro
 // A laptop checkout inside the box (bundle paths copied from /repo, committed), a fake ssh that runs the remote command as polyops, and `bump` to make a new commit.
 const LAP = `
 rm -rf /tmp/lap /tmp/bin; mkdir -p /tmp/lap /tmp/bin
-(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql infra/backup infra/postgres/archive-wal.sh /tmp/lap/)
+(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/deploy /tmp/lap/)
 find /tmp/lap -name __pycache__ -prune -exec rm -rf {} +
 (cd /tmp/lap && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm one)
 cat > /tmp/bin/ssh <<'SSH'
@@ -69,7 +69,7 @@ describe('polycarpic-ops install: install.sh to install_box.py on a real root', 
   });
 
   it('a third id deletes the oldest, keeps the previous, and each output names its previous', () => {
-    const r = ops(`for n in a b c; do bump $n; install_ops | sed "s/^/OUT /"; ls /opt/polycarpic/ops | tr '\\n' ' ' | sed "s/^/LS /"; echo; done`);
+    const r = ops(`for n in a b c; do bump $n; install_ops | sed "s/^/OUT /"; ls /opt/polycarpic/ops | grep -v '^ssh-target$' | tr '\\n' ' ' | sed "s/^/LS /"; echo; done`);
     const outs = r.out.split('\n').filter((l) => l.startsWith('OUT installed'));
     expect(outs[0]).toMatch(/\(previous: none\)$/);
     expect(outs[1]).toMatch(/\(previous: git-[0-9a-f]{12}\)$/);
@@ -172,7 +172,8 @@ awk '/^--ENV/{blk=""} {blk=blk"\\n"$0} /^POLY_POSTGRES_IMAGE=/{print "ENVHAS " $
     expect(r.out).toContain('OUT=https://app.example.com/accept?t=FAKELINK');
     expect(r.out).toContain('ERR=invitation recorded (bootstrap), expires');
     expect(r.out).toContain('LEAKS=0');
-    expect(r.out).toMatch(/RUN ARGV compose -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
+    // G11 (ruling 3b62bbe6): every compose call names --project-directory (a bundle file's own directory here) and --env-file /dev/null
+    expect(r.out).toMatch(/RUN ARGV compose --project-directory \S+\/infra\/compose --env-file \/dev\/null -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
     expect(r.out).toContain(`ENVHAS POLY_APP_IMAGE=${app}`);
     expect(r.out).toContain(`ENVHAS POLY_POSTGRES_IMAGE=${pg}`);
   });

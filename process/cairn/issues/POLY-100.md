@@ -1,30 +1,30 @@
 ---
 id: POLY-100
 title: Pull-based deploy + timers
-status: backlog
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
 assignee: devops-engineer
-paths: [infra/deploy/**]
+paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, infra/deploy/**, infra/ops/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/caddy/**, infra/README.md, infra/lint/**, infra/ci/**, packages/db/**, packages/config/**, apps/worker/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore, Dockerfile]
 labels: [ops, deploy, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/152
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-24
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
 
 ## Acceptance criteria
 
-- [ ] With a fake registry fixture, an unverified image is never run.
-- [ ] A failed attestation, a bad tag signature and a wrong commit label each stop the deploy and alert.
-- [ ] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running.
-- [ ] The script never rewrites itself.
-- [ ] The bad-migration rollback runbook restores from the pre-migration backup on the operator's laptop within 60 minutes (measured in the restore drill).
-- [ ] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction).
-- [ ] Two migrate runs started together: the second waits on the advisory lock and then applies nothing.
+- [x] With a fake registry fixture, an unverified image is never run. Proved by `test_deploy_candidate.py` (`test_t1_v1_argv_is_exactly_the_six_flags_with_c_and_precedes_any_pull`, `test_t2_a_label_alone_does_not_bind_the_image`) and `test_deploy_flow.py::test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release`; the guard cases in `test_deploy_guard.py`; red-run.md has each on a mutant.
+- [x] A failed attestation, a bad tag signature and a wrong commit label each stop the deploy and alert. Proved by `test_deploy_candidate.py` (`test_label_mismatch_is_refused_and_quarantined`, `test_t3_a_tag_signed_by_a_key_not_in_allowed_signers`, V1 refusals) and `test_deploy_prod.py`.
+- [x] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running. Proved by `test_deploy_flow.py` (`test_t10_unhealthy_rolls_back_from_the_previous_bundle_without_migrating_and_is_quarantined_once`, `test_t11_a_failing_migrate_never_touches_the_running_containers`), `test_deploy_probe.py`, `test_deploy_hang.py`.
+- [x] The script never rewrites itself. Proved by `test_deploy_flow.py::test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release` and `test_deploy_render.py` (every compose call names the saved render; a `releases/` path only as `config`'s inputs).
+- [x] The bad-migration rollback runbook's inputs are proven: `backup premigration`, then a restore from the pre-migration backup on the operator's laptop (T13). The 60-minute timing is measured in the restore drill, POLY-116. Proved by `test_deploy_t13.py` (`test_the_set_a_deploy_logs_is_the_set_list_premigration_offers`, `test_fetch_premigration_gives_the_same_bytes`, `test_the_fake_box_and_the_real_list_print_the_same_bytes`).
+- [x] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction). Proved by `tests/db/runner.test.ts` `a failing file leaves schema and tracking unchanged (one transaction)` (green in the db job, 44/44 locally).
+- [x] Two migrate runs started together: the second waits on the advisory lock and then applies nothing. Proved by `tests/db/runner.test.ts` `T-lock: two migrate runs together` > `both exit 0, one applies and one finds nothing, one tracking row, the second was seen waiting on Lock/advisory`.
 
 ## Comments
 
@@ -81,4 +81,17 @@ From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.m
 
 ### @team-lead — 2026-11-22
 
+Feature started. Branch: `feature/poly-100-pull-based-deploy`.
 From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8; ruling R6 is the contract): the deploy calls `polycarpic-ops backup premigration` and migrates only on exit 0 (1 failed, 3 not ready, 4 lock not got in 30 min), writing the `premigration-set …` line to deploy.log. Also this issue's: write /opt/polycarpic/images.env; enable both timers; publish and attest the tools image; install the ops bundle from the verified image; the deploy lock alongside backup.lock; `github_read_token` joins HOST_ONLY only through seceng's pinned-set review (secrets/host/, root:root 0400).
+
+### @team-lead — 2026-11-23
+
+Criterion 5 reworded with the Principal's agreement (2026-11-23), at the architect's request (ruling §L1): this loop proves the runbook's inputs (T13); the 60-minute timing is POLY-116's, where the timed drill lives. The old text read "within 60 minutes (measured in the restore drill)".
+
+### @team-lead — 2026-11-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/152. Gate signed at a9d35481, seceng PASS WITH FOLLOW-UPS (H1 accepted into POLY-160 by the Principal), architect verdict at 82b8b1c2. Awaiting the Principal's merge.
+
+### @team-lead — 2026-11-24
+
+Validate passed; merging via PR #152. Closing. No real deploy has completed: POLY-160, POLY-161 and POLY-162 carry the rest.

@@ -77,7 +77,7 @@ export function up(opts: UpOpts = {}): Stack {
   }
   const dir = mkdtempSync(join(tmpdir(), 'poly99-stack-'));
   chmodSync(dir, 0o755);
-  const env: Record<string, string> = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1' };
+  const env: Record<string, string> = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1', POLY_APP_IMAGE: 'ghcr.io/richmosko/polycarpic@sha256:' + '1'.repeat(64), POLY_TOOLS_IMAGE: 'ghcr.io/richmosko/polycarpic-tools@sha256:' + '2'.repeat(64), POLY_CADDY_IMAGE: 'ghcr.io/richmosko/polycarpic-caddy@sha256:' + '3'.repeat(64) }; // POLY-100: every image variable is required
   if (opts.uploader === 'stub') env.POLY_TOOLS_IMAGE = TOOLS;
   else if (opts.uploader) {
     // R4: the tools image is built here from infra/backup/tools.Dockerfile (context infra/backup); build.yml publishes it in POLY-100.
@@ -86,7 +86,7 @@ export function up(opts: UpOpts = {}): Stack {
     env.POLY_TOOLS_IMAGE = TOOLS_UP;
   }
   const base = join(ROOT, 'infra', 'compose', 'prod.yml');
-  const rendered = sh('docker', ['compose', '-f', base, '--profile', 'backup', '--profile', 'uploader', 'config', '--format', 'json'], { env });
+  const rendered = sh('docker', ['compose', '-f', base, '--profile', 'backup', '--profile', 'uploader', 'config', '--no-env-resolution', '--format', 'json'], { env });
   if (rendered.code !== 0) throw new Error(`compose config failed: ${rendered.err.slice(-500)}`);
   const cfg = JSON.parse(rendered.out) as any;
   const vol = (d: Dir) => `${PROJECT}-${d}`;
@@ -157,7 +157,9 @@ export function up(opts: UpOpts = {}): Stack {
   const ovFile = join(dir, 'override.yml');
   // The uploader's base mount is the whole spool at /spool (one target); three volume mounts at /spool/<dir> would sit beside it and Docker
   // Desktop refuses the host path. `!override` makes the list replace the base list instead of merging by target.
-  let ovText = stringify(ov);
+  // POLY-100 R11: the five app services read /etc/polycarpic host and mail env files; a harness has none and starts none of them, so its override drops the lists
+  for (const s of ['web', 'auth', 'worker', 'migrate', 'operator']) (ov.services[s] ??= {}).env_file = '__RESET__';
+  let ovText = stringify(ov).replace(/'__RESET__'|__RESET__/g, '!reset []');
   if (ov.services.uploader) ovText = ovText.replace(/(\n {2}uploader:\n {4}volumes:)/, '$1 !override');
   writeFileSync(ovFile, ovText);
   rootRun(['chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv', ...chowns].join(' && '));

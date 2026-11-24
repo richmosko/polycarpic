@@ -1,0 +1,41 @@
+#!/usr/bin/python3 -I
+"""T-real's fake `gh` (POLY-100, ruling 3765f358): the only fake of the run. Installed at /usr/local/sbin/gh (first on the tool's fixed PATH, never written over a real one) by the harness and removed by
+the undo. It answers the four calls the staging poll makes from /run/poly-deploy-real/gh.json, requires the tool's own GH_TOKEN to equal the token file (so the tool really passes it), and logs argv only."""
+import json
+import os
+import sys
+
+D = "/run/poly-deploy-real"
+TOKEN_FILE = "/etc/polycarpic/secrets/host/github_read_token"
+a = sys.argv[1:]
+with open(D + "/gh-calls.log", "a", encoding="utf-8") as fh:
+    fh.write(" ".join(a) + "\n")
+with open(TOKEN_FILE, encoding="utf-8") as fh:
+    want = fh.read().strip()
+if not want or os.environ.get("GH_TOKEN") != want:
+    sys.stderr.write("fake gh: GH_TOKEN is not the installed token\n")
+    sys.exit(4)
+with open(D + "/gh.json", encoding="utf-8") as fh:
+    st = json.load(fh)
+if a[:1] == ["api"]:
+    url = next(x for x in a[1:] if not x.startswith("-"))
+    if "/actions/workflows/build.yml/runs" in url:
+        print(json.dumps({"total_count": len(st["runs"]), "workflow_runs": st["runs"][:1]}))
+        sys.exit(0)
+    sys.stderr.write("fake gh: no fixture for %s\n" % url)
+    sys.exit(1)
+if a[:2] == ["run", "download"]:
+    rid, name, dest = a[2], a[a.index("-n") + 1], a[a.index("-D") + 1]
+    dig = st["artifacts"].get(rid)
+    if dig is None or not name.startswith("image-"):
+        sys.stderr.write("no artifact\n")
+        sys.exit(1)
+    os.makedirs(dest, exist_ok=True)
+    with open(dest + "/digest.txt", "w", encoding="utf-8") as out:
+        out.write(dig + "\n")
+    sys.exit(0)
+if a[:2] == ["attestation", "verify"]:
+    dig = a[2].split("@", 1)[1]
+    sys.exit(0 if dig in st["attested"] else 1)
+sys.stderr.write("fake gh: unhandled %r\n" % (a,))
+sys.exit(1)

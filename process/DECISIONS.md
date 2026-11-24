@@ -937,3 +937,73 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Defer to POLY-103's alerting design.
 **Approved by:** Mosko
+
+### 2026-11-23 — The box's GitHub token reads public repositories only
+**Decision:** `github_read_token` is a fine-grained token limited to public repositories, read-only, with no permissions (POLY-100 ruling §D1 option (b)). Classic tokens are refused by `set-secret`. Before the first staging deploy (POLY-104) it must be shown to download the staging digest artifact and to run `gh attestation verify`; if it cannot, the choice returns to the Principal and is never widened quietly.
+**Why:** The box needs a token only because GitHub refuses the attestation check and the artifact download to anonymous callers and caps them at 60 requests an hour; everything it reads is public. The token sits in a root-only file, so its own reach is what matters if root on the box or the laptop is compromised. This scope reads nothing a stranger cannot, now or if the repository is later made private; a thief can only exhaust the hourly allowance and stall deploys. The architect and seceng both recommended it.
+**Alternatives considered:**
+- INFRA's earlier spec: this repository, `contents:read` and `packages:read`, which would read private code if the repository went private and may force a classic token for packages (unmeasured).
+**Approved by:** Mosko
+
+### 2026-11-23 — Staging never deploys the shared Caddy edge (strict)
+**Decision:** Caddy's image, Caddyfile and `edge.yml` come only from a signed prod release, on every host, with no exception for a staging-only host (POLY-100 ruling §D2, strict). The Principal first chose the exception and reversed it the same day. The CI lint allowlists Caddyfile directives per block and in order (A12, S20), and each prod deploy after the first checks health through Caddy (A13). Before prod exists, Caddy is first brought up alone from a signed `edge-<n>` tag by an operator command, `edge-deploy <tag>` (the Principal chose "edge alone" over "prod first"): the `edge-<n>` and `v1.*` namespaces cannot stand in for each other, an edge tag starts only Caddy, the command refuses once prod has a release, and prod's first deploy takes Caddy over only from the same or a later commit (seceng S22-S25). Staging can be deployed first, since it needs no Caddy to start; the tag-signing key and `RELEASE_SIGNERS` are needed before staging is served, that is before `edge-deploy edge-1`.
+**Why:** One Caddy decrypts all prod traffic. Staging deploys every `main` build with no signature, so staging-owned Caddy puts unsigned code on ports 80 and 443. The exception was meant to save one setup step before the first staging deploy; it needed five security conditions (S11, S15, S16, S17, A11), several of which failed open in the built code, and it still left a DNS check that is a glance at poll time, for one name, with no way to revoke a certificate already issued, and a destructive wipe never run live. The lead's first description of the exception to the Principal overstated the safety net: health catches a Caddy that will not start, not one that starts and is configured wrongly; nothing on the box stops that under any option. seceng and the lead changed their recommendation to strict.
+**Alternatives considered:**
+- The exception: staging owns Caddy on a host with no prod, guarded by DNS checks and a wipe at prod's first deploy.
+- Caddy follows staging always, which bypasses the signed-tag gate.
+- Prod first: prod accepts a pre-GA tag and is installed before staging, which needs prod's database and secrets on the box early, leaves prod's first install unrehearsed and widens what prod will run (`v1.0.0` is the GA tag, so either shape needs a signed pre-GA tag).
+**Approved by:** Mosko
+
+### 2026-11-23 — The box's compose guard policy ships only by `install.sh`
+**Decision:** The compose guard and its allowlist (`infra/deploy/compose-allow.json`) are installed tooling, never read from a release (POLY-100 ruling §D3 option (a)). A release that needs a wider policy is refused and quarantined until the operator runs `infra/ops/install.sh` from a reviewed checkout; the next poll then re-checks it in full with nothing to clear. By the Principal's requirement, the refusal's alert, log and status carry the exact commands, review first and install second, built only from installed and verified values.
+**Why:** Staging has no human gate after a merge and shares the box with prod, so a release judging itself would let any `main` merge widen the policy and mount host paths in the same change. The cost is one laptop command on releases that change mounts, services, networks or pinned settings. The architect and seceng both recommended it.
+**Alternatives considered:**
+- The release carries its own policy, checked by the installed code.
+**Approved by:** Mosko
+
+### 2026-11-24 — One real end-to-end deploy test in CI, on a narrow trigger, with its rollback case
+**Decision:** POLY-100 adds T-real: one real `first-deploy staging` as the last step of CI's `image` job, as real root, with the real operator tool, Docker, Compose and the job's own images; only GitHub is faked. It includes the rollback case (a release whose web never answers is rolled back and quarantined). It runs only on changes that can break a deploy (the Dockerfile, `infra/`, the config package's settings contract, the migrations and the app's startup code), not on every `apps/` or `packages/` change.
+**Why:** Three times in this loop the deploy passed every test and a green CI run and could not have deployed on a real box, each for a different cause (the bundle a real image ships, a Compose option that does not exist, release directories the render user cannot read). Each was found by seceng reading the code, a review round at a time, because every test checked a piece against a stand-in that agreed with the code. The architect and seceng both recommended the test. The narrow trigger is the Principal's condition: ordinary feature PRs must not pay for it. Estimated cost, unmeasured: about 250 lines and 2.5 to 4 minutes of the image job on the PRs that run it. It does not cover the timers, real GitHub or a prod deploy, and does not replace POLY-104.
+**Alternatives considered:**
+- Fix the review findings only and rely on a further review and the first staging deploy.
+- Run it on every `apps/` or `packages/` change, as first ruled.
+- Without the rollback case, saving about two minutes on those PRs.
+- A follow-up issue, which would merge the deploy code with no test that it can deploy.
+**Approved by:** Mosko
+
+### 2026-11-24 — POLY-100's third build review is limited; lesser findings go to one follow-up issue
+**Decision:** seceng's third review of POLY-100's build covers only what changed since its second review, plus the end-to-end deploy test. It holds the PR only for a fault that lets an unverified release run, bypasses the compose guard, loses or exposes data, or leaves a bad release running. Every other finding is recorded on POLY-160 (Deploy follow-ups), which must be done before the first staging deploy (POLY-104).
+**Why:** The first review found sixteen faults and the second eight more, some introduced by fixing the first; nothing bounded a third, and the loop had passed twice its estimated cost. Nothing is deployed anywhere, so a lesser fault merged now sits in code, not on a running box, and POLY-104 cannot start until the follow-up is done. The Principal: "lets limit and move on. tackle the rest in another issue."
+**Alternatives considered:**
+- Keep fixing every finding before the merge, with no bound on rounds.
+**Approved by:** Mosko
+
+### 2026-11-24 — The Compose plugin is pinned to one exact version; two gates before real data
+**Decision:** The box runs exactly one version of the Docker Compose plugin (5.7.1), held, installed by `provision.sh`; CI uses the same version (POLY-100 ruling G10, S40). Only that plugin is held: the Docker engine and container runtime stay free to update. Two conditions must be met before any real household data is on a box, both on POLY-160: an automatic PR when a new Compose version is released, which the end-to-end deploy test then proves; and confirmation, measured on a real box, that automatic security updates cover Docker's own repository for the engine and runtime.
+**Why:** The compose guard depends on Compose's exact output, and on 2026-11-24 two Compose versions were found to render the same files differently, one of them refusing every release; unpinned, a box would run a version nobody tested, changing whenever Docker publishes one. The cost is that a security fix to the Compose plugin waits for a PR and the operator's install step. Compose reads a release's own files only as an unprivileged user with no network; as root it reads only the file the guard already judged. The Principal raised the exposure, said the implications were not fully clear to them, and chose this option to keep the work moving; it can be revisited, and seceng has not yet assessed the alternative below in writing.
+**Alternatives considered:**
+- Pin the minor version only and let patch releases install automatically; a patch that changes Compose's output would stop deploys with an alert and no quarantine (not assessed by seceng).
+- No pin (today's `provision.sh`): the newest Compose, whatever it is.
+**Approved by:** Mosko
+
+### 2026-11-24 — A minimal health listener now; the real web server split out of POLY-88
+**Decision:** POLY-100 adds a minimal public listener to the `web` service (option A): `GET /api/v1/health` on 3000 from the existing health handler, and a fixed 404 for everything else, under seceng's conditions (exact method and path; no body, cookie or echoed header; no URL logged; header, time and connection limits; the status page stays on loopback; a test forbids any other route; the real server replaces it and never runs beside it). The production web server and image build are split out of POLY-88 into POLY-161, which the first staging deploy (POLY-104) now waits on.
+**Why:** The end-to-end deploy test reached the health window and showed the release image serves no web app at all, so every deploy would end rollback-unhealthy and POLY-104 could never reach healthy. Without a health answer the test could prove only the unhealthy path; the healthy path, rollback and quarantine would merge unproven on real Docker, where the test has found faults every stand-in missed. The listener exposes one bit (database and schema fine, or not), at most one database check per five seconds. Under this option "healthy" does not mean a page is served, hence the split. The architect and seceng both recommended it.
+**Alternatives considered:**
+- Merge without it and prove only the unhealthy path (option B).
+- A stand-in image for the test, or pointing the health rule at the internal status page (neither recommended).
+**Approved by:** Mosko
+
+### 2026-11-24 — POLY-100's scope is closed; the end-to-end deploy test is finished in POLY-162
+**Decision:** No more scope enters POLY-100. It lands what is built and tested: the deploy, the fixes for both security reviews, and the three fixes the end-to-end test found (G10 the pinned Compose version, G11 the fixed working directory and no `.env`, G12 the first-deploy role check). Moved to POLY-162: the health listener (G15, ruled, not built), creating the database (G13) and the service commands (G14), both built without tests, and getting the end-to-end test (T-real) to pass. In POLY-100 T-real's files stay and its CI step is switched off; POLY-162 switches it on. POLY-104 waits on POLY-162, POLY-160 and POLY-161. This replaces, for POLY-100, the decisions of the same day that T-real and the health listener land in it.
+**Why:** The loop had passed three times its estimated cost and kept growing as the end-to-end test found faults outside the deploy code (no health answer in the image, no database created, the worker's command). The Principal: "no more scope creep on this issue. it's already gone too far." What is accepted: the deploy code merges without ever having completed a real deploy, and it is known that today it cannot; nothing is deployed anywhere, and nothing can be until POLY-162 is done.
+**Alternatives considered:**
+- Keep going in POLY-100 until T-real passes.
+**Approved by:** Mosko
+
+### 2026-11-24 — seceng's blocking finding H1 is accepted into POLY-160; POLY-100 merges with it open
+**Decision:** POLY-100's PR goes ahead although seceng's limited third review failed it on one finding in a class the Principal had set to hold the PR. H1: after an interrupted deploy, a Compose-version mismatch or a missing token makes the next run refuse before it restores, so the new release, which passed verification and the compose guard but was never shown healthy, keeps running (alert red); Ctrl-C in a hand run clears the `interrupted` mark, and `edge-deploy` has no poll to recover. H1 is a gate on POLY-160, which the first staging deploy (POLY-104) waits on. seceng's verdict is PASS WITH FOLLOW-UPS on that basis; the architect's verdict names the class as accepted, not met, and ARCH says so.
+**Why:** It takes two faults together, on a box with a release running, and no box has one; nothing can be deployed until POLY-160 is done. Fixing it in POLY-100 would have cost a further round on an issue the Principal had closed to new work. The architect and seceng leaned to fixing it in the PR as small; the lead first recommended accepting it, then leaned to the fix; the Principal chose to accept it.
+**Alternatives considered:**
+- Fix H1 in POLY-100 (recovery first, the mark kept), about an hour and one more CI run.
+**Approved by:** Mosko

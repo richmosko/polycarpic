@@ -2,7 +2,10 @@
   "renderEnv": {
     "POLY_DOMAIN": "lint.test",
     "POLY_STAGING_ALLOW": "192.0.2.0/24",
-    "POLY_TLS": "ops@lint.test"
+    "POLY_TLS": "ops@lint.test",
+    "POLY_APP_IMAGE": "ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "POLY_TOOLS_IMAGE": "ghcr.io/richmosko/polycarpic-tools@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "POLY_CADDY_IMAGE": "ghcr.io/richmosko/polycarpic-caddy@sha256:0000000000000000000000000000000000000000000000000000000000000000"
   },
   "allowedVars": [
     "POLY_POSTGRES_IMAGE",
@@ -183,6 +186,89 @@
         "source": "../caddy/Caddyfile",
         "target": "/etc/caddy/Caddyfile"
       }
+    ]
+  },
+  "caddyAllow": {
+    "{": [
+      "admin off",
+      "http_port 8080",
+      "https_port 8443",
+      "log {",
+      "output stderr",
+      "format filter {",
+      "request>uri regexp \"^(/api/auth/[^/?#]*)[^?#]*|[?#].*\" \"${1}\"",
+      "request>headers>Referer delete",
+      "}",
+      "}"
+    ],
+    "(security_headers)": [
+      "header {",
+      "defer",
+      "Strict-Transport-Security \"max-age=31536000\"",
+      "X-Content-Type-Options \"nosniff\"",
+      "X-Frame-Options \"DENY\"",
+      "Referrer-Policy \"strict-origin-when-cross-origin\"",
+      "}"
+    ],
+    "(no_store)": [
+      "@mutable not path /_app/immutable/*",
+      "header @mutable {",
+      "defer",
+      "Cache-Control \"no-store\"",
+      "}"
+    ],
+    "(upstream)": [
+      "header_up X-Forwarded-For {remote_host}",
+      "header_up -X-Real-IP",
+      "header_up -Forwarded",
+      "lb_try_duration 10s"
+    ],
+    "http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN}": [
+      "import security_headers",
+      "redir https://{host}{uri} permanent"
+    ],
+    "app.{$POLY_DOMAIN}": [
+      "tls {$POLY_TLS}",
+      "import security_headers",
+      "import no_store",
+      "handle_errors {",
+      "import security_headers",
+      "}",
+      "route {",
+      "@sw header Service-Worker *",
+      "respond @sw 403",
+      "@auth path /api/auth /api/auth/*",
+      "reverse_proxy @auth prod-auth:3000 {",
+      "import upstream",
+      "}",
+      "reverse_proxy prod-web:3000 {",
+      "import upstream",
+      "}",
+      "}"
+    ],
+    "staging.{$POLY_DOMAIN}": [
+      "tls {$POLY_TLS}",
+      "import security_headers",
+      "import no_store",
+      "handle_errors {",
+      "import security_headers",
+      "}",
+      "route {",
+      "@denied not remote_ip {$POLY_STAGING_ALLOW}",
+      "respond @denied 403",
+      "@sw header Service-Worker *",
+      "respond @sw 403",
+      "basic_auth {",
+      "import /run/secrets/staging_basic_auth",
+      "}",
+      "@auth path /api/auth /api/auth/*",
+      "reverse_proxy @auth staging-auth:3000 {",
+      "import upstream",
+      "}",
+      "reverse_proxy staging-web:3000 {",
+      "import upstream",
+      "}",
+      "}"
     ]
   }
 }

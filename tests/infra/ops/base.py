@@ -121,11 +121,27 @@ class Runner:
         self.unexpected.append(list(argv))
         raise AssertionError("FAKE: unexpected child process %r" % (argv,))
 
+    @staticmethod
+    def g11_stripped(argv):
+        """G11 (ruling 3b62bbe6): every `docker compose` call names `--project-directory <dir>` and `--env-file <file>`. The older pins (POLY-98/99/100) match the REST of the argv, so rules and `calls[i]["argv"]` see the call
+        without those two pairs; the full argv is `calls[i]["argv_full"]`, and test_deploy_cwd.py, test_deploy_flags.py and the render tests assert the two options on it."""
+        a = list(argv)
+        if "docker" not in a or "compose" not in a or a.index("docker") + 1 != a.index("compose"):
+            return a
+        out, i = [], 0
+        while i < len(a):
+            if a[i] in ("--project-directory", "--env-file") and i + 1 < len(a):
+                i += 2
+                continue
+            out.append(a[i])
+            i += 1
+        return out
+
     def _rec(self, kind, argv, stdin, timeout, env):
         if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
             raise AssertionError("argv must be a list of str, got %r" % (argv,))
-        self.calls.append(dict(kind=kind, argv=list(argv), stdin=stdin, timeout=timeout, env=None if env is None else dict(env)))
-        return self._find(argv)
+        self.calls.append(dict(kind=kind, argv=self.g11_stripped(argv), argv_full=list(argv), stdin=stdin, timeout=timeout, env=None if env is None else dict(env)))
+        return self._find(self.g11_stripped(argv))
 
     def __call__(self, argv, stdin=None, timeout=None, env=None):
         r = self._rec("run", argv, stdin, timeout, env)
@@ -228,7 +244,7 @@ class Host(object):
                     out[rel] = None
         return out
 
-    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None, getpass_impl=None):
+    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None, getpass_impl=None, ctx_extra=None, on_ready=None):
         Ctx = ctx_class()
         r = Result()
         r.term, r.stdout, r.stderr = Term(), io.StringIO(), io.StringIO()
@@ -277,11 +293,14 @@ class Host(object):
         extra = {}
         if "stdout_bytes" in Ctx.__init__.__code__.co_varnames:  # POLY-99 pin 15: fetch-premigration writes bytes through ctx.stdout_bytes
             extra["stdout_bytes"] = r.stdout_bytes
+        extra.update(ctx_extra or {})  # POLY-100: seams a test adds (resolve, run_bytes)
         ctx = Ctx(root=str(self.root), run=r.runner, run_inherit=r.runner.inherit, getpass=getpass_impl or fake_getpass, isatty=lambda: tty,
                   confirm=fake_confirm, now=lambda: clock[0], sleep=fake_sleep, chown=lambda *a: r.chowns.append(a), geteuid=lambda: euid,
                   tls_probe=fake_tls, statvfs=fake_statvfs, stdout=r.stdout, stderr=r.stderr,
                   trusted_uid=os.getuid() if trusted is None else trusted, **extra)
         r.ctx = ctx
+        if on_ready:
+            on_ready(r)  # POLY-100: lets a fake see the run's fake sleeps
         mod = dispatcher or load_dispatcher()
         try:
             r.rc = mod.main(list(argv), ctx)
@@ -294,6 +313,8 @@ class Host(object):
 
 class OpsTest(unittest.TestCase):
     def setUp(self):
+        if getattr(self, "_patches", None):  # a test that calls setUp again (a loop of cases) must stop the earlier patches: only the last list is stopped by the cleanup
+            self._stop()
         self._tmp = tempfile.TemporaryDirectory()
         self.tmp = Path(self._tmp.name)
         self.host = Host(self.tmp)
@@ -309,8 +330,7 @@ class OpsTest(unittest.TestCase):
         for p in self._patches:
             p.start()
         self.addCleanup(self._stop)
-        self._umask = os.umask(0o022)
-        os.umask(self._umask)
+        self._umask = os.umask(0o022)  # held for the test body (restored in _stop): a test that sets 077 must not leave fixtures 0600 for the next one
 
     def _stop(self):
         for p in self._patches:

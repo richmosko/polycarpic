@@ -30,6 +30,11 @@ check_ignorefile() {
 case "$cmd" in
   build)
     commit="${GIT_COMMIT:-$(git rev-parse HEAD)}"
+    # the release bundle needs infra/release/images.env (POLY-100 F1): build.yml writes the real one first; a PR or local build gets all zeros, which V5 refuses
+    if [ ! -f infra/release/images.env ]; then
+      z="sha256:$(printf '0%.0s' $(seq 64))"
+      bash infra/ci/images-env.sh "$z" "$z" "$z"
+    fi
     docker build --no-cache --pull --build-arg "GIT_COMMIT=${commit}" -t "${name}:ci" .
     ;;
   scan)

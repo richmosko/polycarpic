@@ -1,0 +1,473 @@
+{
+  "name": "polycarpic-staging",
+  "networks": {
+    "default": {
+      "ipam": {
+        "config": [
+          {
+            "subnet": "10.202.1.0/24"
+          }
+        ]
+      },
+      "name": "polycarpic-staging_default"
+    },
+    "edge-staging": {
+      "external": true,
+      "name": "polycarpic-edge-staging"
+    }
+  },
+  "secrets": {
+    "auth_secret__auth": {
+      "file": "/etc/polycarpic/staging-secrets/auth/auth_secret"
+    },
+    "credential_keyring__worker": {
+      "file": "/etc/polycarpic/staging-secrets/worker/credential_keyring"
+    },
+    "db_password_app__web": {
+      "file": "/etc/polycarpic/staging-secrets/web/db_password_app"
+    },
+    "db_password_auth__auth": {
+      "file": "/etc/polycarpic/staging-secrets/auth/db_password_auth"
+    },
+    "db_password_migrator__migrate": {
+      "file": "/etc/polycarpic/staging-secrets/migrate/db_password_migrator"
+    },
+    "db_password_operator__operator": {
+      "file": "/etc/polycarpic/staging-secrets/operator/db_password_operator"
+    },
+    "db_password_worker__worker": {
+      "file": "/etc/polycarpic/staging-secrets/worker/db_password_worker"
+    },
+    "db_superuser_password__postgres": {
+      "file": "/etc/polycarpic/staging-secrets/postgres/db_superuser_password"
+    },
+    "plaid_secret__web": {
+      "file": "/etc/polycarpic/staging-secrets/web/plaid_secret"
+    },
+    "resend_api_key__auth": {
+      "file": "/etc/polycarpic/staging-secrets/auth/resend_api_key"
+    },
+    "resend_api_key__worker": {
+      "file": "/etc/polycarpic/staging-secrets/worker/resend_api_key"
+    }
+  },
+  "services": {
+    "auth": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "auth"
+      ],
+      "env_file": [
+        {
+          "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/staging-mail.env",
+          "required": true
+        }
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "AUTH_PUBLIC_PORT": "3000",
+        "AUTH_SECRET_FILE": "/run/secrets/auth_secret",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_auth",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_auth",
+        "PLAID_ENV": "sandbox",
+        "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
+      },
+      "healthcheck": {
+        "interval": "30s",
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/auth/ok',{headers:{'x-forwarded-for':'127.0.0.1'}}).then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_APP_IMAGE:?}",
+      "mem_limit": "192m",
+      "networks": {
+        "default": {},
+        "edge-staging": {
+          "aliases": [
+            "staging-auth"
+          ]
+        }
+      },
+      "read_only": true,
+      "restart": "unless-stopped",
+      "secrets": [
+        {
+          "source": "db_password_auth__auth",
+          "target": "db_password_auth"
+        },
+        {
+          "source": "auth_secret__auth",
+          "target": "auth_secret"
+        },
+        {
+          "source": "resend_api_key__auth",
+          "target": "resend_api_key"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "10107:10107"
+    },
+    "migrate": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "env_file": [
+        {
+          "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        }
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_migrator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_migrator",
+        "PLAID_ENV": "sandbox"
+      },
+      "healthcheck": {
+        "interval": "60s",
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_APP_IMAGE:?}",
+      "mem_limit": "512m",
+      "networks": {
+        "default": null
+      },
+      "profiles": [
+        "migrate"
+      ],
+      "read_only": true,
+      "restart": "no",
+      "secrets": [
+        {
+          "source": "db_password_migrator__migrate",
+          "target": "db_password_migrator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "10103:10103"
+    },
+    "operator": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "entrypoint": [
+        "/app/bin/polycarpic",
+        "cli"
+      ],
+      "env_file": [
+        {
+          "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        }
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_operator",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_operator",
+        "PLAID_ENV": "sandbox"
+      },
+      "healthcheck": {
+        "interval": "60s",
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_APP_IMAGE:?}",
+      "logging": {
+        "driver": "none"
+      },
+      "mem_limit": "256m",
+      "networks": {
+        "default": null
+      },
+      "profiles": [
+        "operator"
+      ],
+      "read_only": true,
+      "restart": "no",
+      "secrets": [
+        {
+          "source": "db_password_operator__operator",
+          "target": "db_password_operator"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "10106:10106"
+    },
+    "postgres": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf"
+      ],
+      "environment": {
+        "POSTGRES_PASSWORD_FILE": "/run/secrets/db_superuser_password"
+      },
+      "healthcheck": {
+        "interval": "10s",
+        "retries": 6,
+        "start_period": "30s",
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U postgres -h /var/run/postgresql"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_POSTGRES_IMAGE:?}",
+      "mem_limit": "1g",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "restart": "unless-stopped",
+      "secrets": [
+        {
+          "source": "db_superuser_password__postgres",
+          "target": "db_superuser_password"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp",
+        "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "999:999",
+      "volumes": [
+        {
+          "bind": {
+            "create_host_path": true
+          },
+          "source": "/srv/polycarpic/pg-staging",
+          "target": "/var/lib/postgresql/data",
+          "type": "bind"
+        },
+        {
+          "bind": {
+            "create_host_path": true
+          },
+          "read_only": true,
+          "source": "@@REL@@/infra/postgres/postgresql.staging.conf",
+          "target": "/etc/postgresql/postgresql.conf",
+          "type": "bind"
+        },
+        {
+          "bind": {
+            "create_host_path": true
+          },
+          "read_only": true,
+          "source": "@@REL@@/infra/postgres/pg_hba.staging.conf",
+          "target": "/etc/postgresql/pg_hba.conf",
+          "type": "bind"
+        }
+      ]
+    },
+    "web": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "env_file": [
+        {
+          "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        }
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_app",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_app",
+        "PLAID_ENV": "sandbox"
+      },
+      "healthcheck": {
+        "interval": "30s",
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_APP_IMAGE:?}",
+      "mem_limit": "384m",
+      "networks": {
+        "default": {},
+        "edge-staging": {
+          "aliases": [
+            "staging-web"
+          ]
+        }
+      },
+      "read_only": true,
+      "restart": "unless-stopped",
+      "secrets": [
+        {
+          "source": "db_password_app__web",
+          "target": "db_password_app"
+        },
+        {
+          "source": "plaid_secret__web",
+          "target": "plaid_secret"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "10101:10101"
+    },
+    "worker": {
+      "cap_drop": [
+        "ALL"
+      ],
+      "env_file": [
+        {
+          "path": "/etc/polycarpic/staging-host.env",
+          "required": true
+        },
+        {
+          "path": "/etc/polycarpic/staging-mail.env",
+          "required": true
+        }
+      ],
+      "environment": {
+        "APP_ENV": "staging",
+        "DATABASE_HOST": "postgres",
+        "DATABASE_NAME": "polycarpic",
+        "DATABASE_PASSWORD_FILE": "/run/secrets/db_password_worker",
+        "DATABASE_PORT": "5432",
+        "DATABASE_SSLMODE": "disable",
+        "DATABASE_USER": "poly_worker",
+        "PLAID_ENV": "sandbox",
+        "RESEND_API_KEY_FILE": "/run/secrets/resend_api_key"
+      },
+      "healthcheck": {
+        "interval": "60s",
+        "test": [
+          "CMD",
+          "node",
+          "-e",
+          "process.exit(0)"
+        ],
+        "timeout": "5s"
+      },
+      "image": "${POLY_APP_IMAGE:?}",
+      "mem_limit": "384m",
+      "networks": {
+        "default": null
+      },
+      "read_only": true,
+      "restart": "unless-stopped",
+      "secrets": [
+        {
+          "source": "db_password_worker__worker",
+          "target": "db_password_worker"
+        },
+        {
+          "source": "credential_keyring__worker",
+          "target": "credential_keyring"
+        },
+        {
+          "source": "resend_api_key__worker",
+          "target": "resend_api_key"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "ulimits": {
+        "core": 0
+      },
+      "user": "10102:10102"
+    }
+  },
+  "x-app-image": "${POLY_APP_IMAGE:?}",
+  "x-hardened": {
+    "cap_drop": [
+      "ALL"
+    ],
+    "read_only": true,
+    "restart": "unless-stopped",
+    "security_opt": [
+      "no-new-privileges:true"
+    ],
+    "ulimits": {
+      "core": 0
+    }
+  }
+}

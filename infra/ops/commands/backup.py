@@ -70,11 +70,20 @@ def _backup(mode, ctx):
 def _run_locked(mode, ctx, image, d, kinds, timeout):
     t0 = ctx.now()
     ctx.run(["docker", "rm", "-f", CONTAINER], timeout=60)
-    argv = ["docker", "compose", "-p", PROJECT, "-f", BUNDLE_COMPOSE, "--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
+    try:
+        cfile, cenv = compose.compose_source(ctx, "prod", "prod.yml", BUNDLE_COMPOSE)
+    except compose.ComposeError:
+        ctx.err("backup: refused state (no saved render of current)")
+        return 1
+    argv = ["docker", "compose", "-p", PROJECT] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "backup", "/usr/local/bin/backup.sh", mode]
     ok, out = True, ""
+    env = {"POLY_POSTGRES_IMAGE": image}
+    if not cenv:  # no release yet: the ops bundle's prod.yml needs every ${...:?} set; an all-zero digest satisfies it and cannot be pulled
+        env["POLY_APP_IMAGE"] = "ghcr.io/richmosko/polycarpic@sha256:" + "0" * 64
+        env["POLY_TOOLS_IMAGE"] = "ghcr.io/richmosko/polycarpic-tools@sha256:" + "0" * 64
     try:
-        code, out, _ = ctx.run(argv, timeout=timeout, extra_env={"POLY_POSTGRES_IMAGE": image})
+        code, out, _ = ctx.run(argv, timeout=timeout, extra_env=env)
         ok = code == 0
     except TimeoutError:
         ok = False

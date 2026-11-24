@@ -47,7 +47,7 @@ gid_of() {
   esac
 }
 # Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
-HOST_ONLY="heartbeat_url=host"
+HOST_ONLY="heartbeat_url=host github_read_token=host"
 # The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
 files_for() {
   local pair
@@ -174,7 +174,7 @@ secret_root "$ETC/secrets" "$PROD_SERVICES host"
 secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
   case "$f" in
-    "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;;
+    "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/mail.env" | "$ETC/staging-mail.env" | "$ETC/edge.env" | "$ETC/allowed_signers" | "$ETC/age-recipients.txt") ;;
     "$ETC/ops.conf") # world-readable by design, so it may hold only the bucket name and the endpoint URL
       if [ ! -s "$f" ] || grep -qvE '^(B2_BUCKET=[a-z0-9-]{6,50}|B2_S3_ENDPOINT=https://s3\.[a-z0-9-]+\.backblazeb2\.com)$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name> or B2_S3_ENDPOINT=<url>;"; fi ;;
     *) h6="$h6 $f is world-readable;" ;;
@@ -263,6 +263,7 @@ report H8 "spool contents" "$h8" "a stale or stray spool file means an interrupt
 # The four unit files equal the bundle's copies. Whether the timers are enabled is the first deploy's line, not this check's.
 h16=''
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd / # G11: the caller's directory decides nothing (`here` is absolute)
 for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
   inst=/etc/systemd/system/$u
   if [ ! -f "$inst" ]; then h16="$h16 $u is not installed;"; continue; fi
@@ -270,6 +271,145 @@ for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.s
   [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h16="$h16 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
 done
 report H16 "backup units" "$h16" "rerun: sudo bash provision.sh --stage host ... (installs the unit files from the bundle)"
+
+# ------------------------------------------------------------------ H17 deploy units and policy (POLY-100 R11)
+h17=''
+for u in polycarpic-deploy@.service polycarpic-deploy@.timer; do
+  inst=/etc/systemd/system/$u
+  if [ ! -f "$inst" ]; then h17="$h17 $u is not installed;"; continue; fi
+  cmp -s "$here/deploy/systemd/$u" "$inst" || h17="$h17 $u differs from the bundle copy;"
+  [ "$(stat -c '%a %u:%g' "$inst")" = "644 0:0" ] || h17="$h17 $u is $(stat -c '%a %u:%g' "$inst") (want 644 0:0);"
+done
+allow=$here/deploy/compose-allow.json
+# the owner is judged on the installed copy only: polycarpic-ops runs this from /opt/polycarpic/ops/<id>, whose whole tree it has already checked
+# is root-owned and not writable by others; run from a checkout, the file belongs to whoever checked it out
+if [ ! -f "$allow" ]; then h17="$h17 $allow is missing;"
+else
+  case "$here" in /opt/polycarpic/ops/*) [ "$(stat -c %u "$allow")" = 0 ] || h17="$h17 $allow is not root-owned;" ;; esac
+fi
+report H17 "deploy units and guard policy" "$h17" "rerun: sudo bash provision.sh --stage host ... (installs the units); the policy ships with polycarpic-ops install.sh"
+
+# ------------------------------------------------------------------ H18 allowed_signers (WAIT before prod)
+signers=$ETC/allowed_signers
+if [ ! -f "$signers" ]; then
+  wait_ H18 "allowed_signers" "waits for: polycarpic-ops allowed-signers install < signers file (before the first prod deploy)"
+elif [ "$(stat -c '%a %u:%g' "$signers")" != "644 0:0" ] || ! [ -s "$signers" ] || grep -qvE '^[A-Za-z0-9][A-Za-z0-9_.@+-]* namespaces="git" ssh-ed25519 [A-Za-z0-9+/]+=*$' "$signers"; then
+  fail H18 "allowed_signers" "$signers is not root:root 0644 with only plain 'namespaces=\"git\" ssh-ed25519' lines" "reinstall it: polycarpic-ops allowed-signers install < signers file"
+else
+  pass H18 "allowed_signers"
+fi
+
+# ------------------------------------------------------------------ H19 edge.env
+if [ -f "$ETC/edge.env" ] && [ "$(stat -c '%a %u:%g' "$ETC/edge.env")" = "644 0:0" ] \
+  && grep -q '^POLY_DOMAIN=' "$ETC/edge.env" && grep -q '^POLY_BIND_ADDR=' "$ETC/edge.env" && grep -q '^POLY_STAGING_ALLOW=' "$ETC/edge.env" && grep -q '^POLY_TLS=' "$ETC/edge.env"; then
+  pass H19 "edge.env"
+else
+  fail H19 "edge.env" "$ETC/edge.env is missing, not root:root 0644, or lacks one of POLY_DOMAIN, POLY_BIND_ADDR, POLY_STAGING_ALLOW, POLY_TLS" "rerun: sudo bash provision.sh --stage host ... --bind-addr <ip> --staging-allow <cidr,...> --acme-email <addr>"
+fi
+
+# ------------------------------------------------------------------ H20 deploy timers
+h20=''
+for proj in prod staging; do
+  if [ -f "/var/lib/polycarpic/state/deploy/$proj/current" ]; then
+    systemctl is-enabled --quiet "polycarpic-deploy@$proj.timer" 2> /dev/null || h20="$h20 polycarpic-deploy@$proj.timer is not enabled;"
+  fi
+done
+report H20 "deploy timers" "$h20" "sudo systemctl enable --now polycarpic-deploy@<project>.timer (first-deploy does this)"
+
+# ------------------------------------------------------------------ H21 edge networks (POLY-100 R9, S24)
+# Both exist with the fixed name, subnet and driver; neither subnet lies inside a pg_hba allow range or the 10.200.0.0/16 default pool.
+h21=''
+for pair in polycarpic-edge-prod=10.201.30.0/28 polycarpic-edge-staging=10.202.30.0/28; do
+  net=${pair%%=*}
+  want=${pair#*=}
+  got=$(docker network inspect -f '{{.Driver}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' "$net" 2> /dev/null) || { h21="$h21 $net is missing;"; continue; }
+  [ "$got" = "bridge $want " ] || h21="$h21 $net is '${got% }' (want 'bridge $want');"
+  overlap=$(python3 -I - "$want" "$here/postgres/pg_hba.prod.conf" "$here/postgres/pg_hba.staging.conf" << 'PY'
+import ipaddress, re, sys
+net = ipaddress.ip_network(sys.argv[1])
+ranges = [ipaddress.ip_network("10.200.0.0/16")]
+for path in sys.argv[2:]:
+    try:
+        text = open(path, encoding="utf-8").read()
+    except OSError:
+        print("unreadable " + path)
+        sys.exit(0)
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0] == "host" and re.fullmatch(r"[0-9./]+", parts[3]):
+            ranges.append(ipaddress.ip_network(parts[3], strict=False))
+for r in ranges:
+    if net.overlaps(r):
+        print(str(r))
+        break
+PY
+)
+  [ -z "$overlap" ] || h21="$h21 $net ($want) overlaps $overlap;"
+done
+# ------------------------------------------------------------------ H22 staging basic-auth file (POLY-100 S30)
+# The Caddyfile imports it as text: exactly `staging $2y$10$<53>` plus one newline, root:10010 0440 in a root:10010 0750 directory, no link.
+# WAIT before the first edge or prod release; after that it is checked, which is what sees a restart by Docker.
+sa=$ETC/secrets/caddy/staging_basic_auth
+if [ ! -f /var/lib/polycarpic/state/deploy/edge/current ] && [ ! -f /var/lib/polycarpic/state/deploy/prod/current ] && [ ! -e "$sa" ]; then
+  wait_ H22 "staging-auth" "waits for: polycarpic-ops staging-auth (before the first edge or prod release)"
+else
+  h22=''
+  # shellcheck disable=SC2016 # the single quotes are intended: grep must see a literal $, not an expansion
+  sa_re='staging \$2y\$10\$[./A-Za-z0-9]{53}'
+  if [ -L "$sa" ] || [ ! -f "$sa" ]; then h22=" $sa is missing or a link;"
+  else
+    [ "$(stat -c '%a %u:%g' "$sa")" = "440 0:10010" ] || h22="$h22 file is $(stat -c '%a %u:%g' "$sa") (want 440 0:10010);"
+    [ "$(stat -c '%a %u:%g' "$(dirname "$sa")")" = "750 0:10010" ] || h22="$h22 directory is $(stat -c '%a %u:%g' "$(dirname "$sa")") (want 750 0:10010);"
+    { [ "$(stat -c %s "$sa")" -le 128 ] && [ "$(LC_ALL=C grep -cxE "$sa_re" "$sa")" = 1 ] && [ "$(wc -l < "$sa")" -eq 1 ] && [ "$(stat -c %s "$sa")" = 69 ]; } || h22="$h22 content is not the one exact line;"
+  fi
+  report H22 "staging-auth" "$h22" "sudo polycarpic-ops staging-auth (paste the htpasswd -nBC 10 staging line), then sudo polycarpic-ops restart caddy"
+fi
+report H21 "edge networks" "$h21" "sudo bash provision.sh --stage host ... creates both; a different existing network must be removed by hand after checking nothing uses it"
+
+# ------------------------------------------------------------------ H23 render user (POLY-100 A18)
+# uid and gid 10020, no shell, no home, in no other group, and no process but a render runs as it.
+h23=''
+row=$(getent passwd polycarpic-render) || row=''
+if [ "$row" != "polycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin" ]; then
+  h23=" polycarpic-render is '${row:-missing}';"
+else
+  [ "$(id -G polycarpic-render)" = 10020 ] || h23="$h23 it is in groups $(id -G polycarpic-render);"
+  # G8: a process of uid 10020 is a render only when its executable is docker or docker-compose and its arguments hold `compose` and `config`
+  for pid in $(pgrep -u 10020 2> /dev/null || true); do
+    exe=$(basename "$(readlink "/proc/$pid/exe" 2> /dev/null)")
+    args=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2> /dev/null)
+    case "$exe" in docker | docker-compose) ;; *) h23="$h23 pid $pid runs as it with executable '$exe';"; continue ;; esac
+    case " $args " in *" compose "*" config "*) ;; *) h23="$h23 pid $pid (docker) is not a compose config;" ;; esac
+  done
+fi
+report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates it; a different existing user must be removed by hand after checking nothing uses it"
+
+# ------------------------------------------------------------------ H25 one Compose version (POLY-100 G10, S40)
+# `docker compose version --short` equals infra/deploy/compose-version as root AND as the render user with its own HOME; the package is Docker's,
+# and held; nothing sits in /root/.docker/cli-plugins (a plugin there could start what another Compose judged).
+h25=''
+want25=$(tr -d '[:space:]' < "$here/deploy/compose-version" 2> /dev/null || true)
+if ! [[ "$want25" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then h25=" $here/deploy/compose-version does not hold one version;"
+else
+  root25=$(docker compose version --short 2> /dev/null || true)
+  rhome=$(mktemp -d)
+  user25=$(HOME="$rhome" setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs -- docker compose version --short 2> /dev/null || true)
+  rm -rf "$rhome"
+  [ "$root25" = "$want25" ] || h25="$h25 root's Compose is '${root25:-none}' (want $want25);"
+  [ "$user25" = "$want25" ] || h25="$h25 the render user's Compose is '${user25:-none}' (want $want25);"
+  apt-cache policy docker-compose-plugin 2> /dev/null | grep -q 'download.docker.com' || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
+  apt-mark showhold 2> /dev/null | grep -qx docker-compose-plugin || h25="$h25 docker-compose-plugin is not held;"
+fi
+[ -z "$(ls -A /root/.docker/cli-plugins 2> /dev/null)" ] || h25="$h25 /root/.docker/cli-plugins holds a plugin;"
+report H25 "compose version" "$h25" "sudo bash provision.sh --stage host ... installs and holds it; remove /root/.docker/cli-plugins by hand"
+
+# ------------------------------------------------------------------ H24 shared deploy directories (POLY-100 G1)
+h24=''
+for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy; do
+  if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
+  else [ "$(stat -c '%a %u' "$d")" = "755 0" ] || h24="$h24 $d is $(stat -c '%a %u' "$d") (want 755, owned by root);"; fi
+done
+report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... creates them; a link or a file in the way must be removed by hand"
 
 # ------------------------------------------------------------------ H9 service gids
 h9=''
@@ -292,14 +432,27 @@ for f in host.env staging-host.env; do
   if [ ! -f "$p" ]; then h10="$h10 $p is missing;"; continue; fi
   origin=$(sed -n 's/^PUBLIC_ORIGIN=//p' "$p" | head -1)
   dom=${origin#https://*.}
-  mf=$(sed -n 's/^MAIL_FROM=//p' "$p" | head -1 | sed -e 's/^"//' -e 's/"$//')
-  addr=${mf##*<}; addr=${addr%%>*}
-  [ -n "$dom" ] && [ "${addr##*@}" = "mail.$dom" ] || h10="$h10 $f MAIL_FROM is '${mf}' (want an address under mail.${dom:-<domain>});"
+  # host.env holds exactly TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE: MAIL_FROM lives in the mail file (POLY-100 R11)
+  while IFS= read -r k; do
+    case "$k" in TLS_MODE | PUBLIC_ORIGIN | POLY_INSTANCE) ;; *) h10="$h10 $f holds the key $k (allowed: TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE);" ;; esac
+  done < <(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$p")
   while IFS= read -r k; do
     h10="$h10 $f holds the secret-named key $k;"
   done < <(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$p" | grep -iE '(PASSWORD|SECRET|TOKEN|_KEY|CREDENTIAL)' || true)
+  mailf=$ETC/mail.env
+  [ "$f" = staging-host.env ] && mailf=$ETC/staging-mail.env
+  if [ ! -f "$mailf" ]; then
+    h10="$h10 $mailf is missing;"
+  else
+    [ "$(stat -c '%a %u:%g' "$mailf")" = "644 0:0" ] || h10="$h10 $mailf is $(stat -c '%a %u:%g' "$mailf") (want 644 0:0);"
+    keys=$(sed -n 's/^\([A-Za-z0-9_]*\)=.*/\1/p' "$mailf" | tr '\n' ' ')
+    [ "$keys" = "MAIL_FROM " ] || h10="$h10 $mailf holds '${keys% }' (want exactly MAIL_FROM);"
+    mf=$(sed -n 's/^MAIL_FROM=//p' "$mailf" | head -1 | sed -e 's/^"//' -e 's/"$//')
+    addr=${mf##*<}; addr=${addr%%>*}
+    [ -n "$dom" ] && [ "${addr##*@}" = "mail.$dom" ] || h10="$h10 $mailf MAIL_FROM is '${mf}' (want an address under mail.${dom:-<domain>});"
+  fi
 done
-report H10 "host.env files" "$h10" "edit the file: keep only TLS_MODE, PUBLIC_ORIGIN, MAIL_FROM, POLY_INSTANCE (secrets live under $ETC/secrets), or rerun provision.sh --stage host"
+report H10 "host.env files" "$h10" "edit the file: host.env keeps only TLS_MODE, PUBLIC_ORIGIN, POLY_INSTANCE, the mail file only MAIL_FROM (secrets live under $ETC/secrets), or rerun provision.sh --stage host"
 
 # ------------------------------------------------------------------ H11 age recipients
 h11=''
@@ -399,7 +552,7 @@ done < <(getent passwd)
 report H15 "operator access" "$h15" "remove the extra account or its authorized_keys; the sudoers drop-in is written by cloud-init (infra/hetzner/cloud-init.yaml)"
 
 # ------------------------------------------------------------------ database checks
-dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" "$@"; }
+dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null "$@"; }
 running() { dc "$1" ps --status running --services < /dev/null 2> /dev/null | grep -qx postgres; }
 q() { local proj=$1; shift; dc "$proj" exec -T postgres psql -X -tA -U postgres -d polycarpic -c "$1" < /dev/null 2>&1; }
 up_prod=0 up_staging=0
@@ -451,7 +604,7 @@ d3_probe() { # svc mode -> PROBE_OUT, PROBE_RC. The password is read inside the 
   case "$svc" in
     web)
       local wid
-      wid=$(docker compose -p polycarpic-prod ps -q web < /dev/null 2> /dev/null | head -1)
+      wid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q web < /dev/null 2> /dev/null | head -1)
       if [ -z "$wid" ]; then PROBE_OUT="no running web container of polycarpic-prod"; PROBE_RC=125; return; fi
       net="container:$wid" ;;
     backup) net=polycarpic-prod_backup-net ;;
@@ -472,7 +625,7 @@ if [ "$2" = replication ]; then psql "$1" -tAc IDENTIFY_SYSTEM; else psql "$1" -
 d3() {
   local out='' svc mode first pgid t0 t1
   # The probe runs the image the running postgres container uses: no default tag, nothing pulled.
-  pgid=$(docker compose -p polycarpic-prod ps -q postgres < /dev/null 2> /dev/null | head -1)
+  pgid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q postgres < /dev/null 2> /dev/null | head -1)
   PROBE_IMAGE=$([ -n "$pgid" ] && docker inspect --format '{{.Config.Image}}' "$pgid" 2> /dev/null)
   if [ -z "$PROBE_IMAGE" ]; then echo " cannot read the image of the running postgres container;"; return; fi
   t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)

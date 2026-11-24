@@ -12,11 +12,11 @@ MAPPER=polycarpic-data
 DOCKER_KEY_FPR=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
 VOL_DEVICE_GLOB='/dev/disk/by-id/scsi-0HC_Volume_*'
 
-stage='' target='' domain='' mail_from='' project='' b2_endpoint='' b2_endpoint_set=0
+stage='' target='' domain='' mail_from='' project='' b2_endpoint='' b2_endpoint_set=0 bind_addr='' staging_allow='' acme_email=''
 changes=0
 
 die() { echo "provision.sh: $*" >&2; exit "${2:-1}"; }
-usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-endpoint <url>] | --stage database --project prod|staging" >&2; exit 2; }
+usage() { echo "usage: provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-endpoint <url>] [--bind-addr <ip> --staging-allow <cidr,...> --acme-email <addr>] | --stage database --project prod|staging" >&2; exit 2; }
 change() { echo "change: $*"; changes=$((changes + 1)); }
 
 while [ $# -gt 0 ]; do
@@ -26,11 +26,15 @@ while [ $# -gt 0 ]; do
     --domain) domain=${2:-}; shift 2 ;;
     --mail-from) mail_from=${2:-}; shift 2 ;;
     --b2-endpoint) b2_endpoint=${2:-}; b2_endpoint_set=1; shift 2 ;;
+    --bind-addr) bind_addr=${2:-}; shift 2 ;;
+    --staging-allow) staging_allow=${2:-}; shift 2 ;;
+    --acme-email) acme_email=${2:-}; shift 2 ;;
     --project) project=${2:-}; shift 2 ;;
     *) usage ;;
   esac
 done
 [ "$(id -u)" = 0 ] || die "run as root (sudo bash provision.sh ...)" 2
+cd / # G11: the caller's directory decides nothing
 
 # Service gids (F6, POLY-146). The same set the compose files mount secrets for.
 gid_of() {
@@ -146,7 +150,29 @@ install_docker() {
     change "added Docker's apt repository (key fingerprint verified)"
   fi
   apt-get update -y > /dev/null
-  apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null
+  apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin > /dev/null
+  install_compose
+}
+
+# The one Compose version every render, judge and start uses (POLY-100 G10, S40): the exact `N.N.N` in infra/deploy/compose-version, from Docker's
+# repository, that package alone held so engine, containerd and runc stay free to take fixes. A newer or held plugin is brought to the version with
+# the downgrade and held flags for that one package; a version the repository does not list stops, and a newer one is never taken instead.
+install_compose() {
+  local file want have cand
+  file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deploy/compose-version"
+  want=$(tr -d '[:space:]' < "$file" 2> /dev/null || true)
+  [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "$file does not hold one version N.N.N; nothing installed"
+  have=$(dpkg-query -W -f='${Version}' docker-compose-plugin 2> /dev/null || true)
+  if [[ "$have" == "$want"-* || "$have" == "$want" ]]; then
+    apt-mark hold docker-compose-plugin > /dev/null
+    return 0
+  fi
+  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2); if (index($2, w "-") == 1) { print $2; exit } }')
+  [ -n "$cand" ] || die "Docker's repository does not list docker-compose-plugin $want; nothing installed"
+  apt-mark unhold docker-compose-plugin > /dev/null 2>&1 || true
+  apt-get install -y --no-install-recommends --allow-downgrades --allow-change-held-packages "docker-compose-plugin=$cand" > /dev/null
+  apt-mark hold docker-compose-plugin > /dev/null
+  change "docker-compose-plugin $cand installed and held (infra/deploy/compose-version)"
 }
 
 write_daemon_json() {
@@ -262,6 +288,23 @@ state_files() {
   if [ -f "$STATE/last-dump" ] && [ ! -s "$STATE/last-dump" ]; then rm -f "$STATE/last-dump"; change "removed the unused $STATE/last-dump"; fi
 }
 
+# The directories every deploy run shares (POLY-100 G1): root, 0755, so the unprivileged render user can reach what it must read. A directory that is
+# too tight is repaired; a link, a non-directory, another owner or any bit beyond 0755 stops the run and is left as found.
+deploy_dirs() {
+  local d m
+  for d in /opt/polycarpic /opt/polycarpic/releases "$STATE/deploy"; do
+    if [ ! -e "$d" ] && [ ! -L "$d" ]; then
+      install -d -m 0755 -o 0 -g 0 "$d"
+      change "created $d"
+      continue
+    fi
+    { [ ! -L "$d" ] && [ -d "$d" ] && [ "$(stat -c %u "$d")" = 0 ]; } || die "$d is a link, not a directory or not root-owned; not changing it"
+    m=$(stat -c %a "$d")
+    [ $((8#$m & ~8#755)) = 0 ] || die "$d is mode $m, looser than 0755; not changing it"
+    [ "$m" = 755 ] || { chmod 0755 "$d"; change "mode of $d set to 0755"; }
+  done
+}
+
 # ops.conf: root:root 0644. The endpoint line is ours; polycarpic-ops writes the bucket line and keeps this one.
 ops_endpoint() {
   local conf=$ETC/ops.conf other want current=''
@@ -284,6 +327,16 @@ install_units() {
   here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   src=$here/backup/systemd
   for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
+    [ -f "$src/$u" ] || die "$src/$u not found"
+    if ! cmp -s "$src/$u" "/etc/systemd/system/$u"; then
+      install -m 0644 -o 0 -g 0 "$src/$u" "/etc/systemd/system/$u"
+      change "installed /etc/systemd/system/$u"
+      reload=1
+    fi
+  done
+  # the deploy units (POLY-100): installed, not enabled; first-deploy enables the project's timer
+  src=$here/deploy/systemd
+  for u in polycarpic-deploy@.service polycarpic-deploy@.timer; do
     [ -f "$src/$u" ] || die "$src/$u not found"
     if ! cmp -s "$src/$u" "/etc/systemd/system/$u"; then
       install -m 0644 -o 0 -g 0 "$src/$u" "/etc/systemd/system/$u"
@@ -329,19 +382,70 @@ host_secrets() { # secrets root reads and no service mounts (heartbeat_url): roo
 }
 
 host_env() { # file instance origin
-  local file=$1 instance=$2 origin=$3 from=$4
+  local file=$1 instance=$2 origin=$3
   put_file "$file" 0644 "TLS_MODE=real-domain
 PUBLIC_ORIGIN=$origin
-MAIL_FROM=\"$from\"
 POLY_INSTANCE=$instance"
+}
+
+# MAIL_FROM is not a host-wide setting (POLY-100 R11): only auth and worker, the two services that hold the Resend key, list this file.
+mail_env() { # file from
+  put_file "$1" 0644 "MAIL_FROM=\"$2\""
+}
+
+# The two edge networks (POLY-100 R9): fixed names and subnets, created here because all three compose files declare them external.
+# Present and equal changes nothing; present and different stops; nothing is ever replaced.
+edge_networks() {
+  local pair name subnet got
+  for pair in polycarpic-edge-prod=10.201.30.0/28 polycarpic-edge-staging=10.202.30.0/28; do
+    name=${pair%%=*}
+    subnet=${pair#*=}
+    if got=$(docker network inspect -f '{{.Driver}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' "$name" 2> /dev/null); then
+      [ "$got" = "bridge $subnet " ] || die "network $name exists as '${got% }' (want 'bridge $subnet'); not replacing it"
+    else
+      docker network create --driver bridge --subnet "$subnet" "$name" > /dev/null
+      change "created network $name ($subnet)"
+    fi
+  done
+}
+
+# The render user (POLY-100 A18): uid and gid 10020, no shell, no home, in no other group, used by nothing but the isolated compose render.
+# Present and equal changes nothing; present and different stops; nothing is ever modified.
+render_user() {
+  local name=polycarpic-render row want
+  want="$name:x:10020:10020::/nonexistent:/usr/sbin/nologin"
+  if row=$(getent passwd "$name"); then
+    [ "$row" = "$want" ] || die "user $name exists as '$row' (want '$want'); not modifying it"
+  else
+    getent group "$name" > /dev/null 2>&1 || groupadd --system --gid 10020 "$name"
+    useradd --system --uid 10020 --gid 10020 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$name"
+    change "created user $name (10020)"
+  fi
+}
+
+# edge.env (POLY-100 R9): what the shared Caddy needs, read by the deploy's compose calls. Written only when all three flags are given.
+edge_env() {
+  local allow=${staging_allow//,/ }
+  # S20: Caddy substitutes {$NAME} before it parses the Caddyfile, so a value with a brace, a newline or stray whitespace could add a directive
+  [[ "$domain" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || die "--domain must be a plain host name" 2
+  [[ "$bind_addr" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "--bind-addr must be an IPv4 address" 2
+  [[ "$acme_email" =~ ^[^[:space:]@{}\"\'\\]+@[^[:space:]@{}\"\'\\]+$ ]] || die "--acme-email must be an address with no brace or quote" 2
+  [[ "$allow" =~ ^[0-9a-fA-F:./]+( [0-9a-fA-F:./]+)*$ ]] || die "--staging-allow must be a comma-separated list of addresses or CIDRs" 2
+  put_file "$ETC/edge.env" 0644 "POLY_DOMAIN=$domain
+POLY_BIND_ADDR=$bind_addr
+POLY_STAGING_ALLOW=\"$allow\"
+POLY_TLS=$acme_email"
 }
 
 effective_mail_from() {
   if [ -n "$mail_from" ]; then echo "$mail_from"; return; fi
-  local cur=''
-  if [ -f "$ETC/host.env" ]; then
-    cur=$(sed -n 's/^MAIL_FROM=//p' "$ETC/host.env" | head -1 | sed -e 's/^"//' -e 's/"$//')
-  fi
+  local cur='' f
+  for f in "$ETC/mail.env" "$ETC/host.env"; do # an old host.env still carries the key until the rerun drops it
+    if [ -f "$f" ]; then
+      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | head -1 | sed -e 's/^"//' -e 's/"$//')
+      [ -z "$cur" ] || break
+    fi
+  done
   if [ -n "$cur" ] && check_mail_from "$cur"; then echo "$cur"; else echo "Polycarpic <no-reply@mail.$domain>"; fi
 }
 
@@ -376,19 +480,25 @@ stage_host() {
   install_docker
   systemctl enable --now docker > /dev/null 2>&1 || true
   [ "$DAEMON_CHANGED" = 0 ] || systemctl restart docker
+  edge_networks
+  render_user
   unattended_upgrades
   systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
   no_swap
   data_volume "$state"
   data_dirs
   state_files
+  deploy_dirs
   secrets_for "$ETC/secrets" "$PROD_SERVICES" "$PROD_GENERATED"
   host_secrets
   if [ "$b2_endpoint_set" = 1 ]; then ops_endpoint; fi
   install_units
   secrets_for "$ETC/staging-secrets" "$STAGING_SERVICES" "$STAGING_GENERATED"
-  host_env "$ETC/host.env" polycarpic-prod "https://app.$domain" "$mf"
-  host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain" "$mf"
+  host_env "$ETC/host.env" polycarpic-prod "https://app.$domain"
+  host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain"
+  mail_env "$ETC/mail.env" "$mf"
+  mail_env "$ETC/staging-mail.env" "$mf"
+  if [ -n "$bind_addr$staging_allow$acme_email" ]; then edge_env; fi
   check_accounts
   if [ "$changes" = 0 ]; then echo "host stage: no changes"; else echo "host stage: $changes changes"; fi
 }
@@ -427,7 +537,7 @@ stage_database() {
   # poly_backup has a password only where the backup service exists (prod).
   [ "$project" = prod ] && pairs+=(poly_backup:backup/db_password_backup)
 
-  local dc=(docker compose -p "polycarpic-$project")
+  local dc=(docker compose -p "polycarpic-$project" --project-directory "$STATE/deploy/render-home" --env-file /dev/null)
   "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 

@@ -1,0 +1,95 @@
+{
+  "name": "polycarpic-edge",
+  "networks": {
+    "edge-prod": {
+      "name": "polycarpic-edge-prod",
+      "ipam": {},
+      "external": true
+    },
+    "edge-staging": {
+      "name": "polycarpic-edge-staging",
+      "ipam": {},
+      "external": true
+    }
+  },
+  "secrets": {
+    "staging_basic_auth__caddy": {
+      "name": "polycarpic-edge_staging_basic_auth__caddy",
+      "file": "/etc/polycarpic/secrets/caddy/staging_basic_auth"
+    }
+  },
+  "services": {
+    "caddy": {
+      "restart": "unless-stopped",
+      "cap_drop": [
+        "ALL"
+      ],
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "POLY_DOMAIN": "example.com",
+        "POLY_STAGING_ALLOW": "10.0.0.0/8",
+        "POLY_TLS": "internal"
+      },
+      "image": "ghcr.io/richmosko/polycarpic-caddy@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "mem_limit": "134217728",
+      "networks": {
+        "edge-prod": null,
+        "edge-staging": null
+      },
+      "read_only": true,
+      "secrets": [
+        {
+          "source": "staging_basic_auth__caddy",
+          "target": "staging_basic_auth"
+        }
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "tmpfs": [
+        "/tmp"
+      ],
+      "user": "10010:10010",
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/caddy",
+          "target": "/data",
+          "bind": {}
+        },
+        {
+          "type": "bind",
+          "source": "/srv/polycarpic/caddy-config",
+          "target": "/config",
+          "bind": {}
+        }
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "caddy",
+          "version"
+        ],
+        "timeout": "5s",
+        "interval": "1m0s"
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "0.0.0.0",
+          "target": 8080,
+          "published": "80",
+          "protocol": "tcp"
+        },
+        {
+          "mode": "ingress",
+          "host_ip": "0.0.0.0",
+          "target": 8443,
+          "published": "443",
+          "protocol": "tcp"
+        }
+      ]
+    }
+  }
+}

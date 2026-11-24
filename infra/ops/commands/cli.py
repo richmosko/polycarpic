@@ -42,7 +42,12 @@ def run(args, ctx):
             ctx.err("running %s image is not pinned by digest" % svc)
             return 1
         images[svc] = ref
-    argv = ["docker", "compose", "-f", ctx.bundle("infra/compose/%s.yml" % project), "-p", name, "--profile", "operator",
+    try:
+        cfile, cenv = compose.compose_source(ctx, project, project + ".yml", ctx.bundle("infra/compose/%s.yml" % project))
+    except compose.ComposeError:
+        ctx.err("cli: refused state (no saved render of current)")
+        return 1
+    argv = ["docker", "compose"] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["-p", name, "--profile", "operator",
             "run", "--rm", "-T", "--pull", "never", "--no-deps", "operator", "user", "invite", email]
     if len(words) == 4:
         argv.append("--bootstrap")

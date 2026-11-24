@@ -6,6 +6,7 @@
 set -u
 [ $# -ge 1 ] || { echo "usage: gate-check.sh <psql command...>" >&2; exit 2; }
 here=$(cd "$(dirname "$0")" && pwd)
+cd / || exit 1 # G11: the caller's directory decides nothing
 out=$("$@" -X -tA -v ON_ERROR_STOP=1 -f - < "$here/gate-check.sql") || { printf '%s\n' "$out"; echo "gate: error (psql failed)"; exit 1; }
 printf '%s\n' "$out"
 case "$out" in *FAIL*) exit 1 ;; esac

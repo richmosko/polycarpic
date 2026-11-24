@@ -1,0 +1,891 @@
+{
+ "projects": {
+  "edge": {
+   "networks": {
+    "edge-prod": {
+     "external": true,
+     "ipam": {},
+     "name": "polycarpic-edge-prod"
+    },
+    "edge-staging": {
+     "external": true,
+     "ipam": {},
+     "name": "polycarpic-edge-staging"
+    }
+   },
+   "services": {
+    "caddy": {
+     "binds": [
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/caddy",
+       "target": "/data"
+      },
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/caddy-config",
+       "target": "/config"
+      }
+     ],
+     "env_exact": [
+      "POLY_DOMAIN",
+      "POLY_STAGING_ALLOW",
+      "POLY_TLS"
+     ],
+     "image": "caddy",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "ports",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "user",
+      "volumes"
+     ],
+     "networks": {
+      "edge-prod": [],
+      "edge-staging": []
+     },
+     "no_command": true,
+     "pins": {
+      "mem_limit": "134217728",
+      "tmpfs": [
+       "/tmp"
+      ]
+     },
+     "ports": [
+      {
+       "protocol": "tcp",
+       "published": "80",
+       "target": 8080
+      },
+      {
+       "protocol": "tcp",
+       "published": "443",
+       "target": 8443
+      }
+     ],
+     "read_only": true,
+     "secrets": {
+      "staging_basic_auth__caddy": "/etc/polycarpic/secrets/caddy/staging_basic_auth"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10010:10010"
+    }
+   }
+  },
+  "prod": {
+   "networks": {
+    "backup-net": {
+     "internal": true,
+     "ipam": {
+      "config": [
+       {
+        "subnet": "10.201.10.0/29"
+       }
+      ]
+     },
+     "name": "polycarpic-prod_backup-net"
+    },
+    "default": {
+     "ipam": {
+      "config": [
+       {
+        "subnet": "10.201.1.0/24"
+       }
+      ]
+     },
+     "name": "polycarpic-prod_default"
+    },
+    "edge-prod": {
+     "external": true,
+     "ipam": {},
+     "name": "polycarpic-edge-prod"
+    },
+    "upload-net": {
+     "ipam": {
+      "config": [
+       {
+        "subnet": "10.201.20.0/29"
+       }
+      ]
+     },
+     "name": "polycarpic-prod_upload-net"
+    }
+   },
+   "services": {
+    "auth": {
+     "env_files": [
+      "/etc/polycarpic/host.env",
+      "/etc/polycarpic/mail.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": [],
+      "edge-prod": [
+       "prod-auth"
+      ]
+     },
+     "pins": {
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "auth_secret__auth": "/etc/polycarpic/secrets/auth/auth_secret",
+      "db_password_auth__auth": "/etc/polycarpic/secrets/auth/db_password_auth",
+      "resend_api_key__auth": "/etc/polycarpic/secrets/auth/resend_api_key"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10007:10007"
+    },
+    "backup": {
+     "binds": [
+      {
+       "read_only": true,
+       "source": "@release/infra/backup/backup.sh",
+       "target": "/usr/local/bin/backup.sh"
+      },
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/spool/dump",
+       "target": "/spool/dump"
+      },
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/spool/premigration",
+       "target": "/spool/premigration"
+      },
+      {
+       "read_only": true,
+       "source": "/etc/polycarpic/age-recipients.txt",
+       "target": "/etc/backup/age-recipients.txt"
+      }
+     ],
+     "image": "postgres",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user",
+      "volumes"
+     ],
+     "networks": {
+      "backup-net": []
+     },
+     "pins": {
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp:size=1m"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_backup__backup": "/etc/polycarpic/secrets/backup/db_password_backup"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10004:10004"
+    },
+    "migrate": {
+     "env_files": [
+      "/etc/polycarpic/host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "536870912",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_migrator__migrate": "/etc/polycarpic/secrets/migrate/db_password_migrator"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10003:10003"
+    },
+    "operator": {
+     "env_files": [
+      "/etc/polycarpic/host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "logging",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "logging": {
+       "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_operator__operator": "/etc/polycarpic/secrets/operator/db_password_operator"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10006:10006"
+    },
+    "postgres": {
+     "binds": [
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/pg-prod",
+       "target": "/var/lib/postgresql/data"
+      },
+      {
+       "read_only": true,
+       "source": "@release/infra/postgres/postgresql.prod.conf",
+       "target": "/etc/postgresql/postgresql.conf"
+      },
+      {
+       "read_only": true,
+       "source": "@release/infra/postgres/pg_hba.prod.conf",
+       "target": "/etc/postgresql/pg_hba.conf"
+      },
+      {
+       "read_only": true,
+       "source": "@release/infra/postgres/archive-wal.sh",
+       "target": "/usr/local/bin/archive-wal.sh"
+      },
+      {
+       "read_only": true,
+       "source": "/etc/polycarpic/age-recipients.txt",
+       "target": "/etc/postgresql/age-recipients.txt"
+      },
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/spool/wal",
+       "target": "/spool/wal"
+      }
+     ],
+     "image": "postgres",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user",
+      "volumes"
+     ],
+     "networks": {
+      "backup-net": [],
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "3221225472",
+      "tmpfs": [
+       "/tmp",
+       "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_superuser_password__postgres": "/etc/polycarpic/secrets/postgres/db_superuser_password"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "999:999"
+    },
+    "uploader": {
+     "binds": [
+      {
+       "read_only": true,
+       "source": "@release/infra/backup/upload.sh",
+       "target": "/usr/local/bin/upload.sh"
+      },
+      {
+       "read_only": true,
+       "source": "/srv/polycarpic/spool",
+       "target": "/spool"
+      },
+      {
+       "read_only": true,
+       "source": "/etc/polycarpic/ops.conf",
+       "target": "/etc/uploader/ops.conf"
+      },
+      {
+       "read_only": true,
+       "source": "/etc/polycarpic/host.env",
+       "target": "/etc/uploader/host.env"
+      }
+     ],
+     "image": "tools",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user",
+      "volumes"
+     ],
+     "networks": {
+      "upload-net": []
+     },
+     "pins": {
+      "mem_limit": "134217728",
+      "tmpfs": [
+       "/tmp:size=1m"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "backup_store_credential__uploader": "/etc/polycarpic/secrets/uploader/backup_store_credential"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10005:10005"
+    },
+    "web": {
+     "env_files": [
+      "/etc/polycarpic/host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": [],
+      "edge-prod": [
+       "prod-web"
+      ]
+     },
+     "pins": {
+      "mem_limit": "805306368",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_app__web": "/etc/polycarpic/secrets/web/db_password_app",
+      "plaid_secret__web": "/etc/polycarpic/secrets/web/plaid_secret"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10001:10001"
+    },
+    "worker": {
+     "env_files": [
+      "/etc/polycarpic/host.env",
+      "/etc/polycarpic/mail.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "805306368",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "credential_keyring__worker": "/etc/polycarpic/secrets/worker/credential_keyring",
+      "db_password_worker__worker": "/etc/polycarpic/secrets/worker/db_password_worker",
+      "resend_api_key__worker": "/etc/polycarpic/secrets/worker/resend_api_key"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10002:10002"
+    }
+   }
+  },
+  "staging": {
+   "networks": {
+    "default": {
+     "ipam": {
+      "config": [
+       {
+        "subnet": "10.202.1.0/24"
+       }
+      ]
+     },
+     "name": "polycarpic-staging_default"
+    },
+    "edge-staging": {
+     "external": true,
+     "ipam": {},
+     "name": "polycarpic-edge-staging"
+    }
+   },
+   "services": {
+    "auth": {
+     "env_files": [
+      "/etc/polycarpic/staging-host.env",
+      "/etc/polycarpic/staging-mail.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": [],
+      "edge-staging": [
+       "staging-auth"
+      ]
+     },
+     "pins": {
+      "mem_limit": "201326592",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "auth_secret__auth": "/etc/polycarpic/staging-secrets/auth/auth_secret",
+      "db_password_auth__auth": "/etc/polycarpic/staging-secrets/auth/db_password_auth",
+      "resend_api_key__auth": "/etc/polycarpic/staging-secrets/auth/resend_api_key"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10107:10107"
+    },
+    "migrate": {
+     "env_files": [
+      "/etc/polycarpic/staging-host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "536870912",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_migrator__migrate": "/etc/polycarpic/staging-secrets/migrate/db_password_migrator"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10103:10103"
+    },
+    "operator": {
+     "env_files": [
+      "/etc/polycarpic/staging-host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "logging",
+      "mem_limit",
+      "networks",
+      "profiles",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "logging": {
+       "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_operator__operator": "/etc/polycarpic/staging-secrets/operator/db_password_operator"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10106:10106"
+    },
+    "postgres": {
+     "binds": [
+      {
+       "read_only": false,
+       "source": "/srv/polycarpic/pg-staging",
+       "target": "/var/lib/postgresql/data"
+      },
+      {
+       "read_only": true,
+       "source": "@release/infra/postgres/postgresql.staging.conf",
+       "target": "/etc/postgresql/postgresql.conf"
+      },
+      {
+       "read_only": true,
+       "source": "@release/infra/postgres/pg_hba.staging.conf",
+       "target": "/etc/postgresql/pg_hba.conf"
+      }
+     ],
+     "image": "postgres",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user",
+      "volumes"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "1073741824",
+      "tmpfs": [
+       "/tmp",
+       "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_superuser_password__postgres": "/etc/polycarpic/staging-secrets/postgres/db_superuser_password"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "999:999"
+    },
+    "web": {
+     "env_files": [
+      "/etc/polycarpic/staging-host.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": [],
+      "edge-staging": [
+       "staging-web"
+      ]
+     },
+     "pins": {
+      "mem_limit": "402653184",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "db_password_app__web": "/etc/polycarpic/staging-secrets/web/db_password_app",
+      "plaid_secret__web": "/etc/polycarpic/staging-secrets/web/plaid_secret"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10101:10101"
+    },
+    "worker": {
+     "env_files": [
+      "/etc/polycarpic/staging-host.env",
+      "/etc/polycarpic/staging-mail.env"
+     ],
+     "image": "app",
+     "keys": [
+      "cap_drop",
+      "command",
+      "entrypoint",
+      "env_file",
+      "environment",
+      "healthcheck",
+      "image",
+      "mem_limit",
+      "networks",
+      "read_only",
+      "restart",
+      "secrets",
+      "security_opt",
+      "tmpfs",
+      "ulimits",
+      "user"
+     ],
+     "networks": {
+      "default": []
+     },
+     "pins": {
+      "mem_limit": "402653184",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": 0
+      }
+     },
+     "read_only": true,
+     "secrets": {
+      "credential_keyring__worker": "/etc/polycarpic/staging-secrets/worker/credential_keyring",
+      "db_password_worker__worker": "/etc/polycarpic/staging-secrets/worker/db_password_worker",
+      "resend_api_key__worker": "/etc/polycarpic/staging-secrets/worker/resend_api_key"
+     },
+     "security_opt": [
+      "no-new-privileges:true"
+     ],
+     "user": "10102:10102"
+    }
+   }
+  }
+ }
+}

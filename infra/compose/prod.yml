@@ -1,6 +1,5 @@
 # polycarpic-prod (INFRA §2.2). Rendered and checked by infra/lint/compose-policy.mjs; the deploy passes exactly this file.
-# Image references: POLY_POSTGRES_IMAGE has no default (the lint and the deploy fail without it). The app and tools
-# images carry a zero-digest placeholder that cannot be pulled; POLY-100's deploy sets the verified digest.
+# Image references: every POLY_*_IMAGE has no default; the deploy supplies them from the verified release (POLY-100).
 name: polycarpic-prod
 
 x-hardened: &hardened
@@ -10,7 +9,7 @@ x-hardened: &hardened
   restart: unless-stopped
   ulimits: {core: 0}
 
-x-app-image: &app-image ${POLY_APP_IMAGE:-ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+x-app-image: &app-image ${POLY_APP_IMAGE:?}
 
 services:
   postgres:
@@ -45,8 +44,16 @@ services:
     <<: *hardened
     image: *app-image
     user: "10001:10001"
+    env_file: [/etc/polycarpic/host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_app
+      APP_ENV: production
+      PLAID_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_app
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_app
     secrets:
       - {source: db_password_app__web, target: db_password_app}
       - {source: plaid_secret__web, target: plaid_secret}
@@ -66,8 +73,16 @@ services:
     image: *app-image
     user: "10007:10007"
     command: ["auth"]
+    env_file: [/etc/polycarpic/host.env, /etc/polycarpic/mail.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_auth
+      APP_ENV: production
+      PLAID_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_auth
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_auth
       AUTH_SECRET_FILE: /run/secrets/auth_secret
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       AUTH_PUBLIC_PORT: "3000"
@@ -90,8 +105,16 @@ services:
     <<: *hardened
     image: *app-image
     user: "10002:10002"
+    env_file: [/etc/polycarpic/host.env, /etc/polycarpic/mail.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_worker
+      APP_ENV: production
+      PLAID_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_worker
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_worker
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
     secrets:
       - {source: db_password_worker__worker, target: db_password_worker}
@@ -111,8 +134,16 @@ services:
     user: "10003:10003"
     restart: "no"
     profiles: [migrate]
+    env_file: [/etc/polycarpic/host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_migrator
+      APP_ENV: production
+      PLAID_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_migrator
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_migrator
     secrets:
       - {source: db_password_migrator__migrate, target: db_password_migrator}
     networks: [default]
@@ -131,8 +162,16 @@ services:
     profiles: [operator]
     logging: {driver: "none"}
     entrypoint: ["/app/bin/polycarpic", "cli"]
+    env_file: [/etc/polycarpic/host.env]
     environment:
-      DB_PASSWORD_FILE: /run/secrets/db_password_operator
+      APP_ENV: production
+      PLAID_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: polycarpic
+      DATABASE_USER: poly_operator
+      DATABASE_SSLMODE: disable
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password_operator
     secrets:
       - {source: db_password_operator__operator, target: db_password_operator}
     networks: [default]
@@ -168,7 +207,7 @@ services:
 
   uploader:
     <<: *hardened
-    image: ${POLY_TOOLS_IMAGE:-ghcr.io/richmosko/polycarpic-tools@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    image: ${POLY_TOOLS_IMAGE:?}
     user: "10005:10005"
     restart: "no"
     profiles: [uploader]

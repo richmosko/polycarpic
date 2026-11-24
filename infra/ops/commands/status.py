@@ -7,7 +7,7 @@ from lib.discover import load, modules
 from lib.out import Line, fit, fmt_line, stamp
 
 HELP = "one-screen health of the box: disk, app, cert, backup, backup logins, slots, revokes"
-ORDER = {"host": 0, "prod": 1, "staging": 2}
+ORDER = {"host": 0, "prod": 1, "staging": 2, "edge": 3}
 MAX_LINES = 24
 OPS_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -51,17 +51,21 @@ def run(args, ctx):
     current = ctx.p(BUNDLE)
     version = os.path.basename(os.readlink(current)) if os.path.islink(current) else "unknown"
     header = "polycarpic-ops status  %s  %s  ops %s" % (host, stamp(ctx.epoch()), version)
-    budget = MAX_LINES - 2 - len(fixes)
+    extras = sum(len(x.extra) for x in lines)  # a refusal's operator text, printed unwrapped and uncut (POLY-100 R10)
+    budget = MAX_LINES - 2 - len(fixes) - extras
     body = list(lines)
     cut = False
-    while len(body) > budget:
+    while len(body) > max(budget, 1):
         cut = True
         ok = [i for i, x in enumerate(body) if x.state == "OK"]
         del body[ok[-1] if ok else -1]
-    out = [header] + [fmt_line(x) for x in body]
+    out = [(header, False)]
+    for x in body:
+        out.append((fmt_line(x), False))
+        out += [(row, True) for row in x.extra]
     if cut:
-        out[-1] = "…"
-    out += fixes + [summary]
-    for text in out:
-        ctx.out(fit(text))
+        out[-1] = ("…", False)
+    out += [(f, False) for f in fixes] + [(summary, False)]
+    for text, raw in out:
+        ctx.out(text if raw else fit(text))
     return code

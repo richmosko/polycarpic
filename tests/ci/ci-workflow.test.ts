@@ -84,7 +84,7 @@ describe('ci.yml: changes + guard (criteria 1, 4)', () => {
     expect(runOf(j)).toMatch(/set -euo pipefail/);
     expect(runOf(j)).toMatch(/infra\/ci\/changes\.mjs/);
     expect(runOf(j)).toMatch(/\^\[0-9a-f\]\{40\}\$/); // dispatch base validated as 40-hex
-    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['backup', 'ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node', 'provision']); // POLY-141: the five keys, e2e and the four areas
+    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['backup', 'ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'deploy', 'e2e', 'image', 'layers', 'node', 'provision']); // POLY-141: the five keys, e2e and the four areas
   });
   it('guard runs always (no if), pin check over .github and infra/ci, and gitleaks  [red if: guard gated on changes]', () => {
     const j = w.jobs.guard!;
@@ -313,11 +313,11 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
   const battery = () => steps(dbj())[idx(/tests\/db\/vitest\.config\.ts/)]!;
 
   it('changes exposes the nine outputs: the five keys and db_auth, db_tenancy, db_migrate, db_ops  [red while the area keys are absent]', () => {
-    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['backup', 'ci', 'db', ...AREA_KEYS, 'e2e', 'image', 'layers', 'node', 'provision'].sort());
+    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['backup', 'ci', 'db', ...AREA_KEYS, 'deploy', 'e2e', 'image', 'layers', 'node', 'provision'].sort());
   });
   it('a dispatch with no base sets every key true: the printf names all nine', () => {
     const body = runOf(w.jobs.changes!);
-    for (const k of ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'backup', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
+    for (const k of ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'backup', 'deploy', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
   });
   it('the db job is still gated on `db` alone (db is the OR of the areas)', () => {
     expect(dbj().if).toContain('needs.changes.outputs.db');

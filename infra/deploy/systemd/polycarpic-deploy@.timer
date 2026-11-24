@@ -1,0 +1,9 @@
+[Unit]
+Description=Polycarpic deploy poll (%i)
+
+[Timer]
+OnCalendar=*:0/5
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

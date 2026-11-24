@@ -62,11 +62,12 @@ export const TABLE = {
   // POLY-97: infra/hetzner/ and infra/operator/ and the dry-run test files belong to the `provision` job. infra/provision*.sh and the
   // box helpers (Dockerfile, fakes, box.ts, pg.ts) stay here too, because tests/infra/image/provision-db.test.ts runs them.
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/|hetzner\/|operator\/|ops\/)/, /^bin\//,
-    /^infra\/ci\/(image|install-trivy)\.sh$/, /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
+    /^infra\/ci\/(image|install-trivy)\.sh$/, /^infra\/ops\/lib\/(release|compose_guard|ts)\.py$/, /^tests\/infra\/ops\/fixtures\//, // POLY-100: F1's built-image test feeds the bundle to the installed `read_tar`; the lint fixtures run guard_real.py (guard, release, ts) on real renders
+    /^tests\/infra\/(?!operator\/|ops\/)(?!provision\/[^/]*\.test\.ts$)(?!vitest\.provision\.config\.ts$)/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
   ],
   // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run, shellcheck and the operator-tool unit tests. Reads the compose
   // files (secret table), the Postgres pin and prod config (D checks), roles.sql, and the workflow that defines the job.
-  provision: [/^infra\/hetzner\//, /^infra\/provision(-check)?\.sh$/, /^infra\/operator\//, /^infra\/ops\//, /^tests\/infra\/(provision|operator|ops)\//, /^tests\/infra\/vitest\.provision\.config\.ts$/,
+  provision: [/^infra\/hetzner\//, /^infra\/provision(-check)?\.sh$/, /^infra\/operator\//, /^infra\/ops\//, /^infra\/deploy\//, /^tests\/infra\/(provision|operator|ops)\//, /^tests\/infra\/vitest\.provision\.config\.ts$/,
     /^infra\/compose\//, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^\.github\/workflows\/ci\.yml$/,
     /^infra\/backup\//, /^infra\/(restore|drill)\.sh$/], // POLY-99: the shellcheck step and the unit files the provision dry run installs
   // POLY-99 (ruling Guards): the backup, uploader, restore and drill container suite (tests/infra/backup) is one more step of the `image` job and
@@ -74,6 +75,17 @@ export const TABLE = {
   backup: [/^infra\/backup\//, /^infra\/(restore|drill)\.sh$/, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^infra\/compose\/prod\.yml$/,
     /^infra\/ops\/commands\/(backup|upload)\.py$/, /^tests\/infra\/backup\//, /^tests\/infra\/vitest\.backup\.config\.ts$/],
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
+  // POLY-100 T-real (ruling 3765f358): the one real deploy, the last step of the `image` job. Only what a real deploy touches: the image and its entrypoint,
+  // the tool and what the bundle holds, the settings contract, migrations and their runner, startup code and the health route, and the test itself.
+  deploy: [
+    /^Dockerfile$/, /^\.dockerignore$/, /^bin\/polycarpic$/,
+    /^infra\/(ops|deploy|compose|caddy|postgres|backup)\//, /^infra\/postgres-major$/, /^infra\/provision(-check)?\.sh$/, /^infra\/ci\/(image|images-env)\.sh$/,
+    /^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)/,
+    /^packages\/db\/(migrations|sql)\//, /^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$/,
+    /^apps\/migrate\/src\/(cli|run|index)\.ts$/, /^apps\/(web|worker)\/src\/(main|startup)\.ts$/, /^apps\/auth\/src\/(main|bind|http)\.ts$/,
+    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe)\.ts$/,
+    /^tests\/infra\/deploy-real\//, /^tests\/infra\/vitest\.deploy-real\.config\.ts$/, /^infra\/ci\/changes\.mjs$/, /^\.github\/workflows\/ci\.yml$/,
+  ],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):
   // the db harness helpers and image build, apps/migrate, and the Postgres pin. Runs only the `unit` job's e2e step.
   e2e: [/^apps\/auth\/src\//, /^packages\/mail\//, /^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],

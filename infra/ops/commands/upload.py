@@ -7,7 +7,7 @@ too), deletes the file or writes the uploaded marker. A line that fails validati
 import os
 import re
 
-from lib import spool, ts as tsmod
+from lib import compose, spool, ts as tsmod
 
 HELP = "run the uploader container; root verifies what it reports, then deletes or marks the spool files"
 PROJECT = "polycarpic-prod"
@@ -73,7 +73,12 @@ def _locked(ctx):
         ctx.err("upload: /opt/polycarpic/images.env missing or malformed")
         return 3
     ctx.run(["docker", "rm", "-f", CONTAINER], timeout=60)
-    argv = ["docker", "compose", "-p", PROJECT, "-f", BUNDLE_COMPOSE, "--profile", "uploader", "run", "--rm", "--no-deps", "-T", "--name",
+    try:
+        cfile, cenv = compose.compose_source(ctx, "prod", "prod.yml", BUNDLE_COMPOSE)
+    except compose.ComposeError:
+        ctx.err("upload: refused state (no saved render of current)")
+        return 1
+    argv = ["docker", "compose", "-p", PROJECT] + compose.file_opts(ctx, cfile) + ["-f", cfile] + cenv + ["--profile", "uploader", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "uploader", "/usr/local/bin/upload.sh"]
     ok, out = True, ""
     try:

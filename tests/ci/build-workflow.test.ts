@@ -100,19 +100,23 @@ describe('build.yml: Addendum 1 (per-run tags, built-image check, one build-step
 });
 
 describe('build.yml: the scheduled scan of the newest v1.* Release (A3)', () => {
-  const others = Object.entries(w.jobs).filter(([id]) => id !== 'build');
-  it('a scan-only job exists: schedule only, reads the newest v1.* Release, runs image.sh scan, no build/push/attest', () => {
+  // POLY-100 B2: the writing jobs are exactly build and siblings (tests/infra/build-pins-poly100.test.ts holds the full pins and their mutants)
+  const WRITERS = ['build', 'siblings'];
+  const others = Object.entries(w.jobs).filter(([id]) => !WRITERS.includes(id));
+  it('a scan-only job, selected by its id release-scan: schedule only, reads the newest v1.* Release, runs image.sh scan, no build/push/attest', () => {
     expect(others.length).toBeGreaterThan(0);
-    const [, j] = others.find(([, x]) => /image\.sh scan/.test(JSON.stringify(x)))!;
+    const j = (w.jobs as any)['release-scan'];
+    expect(j, 'the scan-only finder selects the job by id, not by the first job that runs image.sh scan').toBeTruthy();
     const body = JSON.stringify(j);
     expect(j.if).toMatch(/github\.event_name == 'schedule'/);
     expect(body).toMatch(/gh release/);
     expect(body).toMatch(/v1\./);
     expect(body).not.toMatch(/image\.sh build|build-push-action|docker push|attest|buildx/);
   });
-  it('packages: write and id-token: write exist only in the build job', () => {
-    expect(Object.keys(w.jobs)).toContain('build');
+  it('packages, id-token and attestations: write exist only in build and siblings, and no other job holds any write', () => {
+    expect(Object.keys(w.jobs)).toEqual(expect.arrayContaining(WRITERS));
     for (const [id, other] of others) expect(JSON.stringify(other.permissions ?? {}), id).not.toMatch(/write/);
+    for (const id of WRITERS) expect((w.jobs as any)[id].permissions, id).toEqual({ contents: 'read', packages: 'write', 'id-token': 'write', attestations: 'write' });
   });
 });
 

@@ -44,9 +44,32 @@ def _replace_link(target, path):
     os.replace(tmp, path)
 
 
-def install(stream, bundle_id, root="/", out=sys.stdout):
+TARGET = re.compile(r"polyops@[A-Za-z0-9][A-Za-z0-9._-]{0,252}")
+
+
+def _write_target(ops, target):
+    """The ssh target a guard refusal prints in its install command (POLY-100 R10): root 0644, written only from a value checked before extraction."""
+    if target is None:
+        return
+    path = os.path.join(ops, "ssh-target")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            if fh.read() == target + "\n" and (os.stat(path).st_mode & 0o777) == 0o644:
+                return  # unchanged: a second install of the same id must touch nothing
+    except OSError:
+        pass
+    tmp = path + ".new"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(target + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def install(stream, bundle_id, root="/", out=sys.stdout, target=None):
     if not ID.fullmatch(bundle_id):
         raise InstallError("bad id")
+    if target is not None and not TARGET.fullmatch(target):
+        raise InstallError("bad ssh target")
     opt = os.path.join(root, "opt/polycarpic")
     ops = os.path.join(opt, "ops")
     current = os.path.join(ops, "current")
@@ -58,6 +81,7 @@ def install(stream, bundle_id, root="/", out=sys.stdout):
     if previous == bundle_id and os.path.isdir(os.path.join(ops, bundle_id)):
         while stream.read(1 << 16):
             pass
+        _write_target(ops, target)
         out.write("polycarpic-ops %s already installed\n" % bundle_id)
         return 0
     staging = tempfile.mkdtemp(prefix=".ops-incoming.", dir=opt)
@@ -84,6 +108,7 @@ def install(stream, bundle_id, root="/", out=sys.stdout):
         sbin = os.path.join(root, LINK.lstrip("/"))
         os.makedirs(os.path.dirname(sbin), exist_ok=True)
         _replace_link("/opt/polycarpic/ops/current/infra/ops/polycarpic-ops", sbin)
+        _write_target(ops, target)
         keep = {bundle_id, previous, "current"}
         for n in os.listdir(ops):
             if n not in keep and (n.startswith("git-") or n.startswith("sha256-")):
@@ -96,14 +121,14 @@ def install(stream, bundle_id, root="/", out=sys.stdout):
 
 
 def main(argv):
-    if len(argv) != 1:
-        sys.stderr.write("usage: install_box.py <id>  (tar on stdin)\n")
+    if len(argv) not in (1, 2):
+        sys.stderr.write("usage: install_box.py <id> [<user@host>]  (tar on stdin)\n")
         return 2
     if os.geteuid() != 0:
         sys.stderr.write("install_box.py: run as root\n")
         return 4
     try:
-        return install(sys.stdin.buffer, argv[0])
+        return install(sys.stdin.buffer, argv[0], target=argv[1] if len(argv) == 2 else None)
     except (InstallError, tarfile.TarError, OSError) as err:
         sys.stderr.write("install_box.py: %s\n" % err)
         return 1

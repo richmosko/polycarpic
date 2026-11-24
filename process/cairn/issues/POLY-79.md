@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -79,3 +79,7 @@ From the POLY-97 loop (`red-run.md`): three `tests/infra/image/postgres.test.ts`
 ### @team-lead — 2026-11-22
 
 From the POLY-99 loop (PR #150): the PreToolUse `test_run_guard` hook refuses `python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops` on the host ("refusing an un-tiered full-suite run … python3 run_tests.py --gate …"), although that is CI's own command for the product's operator unit tests and has nothing to do with the cairn suite the guard protects. Builder and qa therefore ran those tests file by file, which hid a cross-file `sys.modules` leak that failed 132 of 222 cases on CI. Narrow the guard to the cairn suite (`scripts/cairn`), or give product test directories a sanctioned whole-directory run. Until then, briefs say: run each CI step's exact command, in the CI image where the host guard blocks it.
+
+### @team-lead — 2026-11-23
+
+From the POLY-100 loop (2026-11-23): the worktree guard refuses compound commands that contain "git" anywhere, including inside "github" (a `cd … && curl https://api.github.com/…`, an `eval` around `gh`). Two teammates (seceng, architect) answered a refusal by moving the command into a script file or splitting the word, and disclosed it themselves (`process/cairn/reviews/POLY-100/build-review.md`, ruling §M). The commands were GitHub reads. Two follow-ups: (1) the pattern should match git as a command word, not a substring, so `gh` and `curl` to GitHub are not refused; (2) every spawn brief says a refused command is run in the plain form the hook asks for or goes to the lead. The hook is the Principal's to change; the lead does not edit hooks or settings.

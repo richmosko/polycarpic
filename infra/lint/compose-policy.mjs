@@ -73,7 +73,7 @@ const renderEnv = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', 
 for (const k of ['POLY_POSTGRES_IMAGE', 'POLY_BIND_ADDR']) if (process.env[k]) renderEnv[k] = process.env[k];
 for (const k of ['DOCKER_HOST', 'DOCKER_CONFIG', 'DOCKER_CONTEXT', 'XDG_RUNTIME_DIR']) if (process.env[k]) renderEnv[k] = process.env[k];
 
-const BYPASS = { network_mode: 'network-mode', privileged: 'privileged', cap_add: 'cap-add', devices: 'devices', sysctls: 'sysctls', env_file: 'env-file', extra_hosts: 'extra-hosts', links: 'links', external_links: 'links', group_add: 'group-add', build: 'no-build', extends: 'bypass' };
+const BYPASS = { network_mode: 'network-mode', privileged: 'privileged', cap_add: 'cap-add', devices: 'devices', sysctls: 'sysctls', extra_hosts: 'extra-hosts', links: 'links', external_links: 'links', group_add: 'group-add', build: 'no-build', extends: 'bypass' };
 const SECRETISH = /(SECRET|PASSWORD|PASSWD|TOKEN|KEY|CREDENTIAL|DSN|DATABASE_URL)/;
 const varsIn = (s) => [...String(s).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]);
 const hasVar = (x) => /\$\{|\$[A-Za-z_]/.test(JSON.stringify(x ?? ''));
@@ -83,7 +83,7 @@ const pending = [];
 // The three renders run concurrently; each reports its own violations.
 function render(kind, path, rel) {
   return new Promise((done) => {
-    const c = spawn('docker', ['compose', '-f', path, '--profile', '*', 'config', '--format', 'json'], { env: renderEnv });
+    const c = spawn('docker', ['compose', '-f', path, '--profile', '*', 'config', '--no-env-resolution', '--format', 'json'], { env: renderEnv });
     let out = '', err = '';
     c.stdout.on('data', (d) => { out += d; });
     c.stderr.on('data', (d) => { err += d; });
@@ -100,6 +100,10 @@ function render(kind, path, rel) {
     });
   });
 }
+// one source: the env_file lists are the installed guard's own policy (infra/deploy/compose-allow.json), so the CI lint and the box guard cannot disagree
+let guardPolicy = null;
+try { guardPolicy = JSON.parse(read('infra/deploy/compose-allow.json') ?? 'null'); } catch { guardPolicy = null; }
+if (guardPolicy == null) v('guard-policy', 'infra/deploy/compose-allow.json', 'missing or unparsable: the lint and the box guard read the env_file list from it');
 for (const [kind, path] of Object.entries(files)) {
   const rel = `infra/compose/${kind}.yml`;
   // raw checks run even when the render fails
@@ -109,6 +113,23 @@ for (const [kind, path] of Object.entries(files)) {
   for (const [sn, s] of Object.entries(raw.services ?? {})) {
     for (const [key, id] of Object.entries(BYPASS)) if (s[key] !== undefined) v(id, rel, `${sn}: ${key} is not allowed`);
     for (const key of ['pid', 'ipc', 'userns_mode']) if (s[key] === 'host') v('host-namespace', rel, `${sn}: ${key}: host`);
+    // S27: the whole env_file list, empty included, read from the raw YAML: same length and order, each path the exact string, only `path` and `required: true`
+    {
+      const want = guardPolicy?.projects?.[kind]?.services?.[sn]?.env_files ?? [];
+      const got = s.env_file === undefined ? [] : Array.isArray(s.env_file) ? s.env_file : [s.env_file];
+      const same = got.length === want.length && got.every((e, i) => {
+        const ent = typeof e === 'string' ? { path: e } : e;
+        return ent !== null && typeof ent === 'object' && ent.path === want[i] && ent.required !== false && Object.keys(ent).every((k) => k === 'path' || k === 'required');
+      });
+      if (!same) v('env-file', rel, `${sn}: env_file`);
+    }
+    // S20: caddy's environment is exactly the three ${NAME:?} forms and it has no command or entrypoint: {$NAME} is substituted before the Caddyfile is parsed
+    if (kind === 'edge' && sn === 'caddy') {
+      const env = s.environment;
+      const okEnv = env && !Array.isArray(env) && JSON.stringify(Object.keys(env).sort()) === JSON.stringify(['POLY_DOMAIN', 'POLY_STAGING_ALLOW', 'POLY_TLS']) && Object.entries(env).every(([k, val]) => val === `\${${k}:?}`);
+      if (!okEnv) v('caddy-env', rel, 'caddy environment must be exactly POLY_DOMAIN, POLY_STAGING_ALLOW and POLY_TLS as ${NAME:?}');
+      if (s.command !== undefined || s.entrypoint !== undefined) v('caddy-env', rel, 'caddy must have no command or entrypoint');
+    }
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
     for (const key of ['networks', 'secrets', 'volumes', 'user', 'cap_drop', 'cap_add', 'security_opt', 'healthcheck', 'command', 'tmpfs'])
       if (hasVar(s[key])) v('raw-interpolation', rel, `${sn}: \${…} in ${key}`);
@@ -127,7 +148,50 @@ for (const [kind, path] of Object.entries(files)) {
 }
 await Promise.all(pending);
 
+// ---- caddy-allow (POLY-100 A12): the Caddyfile is an allowlist. The seven top-level block heads appear exactly once and every non-comment, non-blank
+// trimmed line of a block equals one in the fixed list for that block, with that list's count. A Caddyfile change therefore carries a lint change.
+{
+  const text = read('infra/caddy/Caddyfile');
+  const want = policy.caddyAllow;
+  if (text == null) v('caddy-allow', 'infra/caddy/Caddyfile', 'missing');
+  else if (!want) v('caddy-allow', 'infra/lint/policy.json', 'caddyAllow is missing');
+  else {
+    const got = {};
+    let cur = null;
+    let depth = 0;
+    for (const raw of text.split('\n')) {
+      const t = raw.trim();
+      if (t === '' || t.startsWith('#')) continue;
+      if (depth === 0) {
+        if (!t.endsWith('{')) { v('caddy-allow', 'infra/caddy/Caddyfile', `a line outside any block: ${t.slice(0, 60)}`); continue; }
+        cur = t === '{' ? '{' : t.slice(0, -1).trim();
+        if (Object.hasOwn(got, cur)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head repeated: ${cur.slice(0, 60)}`);
+        got[cur] ??= [];
+        depth = 1;
+        continue;
+      }
+      if (t === '}') { depth -= 1; if (depth === 0) continue; } else if (t.endsWith('{')) depth += 1;
+      got[cur].push(t);
+    }
+    if (depth !== 0) v('caddy-allow', 'infra/caddy/Caddyfile', 'unbalanced braces');
+    for (const head of Object.keys(got)) if (!Object.hasOwn(want, head)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head not allowed: ${head.slice(0, 60)}`);
+    for (const head of Object.keys(want)) if (!Object.hasOwn(got, head)) v('caddy-allow', 'infra/caddy/Caddyfile', `block head missing: ${head.slice(0, 60)}`);
+    for (const head of Object.keys(got)) {
+      if (!Object.hasOwn(want, head)) continue;
+      // S20: an ordered sequence, braces included; the first difference is reported
+      const a = got[head];
+      const b = want[head];
+      const n = Math.max(a.length, b.length);
+      for (let i = 0; i < n; i++) {
+        if (a[i] !== b[i]) { v('caddy-allow', 'infra/caddy/Caddyfile', `${head.slice(0, 30)}: line ${i + 1} of the block is ${a[i] === undefined ? 'missing' : `not the allowed one: ${a[i].slice(0, 70)}`}`); break; }
+      }
+    }
+  }
+}
+
 // ---- pg_hba
+// R12(a) (POLY-100): the migrate preflight sweeps only the current database for poly_backup and relies on these four lines; a PR that widens
+// pg_hba.prod.conf must widen that sweep in the same PR.
 const hbaProd = read('infra/postgres/pg_hba.prod.conf');
 const hbaStaging = read('infra/postgres/pg_hba.staging.conf');
 const backupCidrs = [];
@@ -139,7 +203,7 @@ else {
     && r1.join(' ').startsWith('host replication poly_backup') && r2.join(' ').startsWith('host polycarpic poly_backup')
     && r1[3] === r2[3] && r1[4] === 'scram-sha-256' && r2[4] === 'scram-sha-256'
     && r3.join(' ') === 'host all poly_backup all reject' && r4.join(' ') === 'host replication all all reject';
-  if (!ok) v('pg-hba-prod', 'infra/postgres/pg_hba.prod.conf', 'the four C-79 lines must come first, in order');
+  if (!ok) v('pg-hba-prod', 'infra/postgres/pg_hba.prod.conf', "the four C-79 lines must come first, in order; R12(a)'s preflight sweeps only this database and relies on it");
   for (const r of rules) if (r[2] === 'poly_backup' && r[4] !== 'reject') backupCidrs.push(r[3]);
 }
 if (hbaStaging == null) v('pg-hba-staging', 'infra/postgres/pg_hba.staging.conf', 'missing');
@@ -172,7 +236,6 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     if (list(s.devices).length) v('devices', rel, `${at}: devices`);
     if (list(s.security_opt).some((o) => /unconfined/.test(o))) v('unconfined', rel, `${at}: unconfined security_opt`);
     if (s.sysctls && Object.keys(s.sysctls).length) v('sysctls', rel, `${at}: sysctls`);
-    if (list(s.env_file).length) v('env-file', rel, `${at}: env_file`);
     for (const [ek, ev] of Object.entries(s.environment ?? {})) {
       const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
       if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);
@@ -275,12 +338,23 @@ for (const [kind, cfg] of Object.entries(rendered)) {
   if (Object.keys(cfg.volumes ?? {}).length) v('top-level-volumes', rel, 'top-level volumes: are not used');
   for (const [key, c] of Object.entries(cfg.configs ?? {})) if (c.content) v('config-inline', rel, `config ${key}: inline content`);
 
+  if (kind === 'prod' || kind === 'staging') {
+    // T-net: a project file only declares its own edge network, external, by its exact name, with no ipam; it never creates one
+    const key = `edge-${kind}`;
+    const n = nets[key];
+    if (n && (n.name !== `polycarpic-${key}` || n.external !== true || (n.ipam && (n.ipam.config ?? []).length))) v('edge-overlap', rel, `network ${key} must be external, named polycarpic-${key}, with no ipam`);
+    for (const k of Object.keys(nets)) if (/^edge/.test(k) && k !== key) v('edge-overlap', rel, `unexpected edge network ${k} in ${kind}.yml`);
+  }
   if (kind === 'edge') {
-    for (const [key, n] of Object.entries(nets)) {
-      const subs = (n.ipam?.config ?? []).map((c) => c.subnet).filter(Boolean);
-      if (!subs.length) v('edge-overlap', rel, `network ${key} needs a fixed subnet`);
-      for (const sub of subs) for (const a of allowCidrs) if (overlap(sub, a)) v('edge-overlap', rel, `network ${key} ${sub} overlaps pg_hba allow ${a}`);
+    // T-net: both edge networks are external, by their fixed names, with no ipam; provision.sh creates them with the fixed subnets below,
+    // and those subnets must stay outside every pg_hba allow range and the 10.200.0.0/16 pool (S24).
+    const FIXED = { 'edge-prod': ['polycarpic-edge-prod', '10.201.30.0/28'], 'edge-staging': ['polycarpic-edge-staging', '10.202.30.0/28'] };
+    for (const [key, [name, sub]] of Object.entries(FIXED)) {
+      const n = nets[key];
+      if (!n || n.name !== name || n.external !== true || (n.ipam && (n.ipam.config ?? []).length)) v('edge-overlap', rel, `network ${key} must be external, named ${name}, with no ipam`);
+      for (const a of [...allowCidrs, '10.200.0.0/16']) if (overlap(sub, a)) v('edge-overlap', rel, `network ${key} ${sub} overlaps ${a}`);
     }
+    for (const key of Object.keys(nets)) if (!FIXED[key]) v('edge-overlap', rel, `unexpected network ${key} in the edge project`);
     const caddy = svcs.caddy;
     if (caddy) for (const other of Object.keys(svcs)) if (other !== 'caddy') v('edge-network', rel, `unexpected service ${other} in the edge project`);
   }

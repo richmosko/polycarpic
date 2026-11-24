@@ -46,6 +46,52 @@ describe('provision.sh host stage (R5)', () => {
     expect(r.out).toMatch(/docker-compose-plugin/);
   });
 
+  // ---- G10 / S40 (ruling f5a62e3c, f887180d): exactly one Compose, the version in infra/deploy/compose-version, held alone ----
+  const WANT = readFileSync(join(ROOT, 'infra', 'deploy', 'compose-version'), 'utf8').trim();
+  const composeCalls = `grep -E '^(apt-get|apt-mark) ' /var/fake-state/calls.log`;
+
+  it('G10 provision: installs docker-compose-plugin at exactly the file\'s version and holds that one package alone (never docker-ce, containerd or runc)', () => {
+    const r = run(`${ENTER} ${HOSTRUN} > /dev/null 2>&1; ${composeCalls}`);
+    expect(r.out, 'an exact-version install').toMatch(new RegExp(`^apt-get .*install.* docker-compose-plugin=${WANT.replace(/\./g, '\\.')}-`, 'm'));
+    const holds = r.out.split('\n').filter((l) => l.startsWith('apt-mark hold'));
+    expect(holds.length, 'one hold').toBe(1);
+    expect(holds[0]).toMatch(/^apt-mark hold docker-compose-plugin$/);
+    expect(r.out, 'no other package is held').not.toMatch(/apt-mark hold .*(docker-ce|containerd|runc|docker-ce-cli)/);
+  });
+
+  it('G10 provision: a newer plugin already installed (and held) is brought down to the version with the downgrade flags, then held; a rerun changes nothing', () => {
+    const r = run(`${ENTER} echo 5.8.0-1~ubuntu.24.04~noble > /var/fake-state/compose-installed; echo docker-compose-plugin > /var/fake-state/holds; ${HOSTRUN} > /dev/null 2>&1; ${composeCalls}`);
+    expect(r.out).toMatch(/apt-mark unhold docker-compose-plugin/);
+    expect(r.out).toMatch(/--allow-downgrades/);
+    expect(r.out).toMatch(/--allow-change-held-packages/);
+    expect(r.out).toMatch(new RegExp(`docker-compose-plugin=${WANT.replace(/\./g, '\\.')}-`));
+    const again = run(`${ENTER} ${HOSTRUN} > /dev/null 2>&1; : > /var/fake-state/calls.log; ${HOSTRUN} > /dev/null 2>&1; grep -c 'docker-compose-plugin=' /var/fake-state/calls.log || true`);
+    expect(again.out.trim().split('\n').pop(), 'a second run installs nothing').toBe('0');
+  });
+
+  it('G10 provision: a version Docker\'s repository does not list stops provision (never a newer one)', () => {
+    const r = run(`${ENTER} echo "5.8.0 2.40.3" > /var/fake-state/compose-madison; ${HOSTRUN} 2>&1${rc}; grep -c 'docker-compose-plugin=' /var/fake-state/calls.log || true`);
+    expect(r.out).not.toMatch(/rc=0/);
+    expect(r.out.trim().split('\n').pop(), 'no other version was installed').toBe('0');
+  });
+
+  it('G10 provision-check: a complete box passes the Compose check; another major, another patch, an unheld package, Ubuntu\'s package, a plugin under /root/.docker/cli-plugins and the two users answering differently each FAIL it', () => {
+    const fail = (setup: string) => {
+      const r = run(`${b2Fixture({})}\n${setup}; ${CHECK}${rc}`, { image: COMPLETE });
+      return lines(r.out).filter((l) => l.kind === 'FAIL' && /compose/i.test(l.text));
+    };
+    expect(fail(':'), 'the complete box fails the compose check').toEqual([]);
+    for (const [label, setup] of [
+      ['another major', 'echo 2.40.3 > /var/fake-state/compose-version'],
+      ['another patch', 'echo 5.7.0 > /var/fake-state/compose-version'],
+      ['an unheld package', ': > /var/fake-state/holds'],
+      ['Ubuntu\'s package', 'echo http://archive.ubuntu.com/ubuntu > /var/fake-state/compose-origin'],
+      ['a plugin under /root/.docker/cli-plugins', 'mkdir -p /root/.docker/cli-plugins && : > /root/.docker/cli-plugins/docker-compose'],
+      ['the render user answering differently', 'echo 5.8.0 > /var/fake-state/compose-version-render; chmod 0644 /var/fake-state/compose-version-render'],
+      ['a failing compose', ': > /var/fake-state/compose-fails'],
+    ] as const) expect(fail(setup).length, label).toBeGreaterThan(0);
+  });
+
   it('refuses a Docker key whose fingerprint differs: exit non-zero, says fingerprint, installs no docker package', () => {
     const r = run(`${ENTER} echo 0000000000000000000000000000000000000000 > /var/fake-state/docker-key-fpr; ${HOSTRUN} 2>&1${rc}; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^apt-get .*install.*docker-ce' || true`);
     expect(r.out).not.toMatch(/rc=0/);
@@ -213,26 +259,30 @@ describe('provision.sh host stage (R5)', () => {
     expect(Number(r.out.trim())).toBeGreaterThan(0);
   });
 
-  it('host.env and staging-host.env: root 0644, TLS_MODE, PUBLIC_ORIGIN per project, MAIL_FROM default under mail.<domain>, POLY_INSTANCE, nothing else', () => {
-    const r = run(`stat -c '%n %a %U' /etc/polycarpic/host.env /etc/polycarpic/staging-host.env; echo ==; cat /etc/polycarpic/host.env; echo ==; cat /etc/polycarpic/staging-host.env`, { image: HOST });
-    const [st, prod, stg] = r.out.split('==').map((x) => x.trim());
+  it('host.env and staging-host.env: root 0644, TLS_MODE, PUBLIC_ORIGIN per project, POLY_INSTANCE, nothing else; MAIL_FROM lives alone in mail.env and staging-mail.env (S27)', () => {
+    const r = run(`stat -c '%n %a %U' /etc/polycarpic/host.env /etc/polycarpic/staging-host.env /etc/polycarpic/mail.env /etc/polycarpic/staging-mail.env; echo ==; cat /etc/polycarpic/host.env; echo ==; cat /etc/polycarpic/staging-host.env; echo ==; cat /etc/polycarpic/mail.env; echo ==; cat /etc/polycarpic/staging-mail.env`, { image: HOST });
+    const [st, prod, stg, mail, smail] = r.out.split('==').map((x) => x.trim());
     expect(st).toMatch(/host\.env 644 root/);
+    expect(st!.split('\n').every((l) => /^\S+ 644 root$/.test(l)), st).toBe(true);
     const kv = (t: string) => Object.fromEntries(t.split('\n').filter(Boolean).map((l) => [l.split('=')[0], l.slice(l.indexOf('=') + 1).replace(/^"(.*)"$/, '$1')]));
     const p = kv(prod!), s = kv(stg!);
-    expect(Object.keys(p).sort()).toEqual(['MAIL_FROM', 'POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
-    expect(Object.keys(s).sort()).toEqual(['MAIL_FROM', 'POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(p).sort()).toEqual(['POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(s).sort()).toEqual(['POLY_INSTANCE', 'PUBLIC_ORIGIN', 'TLS_MODE']);
+    expect(Object.keys(kv(mail!))).toEqual(['MAIL_FROM']);
+    expect(Object.keys(kv(smail!))).toEqual(['MAIL_FROM']);
     expect(p.TLS_MODE).toBe('real-domain');
     expect(p.PUBLIC_ORIGIN).toBe('https://app.polycarpic.com');
     expect(s.PUBLIC_ORIGIN).toBe('https://staging.polycarpic.com');
-    expect(p.MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
+    expect(kv(mail!).MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
+    expect(kv(smail!).MAIL_FROM).toBe('Polycarpic <no-reply@mail.polycarpic.com>');
     expect(p.POLY_INSTANCE).toBeTruthy();
     expect(s.POLY_INSTANCE).not.toBe(p.POLY_INSTANCE);
   });
 
   it('--mail-from under mail.<domain> is accepted; one elsewhere is refused (exit non-zero, names mail.<domain>) and nothing is written', () => {
-    const ok = run(`${ENTER} ${HOSTRUN} --mail-from "Polycarpic <hello@mail.polycarpic.com>" >/dev/null 2>&1; grep MAIL_FROM /etc/polycarpic/host.env`);
+    const ok = run(`${ENTER} ${HOSTRUN} --mail-from "Polycarpic <hello@mail.polycarpic.com>" >/dev/null 2>&1; grep MAIL_FROM /etc/polycarpic/mail.env`);
     expect(ok.out).toContain('hello@mail.polycarpic.com');
-    const bad = run(`${ENTER} ${HOSTRUN} --mail-from "evil@polycarpic.com" 2>&1${rc}; ls /etc/polycarpic/host.env 2>&1 | grep -c 'No such'; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^cryptsetup luksFormat' || true`);
+    const bad = run(`${ENTER} ${HOSTRUN} --mail-from "evil@polycarpic.com" 2>&1${rc}; ls /etc/polycarpic/mail.env 2>&1 | grep -c 'No such'; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^cryptsetup luksFormat' || true`);
     expect(bad.out).not.toMatch(/rc=0/);
     expect(bad.out).toMatch(/mail\.polycarpic\.com/);
     const [nosuch, fmt] = bad.out.trim().split('\n').slice(-2);
@@ -259,16 +309,75 @@ describe('provision.sh host stage (R5)', () => {
 });
 
 describe('provision-check: positive case and the R4 output contract', () => {
-  it('a complete host box: PASS for every H check, INFO H12b (never a pass), WAIT for D1–D6, the HOST CHECKS PASSED summary, exit 3', () => {
+  it('a complete host box: PASS for every H check, INFO H12b (never a pass), WAIT for D1–D6 and for the two things only the operator can supply (H18 allowed_signers, H22 staging-auth), the HOST CHECKS PASSED summary, exit 3', () => {
     const rr = run(`${b2Fixture({})}\n bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}; echo "rc=$?"`, { image: COMPLETE });
     expect(rr.out).toMatch(/rc=3/);
-    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'H15']) expect(find(rr.out, 'PASS', id), `PASS ${id}`).toBeDefined();
+    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'H15', 'H23']) expect(find(rr.out, 'PASS', id), `PASS ${id}`).toBeDefined();
     expect(find(rr.out, 'INFO', 'H12b')?.text).toMatch(/bucket lock: checked off-box by b2-setup\.py/);
     expect(lines(rr.out).some((l) => l.kind === 'PASS' && l.id === 'H12b')).toBe(false);
     const waits = lines(rr.out).filter((l) => l.kind === 'WAIT').map((l) => l.id).sort();
-    expect(waits).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6']);
+    expect(waits).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'H18', 'H22']);
     expect(lines(rr.out).some((l) => l.kind === 'FAIL')).toBe(false);
-    expect(rr.out.split('\n').filter((l) => /rc=/.test(l) === false && l.trim()).pop()).toBe('HOST CHECKS PASSED; 6 checks wait for the first deploy');
+    expect(rr.out.split('\n').filter((l) => /rc=/.test(l) === false && l.trim()).pop()).toBe('HOST CHECKS PASSED; 8 checks wait for the first deploy');
+  });
+
+  it('H23 (A18): the render user missing, with a shell, a home or another group is a FAIL naming what it found; the exact user passes', () => {
+    for (const [label, cmd] of [
+      ['missing', 'userdel polycarpic-render'],
+      ['a shell', 'usermod -s /bin/bash polycarpic-render'],
+      ['a home', 'usermod -d /home/render polycarpic-render'],
+      ['another group', 'groupadd -f extra23 && usermod -aG extra23 polycarpic-render'],
+      ['another uid', 'usermod -u 10021 polycarpic-render'],
+    ] as const) {
+      const r = run(`${b2Fixture({})}\n${cmd}; ${CHECK}${rc}`, { image: COMPLETE });
+      const h23 = lines(r.out).find((l) => l.id === 'H23');
+      expect(h23?.kind, `${label}: ${r.out.slice(-400)}`).toBe('FAIL');
+      expect(h23?.text, label).toMatch(/polycarpic-render|groups/);
+      expect(r.out, label).toMatch(/rc=1/);
+    }
+  });
+
+  const g8 = (exe: string, how: string) => `${b2Fixture({})}\ncp /usr/bin/tail /tmp/${exe}; ( setpriv --reuid 10020 --regid 10020 --clear-groups ${how} & ) ; sleep 1; ${CHECK}${rc}`;
+  const h23 = (out: string) => lines(out).find((l) => l.id === 'H23')?.kind;
+
+  it('G1 (8635f525) in provision and provision-check: 0750 is repaired; 0777, 0775, 1755, 2755, a link and a foreign owner stop provision.sh, name the path and leave it as found; H24 names it', () => {
+    const dirs = ['/opt/polycarpic', '/opt/polycarpic/releases', '/var/lib/polycarpic/state/deploy'];
+    for (const d of dirs) {
+      const fix = run(`${b2Fixture({})}\nchmod 0750 ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; stat -c %a ${d}`, { image: COMPLETE });
+      expect(fix.out.trim().split('\n').slice(-2), `${d} 0750`).toEqual(['rc=0', '755']);
+      for (const bad of ['0777', '0775', '1755', '2755']) {
+        const r = run(`${b2Fixture({})}\nchmod ${bad} ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; cat /tmp/p.out | tail -3; stat -c %a ${d}; ${CHECK}${rc}`, { image: COMPLETE });
+        expect(r.out, `${d} ${bad}: provision stops`).toMatch(/rc=[1-9]/);
+        expect(r.out, `${d} ${bad}: the path is named`).toContain(d);
+        expect(r.out, `${d} ${bad}: left as found`).toContain(bad.replace(/^0/, ''));
+        const h24 = lines(r.out).find((l) => l.id === 'H24');
+        expect(h24?.kind, `${d} ${bad}: provision-check`).toBe('FAIL');
+        expect(h24?.text, `${d} ${bad}: provision-check names the path`).toContain(d);
+      }
+      const link = run(`${b2Fixture({})}\nmv ${d} ${d}.real && ln -s ${d}.real ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; ${CHECK}${rc}`, { image: COMPLETE });
+      expect(link.out, `${d} as a link`).toMatch(/rc=[1-9]/);
+      expect(lines(link.out).find((l) => l.id === 'H24')?.kind, `${d} as a link`).toBe('FAIL');
+      const foreign = run(`${b2Fixture({})}\nchown 1234:1234 ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; stat -c %u ${d}; ${CHECK}${rc}`, { image: COMPLETE });
+      expect(foreign.out, `${d} with a foreign owner: provision stops`).toMatch(/rc=[1-9]/);
+      expect(foreign.out, `${d} with a foreign owner: left as found`).toMatch(/^1234$/m);
+      expect(lines(foreign.out).find((l) => l.id === 'H24')?.kind, `${d} with a foreign owner`).toBe('FAIL');
+    }
+  });
+
+  it('H23 (G8): a real render, executable docker with compose and config among its arguments, passes', () => {
+    // tail stands in for docker (it follows /dev/null and complains about the two names, which is all this needs)
+    const real = run(g8('docker', '/tmp/docker -f /dev/null compose -p polycarpic-staging config'), { image: COMPLETE });
+    expect(h23(real.out), JSON.stringify(lines(real.out).find((l) => l.id === 'H23'))).toBe('PASS');
+  });
+
+  it('H23 (G8): a script of any name whose argument vector only carries the words is a FAIL', () => {
+    const faked = run(g8('looks-ish', `bash -c 'exec -a "docker compose -p polycarpic-staging config" /tmp/looks-ish -f /dev/null'`), { image: COMPLETE });
+    expect(h23(faked.out), faked.out.slice(-600)).toBe('FAIL');
+  });
+
+  it('H23 (G8): the right executable with other arguments is not a render either', () => {
+    const other = run(g8('docker', '/tmp/docker -f /dev/null'), { image: COMPLETE });
+    expect(h23(other.out), other.out.slice(-600)).toBe('FAIL');
   });
 
   it('is read-only: no file under /etc, /srv or /var/lib/polycarpic changes, and no mutating fake verb is called', () => {
@@ -356,8 +465,11 @@ describe('provision-check: one planted fault per check, with id, found value and
     failLine(check('groupadd -g 10001 websvc; usermod -aG websvc polyops'), 'H9', ['polyops', '10001']);
     failLine(check('groupadd docker; usermod -aG docker polyops'), 'H9', ['docker']);
   });
-  it('H10: MAIL_FROM outside mail.<domain>, and a secret-named key in host.env', () => {
-    failLine(check(`sed -i 's/^MAIL_FROM=.*/MAIL_FROM=x@polycarpic.com/' /etc/polycarpic/host.env`), 'H10', ['mail_from']);
+  it('H10: MAIL_FROM outside mail.<domain>, MAIL_FROM back in host.env, a second key in the mail file, a missing mail file, and a secret-named key in host.env', () => {
+    failLine(check(`sed -i 's/^MAIL_FROM=.*/MAIL_FROM=x@polycarpic.com/' /etc/polycarpic/mail.env`), 'H10', ['mail_from']);
+    failLine(check(plantAppend('/etc/polycarpic/host.env', 'MAIL_FROM=x@mail.polycarpic.com')), 'H10', ['mail_from']);
+    failLine(check(plantAppend('/etc/polycarpic/staging-mail.env', 'POLY_INSTANCE=x')), 'H10', ['staging-mail.env']);
+    failLine(check('rm /etc/polycarpic/mail.env'), 'H10', ['mail.env']);
     failLine(check(plantAppend('/etc/polycarpic/host.env', 'RESEND_API_KEY=abc')), 'H10', ['resend_api_key']);
     failLine(check(plantAppend('/etc/polycarpic/staging-host.env', 'DB_PASSWORD=abc')), 'H10', ['db_password']);
   });

@@ -2,7 +2,7 @@
 import collections
 import time
 
-Line = collections.namedtuple("Line", "state item project detail")
+Line = collections.namedtuple("Line", "state item project detail extra", defaults=((),))  # `extra`: more lines printed unwrapped and uncut
 
 
 def clean(text, keep_newline=False):

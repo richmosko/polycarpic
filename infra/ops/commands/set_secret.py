@@ -35,6 +35,9 @@ def _read(ctx, name):
         if name == "heartbeat_url" and not value.startswith("https://"):
             ctx.err("set-secret: heartbeat_url must start with https://; nothing written")
             return 2
+        if name == "github_read_token" and not rules.GITHUB_TOKEN.fullmatch(value):
+            ctx.err("set-secret: github_read_token must be a fine-grained token (github_pat_...); nothing written")
+            return 2
         values.append(value)
     return values
 

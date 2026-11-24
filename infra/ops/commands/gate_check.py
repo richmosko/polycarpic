@@ -13,6 +13,6 @@ def run(args, ctx):
     if not compose.running(compose.ps(ctx, project), "postgres"):
         ctx.out("gate: error (%s postgres is not running)" % project)
         return 1
-    argv = ["/bin/sh", ctx.bundle("infra/postgres/gate-check.sh"), "docker", "compose", "-p", project, "exec", "-T", "postgres",
+    argv = ["/bin/sh", ctx.bundle("infra/postgres/gate-check.sh"), "docker", "compose", "-p", project] + compose.opts(ctx) + ["exec", "-T", "postgres",
             "psql", "-U", "postgres", "-d", "polycarpic"]
     return ctx.run_inherit(argv)

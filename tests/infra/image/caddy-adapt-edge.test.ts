@@ -11,8 +11,8 @@ beforeAll(() => {
   const img = 'poly138-caddy-adapt:test';
   const b = sh('docker', ['build', '-t', img, join(ROOT, 'infra', 'caddy')]);
   if (b.code !== 0) throw new Error(`docker build infra/caddy failed: ${b.err.slice(-400)}`);
-  const env = { POLY_BIND_ADDR: '192.0.2.1', POLY_DOMAIN: 'poly.example', POLY_STAGING_ALLOW: '192.0.2.0/24', POLY_TLS: 'ops@poly.example' };
-  const cfg = sh('docker', ['compose', '-f', join(ROOT, 'infra', 'compose', 'edge.yml'), 'config', '--format', 'json'], { env });
+  const env = { POLY_CADDY_IMAGE: 'ghcr.io/richmosko/polycarpic-caddy@sha256:' + '3'.repeat(64), POLY_BIND_ADDR: '192.0.2.1', POLY_DOMAIN: 'poly.example', POLY_STAGING_ALLOW: '192.0.2.0/24', POLY_TLS: 'ops@poly.example' };
+  const cfg = sh('docker', ['compose', '-f', join(ROOT, 'infra', 'compose', 'edge.yml'), 'config', '--no-env-resolution', '--format', 'json'], { env });
   const rendered = JSON.parse(cfg.out).services.caddy.environment as Record<string, string>;
   const args = Object.entries(rendered).flatMap(([k, val]) => ['-e', `${k}=${val}`]);
   const r = sh('docker', ['run', '--rm', ...args, img, 'caddy', 'adapt', '--config', '/etc/caddy/Caddyfile']);

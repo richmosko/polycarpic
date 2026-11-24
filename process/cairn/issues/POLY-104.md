@@ -4,14 +4,14 @@ title: First staging deploy
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101]
+blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
 assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/index.html]
 labels: [ops, verification]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-23
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -49,3 +49,15 @@ From the POLY-98 verdict (`process/cairn/reviews/POLY-98/verdict.md`, "Unmeasure
 ### @team-lead — 2026-11-22
 
 From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): measured on the staging box, not before: the spool ACLs (r-x for uid 10005, .inflight/) on real LUKS ext4; core: 0 and the host's core_pattern; the backup and upload units under real systemd; `docker compose run`'s timeout and rm -f; the secrets/host/ move and the jobs.log / last-upload ownership on a provisioned box; `status`'s backupdb item against real logs; the nightly run's duration and its 256 MB limit; CONNECTION LIMIT 3 when nightly and premigration runs meet; the two POLY-95 secret-mode cases that cannot fail on Docker Desktop.
+
+### @team-lead — 2026-11-23
+
+From the POLY-100 ruling (`process/cairn/reviews/POLY-100/ruling.md` R9, §L5; seceng S11, S15 in `ruling-review.md`): do not create the `app.` DNS record until `first-deploy prod` has run. That deploy stops Caddy, empties its data directories and recreates it, and prints the instruction as its last line. If the record exists earlier, every staging deploy skips the edge and alerts, and `first-deploy prod` refuses with `edge-prod-name-early` (exit 4). The reason: a staging-era Caddy that can resolve the prod name can obtain prod's certificate. INFRA's first-deploy runbook carries the same order.
+
+### @team-lead — 2026-11-23
+
+Correction to my comment above (2026-11-23): the rule "create the `app.` DNS record only after `first-deploy prod`" is withdrawn. It belonged to the staging-only edge exception, which the Principal replaced the same day with the strict rule: staging never deploys Caddy on any host (`process/DECISIONS.md` 2026-11-23; POLY-100 ruling R9, §L5 at d634da53). There is no DNS-order rule and no `edge-prod-name-early` refusal. What POLY-104 needs instead: `provision.sh` creates the two edge networks, and Caddy is brought up from a signed release before staging is served; which signed release (a signed `edge-<n>` tag, or prod first) is the Principal's open choice, ruling §L6. Either way the tag-signing key and `RELEASE_SIGNERS` come before the first staging deploy.
+
+### @team-lead — 2026-11-23
+
+From POLY-100 (seceng advisory A19, `process/cairn/reviews/POLY-100/ruling-review.md`): the deploy's render step parses a release's compose files on the box that runs prod, as the unprivileged render user with no network, but with no memory cap. A cap was left out of POLY-100 because nobody has measured whether `docker compose config` runs correctly under one. Measure it on the first staging box (the render under a memory limit, on all three files), then add the cap with its test in the next ops loop. Until then a hostile or malformed release could exhaust memory during the render; it cannot read secrets or reach the network there.

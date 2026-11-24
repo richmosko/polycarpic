@@ -1,0 +1,9 @@
+[Unit]
+Description=Polycarpic pull-based deploy (%i)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/polycarpic-ops deploy %i
+TimeoutStartSec=90min

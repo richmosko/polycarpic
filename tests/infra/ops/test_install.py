@@ -15,7 +15,7 @@ from pathlib import Path
 from base import OPS, REPO, need
 
 BUNDLE_PATHS = ["infra/ops", "infra/provision.sh", "infra/provision-check.sh", "infra/postgres/gate-check.sh", "infra/postgres/gate-check.sql",
-                "infra/operator/b2-capabilities.json", "infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compose/edge.yml", "packages/db/sql/roles.sql", "infra/backup", "infra/postgres/archive-wal.sh"]  # POLY-99: the runner and the scripts it starts
+                "infra/operator/b2-capabilities.json", "infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compose/edge.yml", "packages/db/sql/roles.sql", "infra/backup", "infra/postgres/archive-wal.sh", "infra/deploy/compose-allow.json", "infra/deploy/compose-version", "infra/deploy/systemd", "infra/postgres/pg_hba.prod.conf", "infra/postgres/pg_hba.staging.conf"]  # POLY-99: the runner and the scripts it starts
 REAL_GIT = shutil.which("git")
 ENV_GIT = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
 
@@ -105,7 +105,7 @@ class Install(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         names = tarfile.open(fileobj=io.BytesIO(self.ssh_calls()[1][1])).getnames()
         for n in names:
-            self.assertTrue(any(n == p or n.startswith(p + "/") for p in BUNDLE_PATHS) or n in ("infra", "infra/postgres", "infra/operator", "infra/compose", "packages", "packages/db", "packages/db/sql"), n)
+            self.assertTrue(any(n == p or n.startswith(p + "/") for p in BUNDLE_PATHS) or n in ("infra", "infra/postgres", "infra/operator", "infra/compose", "infra/deploy", "packages", "packages/db", "packages/db/sql"), n)
         for must in ("infra/ops/polycarpic-ops", "infra/ops/install_box.py", "infra/provision.sh", "infra/provision-check.sh", "infra/postgres/gate-check.sh", "infra/postgres/gate-check.sql",
                      "infra/operator/b2-capabilities.json", "infra/compose/prod.yml", "infra/compose/staging.yml", "infra/compose/edge.yml", "packages/db/sql/roles.sql"):
             self.assertIn(must, names)
@@ -117,7 +117,7 @@ class Install(unittest.TestCase):
         (a1, in1), (a2, in2) = self.ssh_calls()
         self.assertIn("sudo install -d -m 0700 /opt/polycarpic/.incoming", a1[-1])
         self.assertIn("sudo tee /opt/polycarpic/.incoming/install_box.py", a1[-1])
-        self.assertEqual(a2[-1], "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py git-%s" % sha[:12])
+        self.assertEqual(a2[-1], "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py git-%s polyops@box.example" % sha[:12])  # S21: the box prints the operator's own ssh target in guard help
         self.assertEqual(in1, (self.repo / "infra" / "ops" / "install_box.py").read_bytes())
 
     def test_head_is_resolved_once_and_the_same_sha_goes_to_git_show_and_git_archive(self):  # seceng's note

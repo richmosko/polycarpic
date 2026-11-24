@@ -43,13 +43,13 @@ function mounts(): string[] {
 }
 
 const SNAPS = new Set<string>();
-const SAVE = 'tar --acls --xattrs --numeric-owner -cpf /snap/%TAG%.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf etc srv var/lib/polycarpic var/fake-state home root 2>/dev/null; true';
+const SAVE = 'tar --acls --xattrs --numeric-owner -cpf /snap/%TAG%.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf etc srv opt/polycarpic var/lib/polycarpic var/fake-state home root 2>/dev/null; true';
 const LOAD = (tag: string) => `tar --acls --xattrs --numeric-owner -xpf /snap/${tag}.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf;`;
 
 /** Run `script` as root in a fresh container of the box, first restoring snapshot `o.image` (HOST or COMPLETE) when given. */
 export function run(script: string, o: { image?: string; network?: string; env?: Record<string, string> } = {}): R {
   build();
-  const a = ['run', '--rm', ...mounts(), '-v', `${SNAPDIR}:/snap`];
+  const a = ['run', '--rm', '--cap-add=SYS_PTRACE', ...mounts(), '-v', `${SNAPDIR}:/snap`]; // root on a real box can read /proc/<pid>/exe of another user (H23, G8)
   if (o.network) a.push('--network', o.network);
   for (const [k, v] of Object.entries(o.env ?? {})) a.push('-e', `${k}=${v}`);
   const load = o.image && SNAPS.has(o.image) ? LOAD(o.image) : '';
@@ -66,7 +66,7 @@ export function snapshot(tag: string, from: string | null, script: string) {
   return r;
 }
 
-export const HOST_ARGS = `--stage host --target hetzner --domain ${DOMAIN}`;
+export const HOST_ARGS = `--stage host --target hetzner --domain ${DOMAIN} --bind-addr 192.0.2.10 --staging-allow 192.0.2.0/24 --acme-email ops@polycarpic.com`; // POLY-100 R9: the flags that write edge.env (H19 fails without it)
 export const CHECK = `POLY_NTP_WAIT=2 bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 
 /** cloud-init applied (test key substituted for the placeholder), then the host stage, once: the snapshot every H test starts from. */
