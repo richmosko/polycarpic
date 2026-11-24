@@ -1,0 +1,50 @@
+// POLY-100 T-real, part 2: the rollback case (ruling.md 3765f358). SEPARABLE: only the lead may make it optional (the first-deploy half stays); this file shares nothing with part 1 but the box part 1 left.
+// A second release whose web never answers: rolled back within the window, quarantined, the first release healthy again, and the next poll skips it. Needs part 1 to have run (a healthy `current`).
+import { describe, expect, it } from 'vitest';
+import { IN_CI, commits, containerImages, containers, missing, offer, ops, release, root, run, stateFile, step } from './harness.ts';
+
+const gap = missing();
+if (gap.length && IN_CI) throw new Error(`deploy-real: ${gap.join(', ')} missing in CI: T-real must run, not skip`);
+const suite = gap.length ? describe.skip : describe;
+
+suite('T-real part 2: a release whose web never answers is rolled back', () => {
+  let first = '';
+  let second = '';
+
+  it('part 1 left a healthy first release', () => {
+    first = (stateFile('current') ?? '').split(' ')[0] ?? '';
+    expect(first, 'no `current`: part 1 (first-deploy) did not leave a healthy release').toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it('the second release (web never answers) is offered and polled: exit 1, rolled back within the window, quarantined, an alert', () => {
+    const [, c2] = commits();
+    const rel2 = step('images of release 2', () => release(c2, true));
+    second = rel2.app;
+    offer(rel2, 102);
+    const r = step('rollback poll', () => ops(['deploy', 'staging'], 'deploy staging (release 2: web never answers)'));
+    expect(r.code, r.err).toBe(1);
+    expect(r.err.trim().split('\n').pop(), r.err).toBe('deploy: rolled-back');
+    expect(r.secs, 'the rollback window is 120 s; the restored worker needs its own first health report (60 s): 6 minutes at most').toBeLessThanOrEqual(360);
+    expect((stateFile('current') ?? '').split(' ')[0], 'the first release is current again').toBe(first);
+    expect(stateFile('quarantine') ?? '', 'the second digest is quarantined').toContain(second);
+    expect(stateFile('alert') ?? '', 'an alert says so').not.toBe('');
+  });
+
+  it('the first release is healthy again, on its own digests', () => {
+    const imgs = Object.entries(containerImages()).filter(([n]) => /-(web|auth|worker)-/.test(n));
+    expect(imgs.length).toBeGreaterThanOrEqual(3);
+    for (const [n, i] of imgs) expect(i, `${n} runs the first release`).toBe(i.replace(/@.*/, '') + '@' + first);
+    for (const c of containers().filter((x) => /-(web|auth|worker|postgres)-/.test(x.name))) expect(c.status, c.name).toMatch(/\(healthy\)/);
+  });
+
+  it('the next poll skips the quarantined digest: exit 0, nothing started', () => {
+    const started = (): string => root(['sh', '-c', "docker ps -q --filter label=com.docker.compose.project=polycarpic-staging | xargs -r docker inspect -f '{{.Name}} {{.State.StartedAt}}' | sort"]).out;
+    const s0 = started();
+    const q0 = stateFile('quarantine');
+    const r = step('next poll skips it', () => ops(['deploy', 'staging'], 'deploy staging (next poll)'));
+    expect(r.code, r.err).toBe(0);
+    expect(started()).toBe(s0);
+    expect(stateFile('quarantine'), 'not quarantined twice').toBe(q0);
+    expect(run(['true']).code).toBe(0);
+  });
+});
