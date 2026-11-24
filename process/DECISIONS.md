@@ -985,3 +985,11 @@ Add new decisions ABOVE this comment, newest first.
 - Pin the minor version only and let patch releases install automatically; a patch that changes Compose's output would stop deploys with an alert and no quarantine (not assessed by seceng).
 - No pin (today's `provision.sh`): the newest Compose, whatever it is.
 **Approved by:** Mosko
+
+### 2026-11-24 — A minimal health listener now; the real web server split out of POLY-88
+**Decision:** POLY-100 adds a minimal public listener to the `web` service (option A): `GET /api/v1/health` on 3000 from the existing health handler, and a fixed 404 for everything else, under seceng's conditions (exact method and path; no body, cookie or echoed header; no URL logged; header, time and connection limits; the status page stays on loopback; a test forbids any other route; the real server replaces it and never runs beside it). The production web server and image build are split out of POLY-88 into POLY-161, which the first staging deploy (POLY-104) now waits on.
+**Why:** The end-to-end deploy test reached the health window and showed the release image serves no web app at all, so every deploy would end rollback-unhealthy and POLY-104 could never reach healthy. Without a health answer the test could prove only the unhealthy path; the healthy path, rollback and quarantine would merge unproven on real Docker, where the test has found faults every stand-in missed. The listener exposes one bit (database and schema fine, or not), at most one database check per five seconds. Under this option "healthy" does not mean a page is served, hence the split. The architect and seceng both recommended it.
+**Alternatives considered:**
+- Merge without it and prove only the unhealthy path (option B).
+- A stand-in image for the test, or pointing the health rule at the internal status page (neither recommended).
+**Approved by:** Mosko
