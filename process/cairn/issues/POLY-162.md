@@ -1,7 +1,7 @@
 ---
 id: POLY-162
 title: Deploy test passing end to end
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-162.md, process/cairn/reviews/POLY-162/**, infra/**, .github/workflows/**, Dockerfile, apps/web/**, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, packages/*/package.json, layers.json, eslint.config.js, process/STATE.md, process/DECISIONS.md, .gitleaksignore]
 labels: [ops, deploy]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/153
 created: 2026-11-23
 updated: 2026-11-24
 ---
@@ -47,3 +47,7 @@ How to iterate: the privileged Ubuntu container recipe runs T-real in 2-3 minute
 ### @team-lead — 2026-11-24
 
 Feature started. Branch: `feature/poly-162-deploy-test-passing` (the three kept devops commits, with `main` merged in at d54aedc6). No new ruling stage: G13, G14, G15, T-real and S38/S41/S42 are already ruled and security-reviewed in `process/cairn/reviews/POLY-100/ruling.md`. Sub-issues: a (qa, tests), b (devops, ops build), c (backend, health listener), d (seceng, build review), e (architect, verdict).
+
+### @team-lead — 2026-11-24
+
+PR opened: https://github.com/richmosko/polycarpic/pull/153. Validate is complete: qa gate `process/cairn/reviews/POLY-162/gate.md` (78888010, CI rows 58c060e2); seceng PASS, 0 BLOCKS (8ee7e8fb); architect PASS WITH FOLLOW-UPS at 08a3f3a5 (4e738ce3); the PR's own CI run 45511840990 green on all ten jobs.
