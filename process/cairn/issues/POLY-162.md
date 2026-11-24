@@ -23,3 +23,9 @@ POLY-100 merged the pull-based deploy without a completed real deploy: its end-t
 - [ ] T-real passes in CI on its narrow trigger, with its rollback case, started from an unreadable directory holding a hostile `.env`; its CI step is switched on.
 - [ ] T-real's measured time is recorded; if the `image` job exceeds 17 of its 20 minutes, T-real moves to its own job.
 - [ ] Every product fault T-real finds on the way is fixed here or filed, each with a test shown red on the fault.
+
+## Comments
+
+### @team-lead — 2026-11-23
+
+Conditions from seceng on POLY-100's scope cut (2026-11-24, `process/cairn/reviews/POLY-100/build-review.md`): (1) no `v1.*` or `edge-*` tag is pushed until this issue is done; without G14 the worker container, which holds the credential keyring, runs the image's default `web` command. (2) T-real's CI step is off by a literal condition held by a tests/ci pin; switching it on is this issue's change, with the pin. (3) POLY-100's merge is `build.yml`'s first real run with the `siblings` and `release-lint` jobs: its result is read before anything else lands on `main`; a fault there is fixed here or in POLY-160. qa's findings from the local T-real runs: `.claude/worktrees/qa-100/temp/2026-11-24-qa-100-treal-findings.md` at the time of writing (qa copies the content into this issue before teardown).
