@@ -41,11 +41,25 @@ The worker runs `["worker"]` in both files, and the guard and the lint compare `
 - `build.yml` and `release.yml` do not run it (pinned by test) and restore no cache (C-81), so a cache written by a PR job does not reach an attested image.
 - New: a third-party image by mutable tag runs on the runner (F2).
 
+## Ruling B9: the kept log (S38 c, d on a red run). Replaces F1's "Wanted"
+
+**Nothing is published until a sweep that runs on failure has passed.** No upload at all would be safe too, but a red run is when the log is needed.
+
+1. **Three inputs, one output.** The step's output goes by `tee` to its own file, never the file the harness appends to (measured: `tee` erases the harness's lines). The harness's log is a second file. Neither is the uploaded path. The sweep step reads those two and staging's `deploy.log` and, only when all three are clean, writes the one uploaded file. `deploy.log` absent is allowed (a run that failed before it); an input that exists and cannot be read is a failure.
+2. **The step.** `infra/ci/deploy-real-sweep.*`, in the `deploy` trigger, `if: always()` with the job's gate, after the test and **before the undo** (which deletes the secret list). The undo stays `always()` and does not depend on it. The upload is `always() && steps.<sweep>.outcome == 'success'`, never `!= 'failure'`.
+3. **Fail closed.** No or unparsable `/run/poly-deploy-real/secrets.json`, or a name of the harness's `SECRETS` or the token missing from it: exit 1, no output file, no upload. A run that died in setup keeps only the job's own log.
+4. **What it looks for:** for every listed secret, any 16 consecutive characters of it, in the value as it is, percent-encoded, base64 and hex; `PRIVATE KEY-----`; `github_pat_` or `gh[a-z]_` followed by 20 token characters; and part 3 (c)'s three shapes (a render, an environment dump, env-file lines).
+5. **It removes nothing.** No redaction: a hit is exit 1, the names only, never a value or the line, and no file published. The job is then red even if the test was green. Part 3 stays as it is.
+
+**Tests** (qa; unit, no container; each red on its mutant): clean inputs publish; a planted whole secret, a 16-character piece and an encoded one, each in each of the three inputs; no list, a short list, an unreadable input; the output names the secret and never its value. In `deploy-key.test.ts`: the upload without the sweep's outcome, the sweep after the undo, the sweep without `always()`, `tee` on the harness's file or on the uploaded one.
+
+**Limit, accepted:** the job's own console is public as it is printed; no sweep can hold that back. It holds fixture values only, random per run, on a discarded machine, and the sweep of the step's output makes such a leak a red job. S38 a to e apply unchanged in T-real's own job: `contents: read`, `persist-credentials: false`, no token, no pull after the test.
+
 ## FIX HERE
 
 | # | Owner | Finding | Wanted |
 |---|---|---|---|
-| F1 | devops, qa | `tee` opens the same file the harness appends to, without `-a`. I ran the shape: the later `tee` write overwrites the harness's line. The kept log loses text, the sweep reads a file that then changes, and on a red run it never sweeps. No real secret is at stake (fixture values, random per run, a discarded machine; the step output is public already) | The step's output and the harness's log in two files, or `tee -a` on a fresh one; the sweep also on a failed run before the upload, or the upload only when the sweep passed. Pin the form in `deploy-key.test.ts` |
+| F1 | devops, qa | `tee` opens the same file the harness appends to, without `-a`. I ran the shape: the later `tee` write overwrites the harness's line. The kept log loses text, the sweep reads a file that then changes, and on a red run it never sweeps. No real secret is at stake (fixture values, random per run, a discarded machine; the step output is public already) | Ruling B9 above |
 | F2 | qa | `harness.ts:164` starts `registry:2` by tag, as a root-daemon container | Pin by digest |
 | F3 | devops | The undo removes `polycarpic-edge-staging` but not the project's own `polycarpic-staging_default`, which the harness header lists (by reading) | Remove it |
 | F4 | qa | G14's tests: no guard case for `auth` missing, or for prod's `backup`/`uploader` and caddy with a `command` or `entrypoint` added; no lint row for `backup` and `uploader` (caddy's command has one in `lint-caddy.test.ts`) | Cases for them, red with the loop off |
