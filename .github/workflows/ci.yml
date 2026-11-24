@@ -321,6 +321,10 @@ jobs:
         if: needs.changes.outputs.ci == 'true'
         run: pnpm exec vitest run -c tests/ci/vitest.config.ts
 
+      - name: Install the pinned Compose (infra/deploy/compose-version)
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
+        run: bash infra/ci/install-compose.sh
+
       - name: Compose-policy lint (C-70, C-79)
         if: needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
         # The image reference only has to be a digest-pinned value; the files take it from the environment (INFRA §6.1a).
@@ -638,6 +642,9 @@ jobs:
         if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Install the pinned Compose (infra/deploy/compose-version)
+        run: bash infra/ci/install-compose.sh
+
       - name: Build the image (local, no push)
         env:
           GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -772,7 +779,7 @@ jobs:
         run: docker build -t poly97-box:test tests/infra/provision
 
       - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
-        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh /repo/infra/ci/images-env.sh /repo/infra/ci/deploy-real-undo.sh
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh /repo/infra/ci/images-env.sh /repo/infra/ci/deploy-real-undo.sh /repo/infra/ci/install-compose.sh
 
       - name: Operator tool tests (Python stdlib, injected transports, no network)
         run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
