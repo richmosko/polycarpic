@@ -155,6 +155,7 @@ class World(object):
         self.bad_flags = []
         self.run_hang, self.run_names, self.stuck_oneoff, self.run_started = set(), [], set(), set()
         self.inspect_fail, self.inspect_calls = {}, []
+        self.config_rules = []
         self.child_secs = None  # G7: each health child (compose ps, exec; docker inspect) after the run's first `up` takes this long on the fake clock, or its timeout if shorter (and then times out)
         self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
         self.config_wrapped = []
@@ -449,6 +450,12 @@ class World(object):
             self.on_compose(subcmd, list(argv))
         if subcmd == "config":
             self.config_wrapped.append(self._isolated)
+            for rule in self.config_rules:  # G9: fail one file and pass another, or time out: rule(argv, stdin) -> None | "timeout" | (exit code, stderr[, stdout])
+                got = rule(list(argv), stdin)
+                if got == "timeout":
+                    raise TimeoutError("config")
+                if got:
+                    return got[0], (got[2] if len(got) > 2 else ""), got[1]
             if stdin is not None:  # the re-render of the saved judged file (`-f -`): the same JSON back, unless a test makes the second answer differ
                 d = json.loads(stdin)
                 return 0, json.dumps(self.rerender_hook(d) or d if self.rerender_hook else d), ""

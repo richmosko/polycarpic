@@ -309,3 +309,7 @@ T-real (tests/infra/deploy-real, tests/ci/deploy-key.test.ts): written, not run 
 | G5 (seceng-100): `pair_ok` checks existence only | test_deploy_sidecar.py: sidecar changed alone: each reader refuses `state` | red ×3 |
 | G5 (seceng-100): the same mutant | test_deploy_unwind_more.py: a restore with a saved pair whose sidecar differs is `rollback-unhealthy` | GREEN, LAYERED: `_saved_pair` also compares the stored hash itself; the case still pins the behaviour |
 | G5 (seceng-100): a changed sidecar alone does not stop `up` | test_deploy_render.py `SidecarTamper` | passes on the build as ruled (`up` re-hashes the .json against the Judged record) |
+
+## G9 / S39 (ruling 69f538ae), red on a66b0cf9-era build: `test_deploy_render_error.py` (9)
+
+Red today: no `render-error` line (reason, stage, exit code or `timeout`, the cleaned and cut text), the control render of the installed bundle is never made, so a box fault is `guard-render` with a quarantine instead of `render-env` without one; a timeout is not `render-env`. Green today with no mutant yet (UNTESTED until it is red on: printing stdout, the help text, an install command): `test_stdout_is_never_printed`, `test_no_install_command_and_no_help_text…`. The fake gained `config_rules` (fail one file and pass another, exit with stderr/stdout, or time out).
