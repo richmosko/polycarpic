@@ -484,7 +484,7 @@ It would have caught F1 (the real tar), F16 (`run`'s options), G1 (umask and uid
 
 - **Real:** root, the installed dispatcher and its umask, `install_box.py`, Docker, Compose, the job's own images, Postgres, and a local registry answering as `ghcr.io` over TLS (an `/etc/hosts` line, a CA in `/etc/docker/certs.d/ghcr.io`) holding the app, Postgres,
   Caddy and tools images, so `docker pull <name>@sha256:…` is real. **Faked:** GitHub's API (`gh`). The second candidate's ancestry check makes one real anonymous `git fetch` of the PR's public commit, said in the test.
-- **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users (10020 included), networks, env files, secrets. `provision.sh` stays with the box fixture.
+- **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users (10020 included), networks, env files, secrets. `provision.sh` stays with the box fixture. The harness never creates `/opt/polycarpic`, `releases`, `state/deploy` or the render home: only `install_box.py` and the tool make them, or G1 would pass unseen. Shown red on the code G1 was found in (`2825b6f7`).
 - **Steps:** `first-deploy staging` → exit 4 `roles-missing`; `provision --stage database`; again → healthy, containers on the digests, modes as G1; a second poll changes nothing; then a second release whose web never answers → rolled back within the window, quarantined,
   the first release healthy again; the next poll skips it. No argv names edge.
 - **Not covered:** systemd timers, real GitHub, a prod deploy (premigration backup, edge): POLY-104 and the first prod deploy.
