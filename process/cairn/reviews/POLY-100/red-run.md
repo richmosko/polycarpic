@@ -274,3 +274,24 @@ Mutants not made: S35's secret-in-render check (the build never saves a secret v
 | G7 | `test_deploy_budget.py` (2) | 29 s children: the rollback starts 145 s after the `up` (child budget computed once per poll) | the slow healthy child |
 | G8 | `host.test.ts` H23 ×3 | today's check filters on the string `docker compose`: a real render shape FAILs and a script named with the words PASSes | the right executable with other arguments (FAILs today by the same string match) |
 | G1 Linux, G2 prod-with-edge | not written: wait for devops-100's helper name | | |
+
+## Section G mutants on devops-100's build (e4d80fa9), Edit tool, restored by `git checkout`, tree clean after each
+
+| Mutant | Test | Result |
+|---|---|---|
+| G2: quarantine before the restore | test_deploy_unwind*.py | red ×4 (ENOSPC at the quarantine, log failing…, edge) |
+| G2: one `try` around log and alert | test_deploy_unwind.py | GREEN at first: my cases only failed the quarantine; added `test_a_log_that_cannot_be_written_never_stops_the_alert_…`; then red |
+| G2: `in-progress` cleared before the quarantine | test_deploy_unwind.py | red ×2 |
+| G2: a Refusal after `up` goes to `refuse` | test_deploy_unwind.py | red: `test_a_refusal_raised_after_up_restores_first` |
+| G3: `_start_postgres` asks `ps` again | test_deploy_ps_once.py | red: one ps before step 5 |
+| G3: a failed `ps` read as "not running" | test_deploy_ps_once.py | red: the first-ps-fails case |
+| G3: the candidate's render passed to Postgres with a `current` | — | EQUIVALENT: `pj` is used only when Postgres is down, and then it is reassigned from current's own judgement |
+| G4: gone on the exit code alone | test_deploy_gone.py | red ×3 |
+| G5: save before the in-memory fixed point | test_deploy_sidecar.py | red: a failed fixed point leaves a file |
+| G5: readers check existence, not the hash | test_deploy_sidecar.py | red ×2 |
+| G7: one 30 s child budget per poll | test_deploy_budget.py | red: 145 s > 125 s |
+| G1: no `chmod` repair | test_deploy_paths.py | red ×2 |
+| G1: repair through a link (no `O_NOFOLLOW`) | test_deploy_paths.py | red: link in the way |
+| G1: file checked, parents not | test_deploy_paths.py | red: non-`o+x` parent |
+| G1: `render-path` quarantines | test_deploy_paths.py | red ×2 |
+Still to do: G8 (one container run), G6's `_handle_interrupted` ignoring the restore's answer (the test is red on devops-100's build: `_Stop` is caught as `internal`, reported to devops-100), G6 `mark_transient`, S36's three cases, G2 for prod-with-edge, G1's Linux case.
