@@ -7,7 +7,7 @@ name=${FAKE_NAME:-$(basename "$0")}
 unsupported() { echo "FAKE: unsupported $name $*" >&2; exit 99; }
 vol() { cat "$S/volume" 2>/dev/null || echo empty; }
 case "$name" in
-  apt-get|mkfs.ext4|update-grub|update-initramfs|dpkg-reconfigure|swapoff|sysctl|ufw|hostnamectl|apt-key|add-apt-repository|reboot|shutdown) exit 0 ;;
+  mkfs.ext4|update-grub|update-initramfs|dpkg-reconfigure|swapoff|sysctl|ufw|hostnamectl|apt-key|add-apt-repository|reboot|shutdown) exit 0 ;;
   systemctl)
     case "$1" in is-enabled) echo enabled ;; is-active) echo active ;; esac
     exit 0 ;;
@@ -65,7 +65,42 @@ case "$name" in
         echo '{"code":"unauthorized","status":401,"message":"bad credentials"}'; exit 22 ;;
     esac
     exit 0 ;;
+  apt-get)
+    # G10: `install ... docker-compose-plugin=<ver>` records the installed version (dpkg-query answers it); everything else is a no-op that only the call log shows
+    for a in "$@"; do case "$a" in docker-compose-plugin=*) echo "${a#docker-compose-plugin=}" > "$S/compose-installed" ;; esac; done
+    exit 0 ;;
+  apt-mark)
+    case "$1" in
+      hold) shift; for p in "$@"; do grep -qx "$p" "$S/holds" 2>/dev/null || echo "$p" >> "$S/holds"; done ;;
+      unhold) shift; for p in "$@"; do grep -vx "$p" "$S/holds" > "$S/holds.new" 2>/dev/null; mv "$S/holds.new" "$S/holds" 2>/dev/null; done ;;
+      showhold) cat "$S/holds" 2>/dev/null ;;
+    esac
+    exit 0 ;;
+  dpkg-query)
+    # `dpkg-query -W -f='${Version}' docker-compose-plugin`: the installed version, or exit 1 when the package is not installed
+    [ -s "$S/compose-installed" ] || exit 1
+    printf '%s' "$(cat "$S/compose-installed")"; exit 0 ;;
+  apt-cache)
+    want=$(tr -d '\n' < /repo/infra/deploy/compose-version 2>/dev/null || echo 5.7.1)
+    case "$1" in
+      madison)
+        # the versions Docker's repository offers: the pinned one, an older and a newer
+        for v in ${COMPOSE_MADISON:-$(cat "$S/compose-madison" 2>/dev/null || echo "5.8.0 $want 2.40.3")}; do
+          echo " docker-compose-plugin | $v-1~ubuntu.24.04~noble | $(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu) noble/stable amd64 Packages"; done ;;
+      policy)
+        inst=$(cat "$S/compose-installed" 2>/dev/null || echo "(none)")
+        printf 'docker-compose-plugin:\n  Installed: %s\n  Candidate: %s\n  Version table:\n *** %s 500\n        500 %s noble/stable amd64 Packages\n' "$inst" "$inst" "$inst" "$(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu)" ;;
+    esac
+    exit 0 ;;
   docker)
+    if [ "$1" = compose ] && [ "$2" = version ]; then
+      # G10: the pinned Compose, asked as root and as the render user (uid 10020 reads its own answer); default: the pinned file's version
+      want=$(tr -d '\n' < /repo/infra/deploy/compose-version 2>/dev/null || echo 5.7.1)
+      f="$S/compose-version"; [ "$(id -u)" = 10020 ] && [ -s "$S/compose-version-render" ] && f="$S/compose-version-render"
+      [ -e "$S/compose-fails" ] && { echo "FAKE: compose plugin broken" >&2; exit 1; }
+      case " $* " in *" --short "*) echo "$(cat "$f" 2>/dev/null || echo "$want")" ;; *) echo "Docker Compose version v$(cat "$f" 2>/dev/null || echo "$want")" ;; esac
+      exit 0
+    fi
     case "$1" in
       --version|version) echo "Docker version 29.9.3"; exit 0 ;;
       info)

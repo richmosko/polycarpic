@@ -46,6 +46,52 @@ describe('provision.sh host stage (R5)', () => {
     expect(r.out).toMatch(/docker-compose-plugin/);
   });
 
+  // ---- G10 / S40 (ruling f5a62e3c, f887180d): exactly one Compose, the version in infra/deploy/compose-version, held alone ----
+  const WANT = readFileSync(join(ROOT, 'infra', 'deploy', 'compose-version'), 'utf8').trim();
+  const composeCalls = `grep -E '^(apt-get|apt-mark) ' /var/fake-state/calls.log`;
+
+  it('G10 provision: installs docker-compose-plugin at exactly the file\'s version and holds that one package alone (never docker-ce, containerd or runc)', () => {
+    const r = run(`${ENTER} ${HOSTRUN} > /dev/null 2>&1; ${composeCalls}`);
+    expect(r.out, 'an exact-version install').toMatch(new RegExp(`^apt-get .*install.* docker-compose-plugin=${WANT.replace(/\./g, '\\.')}-`, 'm'));
+    const holds = r.out.split('\n').filter((l) => l.startsWith('apt-mark hold'));
+    expect(holds.length, 'one hold').toBe(1);
+    expect(holds[0]).toMatch(/^apt-mark hold docker-compose-plugin$/);
+    expect(r.out, 'no other package is held').not.toMatch(/apt-mark hold .*(docker-ce|containerd|runc|docker-ce-cli)/);
+  });
+
+  it('G10 provision: a newer plugin already installed (and held) is brought down to the version with the downgrade flags, then held; a rerun changes nothing', () => {
+    const r = run(`${ENTER} echo 5.8.0-1~ubuntu.24.04~noble > /var/fake-state/compose-installed; echo docker-compose-plugin > /var/fake-state/holds; ${HOSTRUN} > /dev/null 2>&1; ${composeCalls}`);
+    expect(r.out).toMatch(/apt-mark unhold docker-compose-plugin/);
+    expect(r.out).toMatch(/--allow-downgrades/);
+    expect(r.out).toMatch(/--allow-change-held-packages/);
+    expect(r.out).toMatch(new RegExp(`docker-compose-plugin=${WANT.replace(/\./g, '\\.')}-`));
+    const again = run(`${ENTER} ${HOSTRUN} > /dev/null 2>&1; : > /var/fake-state/calls.log; ${HOSTRUN} > /dev/null 2>&1; grep -c 'docker-compose-plugin=' /var/fake-state/calls.log || true`);
+    expect(again.out.trim().split('\n').pop(), 'a second run installs nothing').toBe('0');
+  });
+
+  it('G10 provision: a version Docker\'s repository does not list stops provision (never a newer one)', () => {
+    const r = run(`${ENTER} echo "5.8.0 2.40.3" > /var/fake-state/compose-madison; ${HOSTRUN} 2>&1${rc}; grep -c 'docker-compose-plugin=' /var/fake-state/calls.log || true`);
+    expect(r.out).not.toMatch(/rc=0/);
+    expect(r.out.trim().split('\n').pop(), 'no other version was installed').toBe('0');
+  });
+
+  it('G10 provision-check: a complete box passes the Compose check; another major, another patch, an unheld package, Ubuntu\'s package, a plugin under /root/.docker/cli-plugins and the two users answering differently each FAIL it', () => {
+    const fail = (setup: string) => {
+      const r = run(`${b2Fixture({})}\n${setup}; ${CHECK}${rc}`, { image: COMPLETE });
+      return lines(r.out).filter((l) => l.kind === 'FAIL' && /compose/i.test(l.text));
+    };
+    expect(fail(':'), 'the complete box fails the compose check').toEqual([]);
+    for (const [label, setup] of [
+      ['another major', 'echo 2.40.3 > /var/fake-state/compose-version'],
+      ['another patch', 'echo 5.7.0 > /var/fake-state/compose-version'],
+      ['an unheld package', ': > /var/fake-state/holds'],
+      ['Ubuntu\'s package', 'echo http://archive.ubuntu.com/ubuntu > /var/fake-state/compose-origin'],
+      ['a plugin under /root/.docker/cli-plugins', 'mkdir -p /root/.docker/cli-plugins && : > /root/.docker/cli-plugins/docker-compose'],
+      ['the render user answering differently', 'echo 5.8.0 > /var/fake-state/compose-version-render; chmod 0644 /var/fake-state/compose-version-render'],
+      ['a failing compose', ': > /var/fake-state/compose-fails'],
+    ] as const) expect(fail(setup).length, label).toBeGreaterThan(0);
+  });
+
   it('refuses a Docker key whose fingerprint differs: exit non-zero, says fingerprint, installs no docker package', () => {
     const r = run(`${ENTER} echo 0000000000000000000000000000000000000000 > /var/fake-state/docker-key-fpr; ${HOSTRUN} 2>&1${rc}; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^apt-get .*install.*docker-ce' || true`);
     expect(r.out).not.toMatch(/rc=0/);
