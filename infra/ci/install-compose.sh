@@ -1,48 +1,37 @@
 #!/usr/bin/env bash
-# Installs the one Compose version of infra/deploy/compose-version on a CI runner (POLY-100 G10, S40 d), from Docker's apt repository, and fails
-# unless `docker compose version --short` then answers exactly that version. Never the runner's own. Every command is printed before it runs, and
-# nothing's output is hidden: the step's log is the diagnosis.
+# Installs the one Compose version of infra/deploy/compose-version on a CI runner (POLY-100 G10, S40 d, C-81): the release binary of that version from
+# github.com/docker/compose, checked against the sha256 committed in infra/deploy/compose-sha256 (taken from the release's own checksums.txt and from a
+# download hashed locally, which agreed), installed as the system CLI plugin that Docker looks at before the runner's own. It fails unless
+# `docker compose version --short` then answers exactly the pinned version. The box does not use this: provision.sh installs the same version from Docker's
+# apt repository.
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 want=$(tr -d '[:space:]' < "$here/../deploy/compose-version")
 [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "install-compose.sh: infra/deploy/compose-version does not hold one version" >&2; exit 1; }
-FPR=9DC858229FC7DD38854AE2D88D81803C0EBFCD88
-APT=(-o DPkg::Lock::Timeout=300 -o Acquire::Retries=3)
+sums="$here/../deploy/compose-sha256"
 
 run() { echo "+ $*"; "$@"; }
 
-if [ "$(docker compose version --short 2> /dev/null || true)" = "$want" ]; then
-  echo "install-compose.sh: Compose $want already installed"
-  exit 0
-fi
-echo "install-compose.sh: running Compose is '$(docker compose version --short 2> /dev/null || echo none)', pinned $want"
+case "$(uname -m)" in
+  x86_64) arch=x86_64 ;;
+  aarch64 | arm64) arch=aarch64 ;;
+  *) echo "install-compose.sh: no Compose release for $(uname -m)" >&2; exit 1 ;;
+esac
+name="docker-compose-linux-$arch"
+url="https://github.com/docker/compose/releases/download/v$want/$name"
+expect=$(awk -v n="$name" '$2 == n { print $1 }' "$sums")
+[[ "$expect" =~ ^[0-9a-f]{64}$ ]] || { echo "install-compose.sh: $sums holds no sha256 for $name" >&2; exit 1; }
 
-# Docker's repository: the runner image may already carry it (then it is used as it is: a second entry with another Signed-By makes `apt-get update` fail);
-# else it is added, the key checked against provision.sh's fingerprint first.
-if grep -rqs 'download.docker.com' /etc/apt/sources.list /etc/apt/sources.list.d/; then
-  echo "install-compose.sh: Docker's apt repository is already configured:"
-  grep -rs 'download.docker.com' /etc/apt/sources.list /etc/apt/sources.list.d/ || true
-else
-  keyring=/etc/apt/keyrings/docker.gpg
-  tmp=$(mktemp)
-  run curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp"
-  got=$(gpg --show-keys --with-colons "$tmp" | awk -F: '$1 == "fpr" { print $10; exit }')
-  [ "$got" = "$FPR" ] || { echo "install-compose.sh: Docker's apt key fingerprint is $got, expected $FPR" >&2; exit 1; }
-  run sudo install -d -m 0755 /etc/apt/keyrings
-  gpg --dearmor < "$tmp" | sudo tee "$keyring" > /dev/null
-  run sudo chmod 0644 "$keyring"
-  codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://download.docker.com/linux/ubuntu $codename stable" | sudo tee /etc/apt/sources.list.d/docker.list
-fi
-run sudo apt-get "${APT[@]}" update
-cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2); if (index($2, w "-") == 1) { print $2; exit } }')
-if [ -z "$cand" ]; then
-  echo "install-compose.sh: Docker's repository does not list docker-compose-plugin $want; it lists:" >&2
-  apt-cache madison docker-compose-plugin >&2 || true
-  exit 1
-fi
-run sudo apt-get "${APT[@]}" install -y --no-install-recommends --allow-downgrades "docker-compose-plugin=$cand"
+echo "install-compose.sh: running Compose is '$(docker compose version --short 2> /dev/null || echo none)', pinned $want"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+run curl -fsSL --retry 3 -o "$tmp/$name" "$url"
+got=$(sha256sum "$tmp/$name" | awk '{ print $1 }')
+[ "$got" = "$expect" ] || { echo "install-compose.sh: $name has sha256 $got, expected $expect; nothing installed" >&2; exit 1; }
+echo "install-compose.sh: sha256 $got matches $sums"
+run sudo install -d -m 0755 /usr/local/lib/docker/cli-plugins
+run sudo install -m 0755 "$tmp/$name" /usr/local/lib/docker/cli-plugins/docker-compose
 got=$(docker compose version --short)
-[ "$got" = "$want" ] || { echo "install-compose.sh: Compose is $got, expected $want" >&2; exit 1; }
+[ "$got" = "$want" ] || { echo "install-compose.sh: Compose is $got, expected $want" >&2; docker compose version >&2 || true; ls -la "$HOME/.docker/cli-plugins" /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins >&2 || true; exit 1; }
 echo "install-compose.sh: Compose $got"
