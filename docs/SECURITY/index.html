@@ -26,8 +26,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.19.0</span>
-    <span><strong>Last updated:</strong> 2026-11-23</span>
+    <span><strong>Version:</strong> 1.20.0</span>
+    <span><strong>Last updated:</strong> 2026-11-24</span>
   </div>
 </header>
 
@@ -1446,7 +1446,7 @@ host  replication  all          all                reject</code></pre></li>
         <li>the image's revision label equals that commit. This catches a build fault only: a hostile build writes its own label;</li>
         <li>the sibling images, whose digests the attested app image names, pass the same checks at the same commit;</li>
         <li>the release bundle copied out of the image holds exactly the listed files, with no link, device or setuid bit. The host runs nothing from it;</li>
-        <li><strong>the compose guard.</strong> Root's installed tool judges the rendered compose configuration against its own installed allowlist, never the release's. It renders with no network and as an unprivileged user that reads no secret. Services, images, users, capabilities, mounts, networks, secrets, env files and ports are all allowlisted, and the file that was judged is the file that is started. A release that needs more is refused until the operator installs a reviewed tool.</li>
+        <li><strong>the compose guard.</strong> Root's installed tool judges the rendered compose configuration against its own installed allowlist, never the release's. It renders with no network and as an unprivileged user that reads no secret, with one exact Compose version, which root and that user must both answer, and never from the caller's directory or a <code>.env</code> file. Services, images, users, capabilities, mounts, networks, secrets, env files and ports are all allowlisted, and the file that was judged is the file that is started. A release that needs more is refused until the operator installs a reviewed tool.</li>
       </ol>
       Any failure logs, alerts and stops. A fault of the release quarantines its digest; an outage does not. Prod takes an encrypted backup before any container of the new release holds a credential.
       <ul>
@@ -1454,6 +1454,7 @@ host  replication  all          all                reject</code></pre></li>
         <li><strong>The box token</strong> is <code>github_read_token</code> (§6.1). Stolen, it reads what anyone can and can use up the owner's API rate limit, which pauses deploys.</li>
         <li><strong>Caddy comes only from signed releases.</strong> It decrypts prod's traffic, so a staging run never names it, on any host. Before prod exists the operator brings up Caddy alone from a signed <code>edge-&lt;n&gt;</code> tag with <code>edge-deploy</code>. Edge and prod tags cannot stand in for each other, <code>edge-deploy</code> refuses once prod exists, and prod takes over only from the same commit or a later one. The Caddyfile is an exact line list in the lint. A signed Caddy that starts but forwards or logs wrongly is stopped by the lint, review and the signature, not by the box; after a deploy, root asks for health through Caddy, which catches misrouting only.</li>
         <li><strong>Residual.</strong> The attestation proves the image was built by <code>build.yml</code> in this repository from that commit, not that the commit is safe. The signed tag is the human gate, so whoever holds the signing key holds prod.</li>
+        <li><strong>Not yet shown end to end:</strong> no deploy has completed on real Docker, and no CI step runs one. POLY-162 builds what that needs (the database, the worker's command, a health answer) and the test that shows it. Until then this control rests on the tests below, which use fakes for Docker, the registry and GitHub, and the first staging deploy (POLY-104) waits for it.</li>
         <li><strong>Tested by:</strong> <code>tests/infra/ops/test_deploy*.py</code> (real git and SSH signatures, fake registry and GitHub), <code>compose-real.test.ts</code> and <code>render-isolation.test.ts</code> (real Compose renders, on Linux), <code>release-bundle.test.ts</code> (the built image). On staging before the first prod deploy (POLY-104), an image attested by another workflow or repository, one attested from a branch other than <code>main</code> and one attested at another commit are refused; a tag signed by a key not in <code>allowed_signers</code> is refused; the token reminder fires at 14 days.</li>
         <li><strong>Who builds.</strong> <code>build.yml</code> runs on a push to <code>main</code> and on its weekly schedule only, and a manual dispatch is refused off <code>main</code>. The weekly run is a full rebuild in <code>build.yml</code>: push, scan, SBOM, attest, with no cache. It exists because the runtime stage runs <code>apt-get upgrade</code>: Debian security fixes land between base-image digests (10 fixable HIGH were measured on the pinned digest). So a commit can carry several attested digests over time. The image is a product of the commit and the signed Debian archive at build time. The attestation and the SBOM record what shipped; byte-for-byte reproduction from the commit alone is not claimed.
           <ul>
