@@ -1,12 +1,12 @@
 ---
 id: POLY-162d
 title: Deploy test: security review
-status: done
+status: in-progress
 milestone: POLY-M1
 parent: POLY-162
 blocked_by: []
 assignee: seceng
-paths: [process/cairn/issues/POLY-162.md, process/cairn/reviews/POLY-162/**, process/cairn/issues/POLY-162d.md, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-162.md, process/cairn/reviews/POLY-162/**, process/cairn/issues/POLY-162d.md, docs/SECURITY/**, .gitleaksignore]
 stage: review
 estimate.cost_usd: "20.00"
 estimate.gate_cycles: 2
