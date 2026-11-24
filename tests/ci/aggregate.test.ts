@@ -11,7 +11,7 @@ const ifOf = (job: string) => `${wf('ci.yml').jobs[job]?.if ?? ''}`;
 const wired = (out: string) => ['lint', 'unit', 'db', 'image', 'provision'].filter((j) => new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`).test(ifOf(j))).sort();
 
 type Needs = Record<string, { result: string; outputs: Record<string, string> }>;
-const OUT = ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'provision', 'backup']; // POLY-99: the backup suite key (gated step in the image job)
+const OUT = ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'provision', 'backup', 'deploy']; // POLY-99: the backup suite key (gated step in the image job)
 // POLY-141 C20: the aggregate also reads the four area keys; `db` is their OR, so asking for `db` turns all four on.
 const AREAS = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
 const outputsFor = (on: string[]): Record<string, string> => {
@@ -46,7 +46,7 @@ describe('aggregate.mjs', () => {
     it(`${j} failure -> red`, () => { expect(agg(set(base(), j, 'failure'))).not.toBe(0); });
     it(`${j} cancelled -> red  [red if: only 'failure' is rejected]`, () => { expect(agg(set(base(), j, 'cancelled'))).not.toBe(0); });
   }
-  const keyed: [string, string][] = [['node', 'unit'], ['layers', 'lint'], ['ci', 'lint'], ['image', 'image'], ['db', 'db'], ['e2e', 'unit'], ['provision', 'provision'], ['backup', 'image']];
+  const keyed: [string, string][] = [['node', 'unit'], ['layers', 'lint'], ['ci', 'lint'], ['image', 'image'], ['db', 'db'], ['e2e', 'unit'], ['provision', 'provision'], ['backup', 'image'], ['deploy', 'image']]; // T-real (ruling 3765f358): `deploy` gates one step of the image job, which runs on it
   for (const [out, job] of keyed) {
     it(`output ${out}=true but ${job} skipped -> red (mis-wired if:)  [red if: output->job check removed or mapped wrong]`, () => {
       expect(agg(base([out]))).not.toBe(0);
