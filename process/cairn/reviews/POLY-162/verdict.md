@@ -1,7 +1,15 @@
 # POLY-162e verdict: deploy test passing end to end
 
-Architect. **Pre-registered checklist**, written at `a1d5da3f`, before the gate and before any CI result. Not yet judged.
-Read: the whole diff `main...a1d5da3f`, the T-real suite and harness, rows G13 to G15 and "T-real" of `../POLY-100/ruling.md`. I run no container suite.
+Architect. Judged once at gate sha `78888010` (product and tests `a975ba56`; only records after it). Checklist pre-registered at `d0ea5655`.
+
+**Verdict: CHANGES REQUESTED, one item (C1, one test).** Nothing is asked of `infra/**`, `apps/web/src/**` other than that test, or the workflow. The product is as ruled on what I read.
+
+**C1 (qa, `public-health.test.ts`).** The ruled mutant "logging the URL" survives: with `console.log(req.url)` at the top of `answer()`, 16 of 16 passed; reverted, 16 of 16. The test spies `process.stdout.write`, which vitest's console
+does not go through. Wanted: that mutant red (spy `console` too, or read a child's real output), and a control that the capture sees a planted line. With it, record the other ruled G15 mutants as run: decoding, `HEAD`, echoed header,
+`maxHeaderSize`, `requestTimeout`, `keepAliveTimeout`, `connectionsCheckingInterval`, `maxRequestsPerSocket`, exported handler. Only `startsWith`, `maxConnections`, `headersTimeout` are on record as red (`5ba0105c`). By reading the rest are caught; nobody has shown it.
+
+Read: the diff `main...a1d5da3f`; `a1d5da3f..a975ba56` for product, workflow, T-real, its pins, lint and guard cases, and not its other test files (the sweep's, the aggregate's, the wiring's); rows G13 to G15 and "T-real" of `../POLY-100/ruling.md`.
+**Ran:** that one mutant, a unit test. The worktree hook refused a scripted run of the other G15 mutants and I did not rerun it. No container suite.
 
 ## Axes
 
@@ -9,18 +17,18 @@ Result and evidence (sha or run id) are filled once, at the gate sha.
 
 | # | Axis | Passes when | Result | Evidence |
 |---|---|---|---|---|
-| A1 | Criterion 1, G13 | `provision-db-create.test.ts` is green in CI's `image` job; G13's four mutants are red; T-real's `provision --stage database` is exit 0 on a fresh cluster | | |
-| A2 | Criterion 2, G14 | guard, lint and both compose files as ruled; B2 and B5 settled | | |
-| A3 | Criterion 3, G15 and S42 | module as ruled; every ruled mutant red; B7 and D1 settled; seceng's build review has no open S42 item | | |
-| A4 | Criterion 4, T-real in CI | a CI run at the gate's product sha where the step **ran**: 3 files, 16 or more tests passed, 0 skipped, read in the log and not from the job colour; rollback case included; tests/ci pin green; B1, B3, B4, B6 settled | | |
-| A5 | Criterion 5, time | measured step and `image` job time from CI recorded; worst case ≤ 17 min (1020 s), else T-real is in its own job. See "Time" | | |
-| A6 | Criterion 6, faults | each product fault found is fixed or filed, with a test shown red on it | | |
-| A7 | Trigger list | every row of the ruling is in `changes.mjs` and pinned (`public-health.ts` and the undo script included); import walk green | | |
-| A8 | Job placement, S38 a to e | last non-always step of `image`; never in `build.yml`; `contents: read`; no token; undo is `always()`; no later pull; kept log named and swept; B1, B8, B9 settled | | |
-| A9 | Undo | CI log shows the undo ran; what it removes matches the harness's header | | |
-| A10 | Whole CI run | every job green at the gate sha | | |
-| A11 | qa `gate.md`; seceng `build-review.md` | signed; no open blocker | | |
-| A12 | Documents | ARCH (mine, below). INFRA §4.4 "Not yet run end to end" and SECURITY's "Not yet shown end to end" no longer say what is now untrue, without history | | |
+| A1 | Criterion 1, G13 | `provision-db-create.test.ts` is green in CI's `image` job; G13's four mutants are red; T-real's `provision --stage database` is exit 0 on a fresh cluster | met | `9233f8f3`: three mutants red; the fourth (helper makes it first) held by the control case, by reading. Run 45507656076: container tests and T-real's provision step green |
+| A2 | Criterion 2, G14 | guard, lint and both compose files as ruled; B2 and B5 settled | met, except committed guard cases for prod's backup and uploader and for caddy (follow-up 2) | `2cee4fc4`, `0c487709`; seceng's own guard run covers those three |
+| A3 | Criterion 3, G15 and S42 | module as ruled; every ruled mutant red; B7 and D1 settled; seceng's build review has no open S42 item | **NOT MET (C1)**; product met by reading | my mutant run above. Flush mutant survives: accepted, seceng measured both forms alike. D1 and the rest of B7: POLY-161 |
+| A4 | Criterion 4, T-real in CI | a CI run at the gate's product sha where the step **ran**: 3 files, 16 or more tests passed, 0 skipped, read in the log and not from the job colour; rollback case included; tests/ci pin green; B1, B3, B4, B6 settled | met | run 45507656076 @ `a975ba56`, log read: 3 files, 17 of 17, no skip; `CI` passed through sudo. `faulted-runs.md`; B6's 120 s bound has no red of its own (follow-up 4) |
+| A5 | Criterion 5, time | measured step and `image` job time from CI recorded; worst case ≤ 17 min (1020 s), else T-real is in its own job. See "Time" | met: moved to its own job | run 45500690283: 737 + 295 = 1032 s, over. Run 45507656076: `deploy-real` 419 s of 900, T-real step 290 s; `image` 602 s without T-real. One run each |
+| A6 | Criterion 6, faults | each product fault found is fixed or filed, with a test shown red on it | met on the record | beyond G13 to G15 none is recorded as the product's; the rest were the harness's and the undo's (F3). `faulted-runs.md`, `build-review.md` |
+| A7 | Trigger list | every row of the ruling is in `changes.mjs` and pinned (`public-health.ts` and the undo script included); import walk green | met | `deploy-key.test.ts` ROWS at `a975ba56`; `gate.md`: tests/ci 715 of 715 |
+| A8 | Job placement, S38 a to e | last non-always step of `image`; never in `build.yml`; `contents: read`; no token; undo is `always()`; no later pull; kept log named and swept; B1, B8, B9 settled | met, in its own job (the ruling's own alternative); last non-always step of it | `ci.yml` @ `a975ba56`; run 45507656076: sweep, undo, then `kept.log` alone uploaded; pins read; seceng confirms B9 @ `6f81ea42` |
+| A9 | Undo | CI log shows the undo ran; what it removes matches the harness's header | ran; result not shown | run 45507656076; the script always exits 0, so its green says only that it ran. List matches by reading (F3 fixed). Follow-up 3 |
+| A10 | Whole CI run | every job green at the gate sha | met at `a975ba56` (the gate sha adds records only); C1's commit needs its own green run | run 45507656076: all ten jobs success |
+| A11 | qa `gate.md`; seceng `build-review.md` | signed; no open blocker | met; seceng's pass waits on CI and is void if the product tip moves | `gate.md` @ `78888010`; `build-review.md` @ `6f81ea42`. The ops unit suite (555, 1 skipped) was the lead's run, relayed, with no saved output: it goes into `gate-output/` |
+| A12 | Documents | ARCH (mine, below). INFRA §4.4 "Not yet run end to end" and SECURITY's "Not yet shown end to end" no longer say what is now untrue, without history | met | `docs/ARCH` unchanged since `d0ea5655`, re-read; INFRA §4.4 and SECURITY's passage @ `a975ba56` |
 
 ## Assertions and steps that would pass a wrong build (by reading, unless marked measured)
 
@@ -52,6 +60,16 @@ the gate shows another test holds the clause. B7 and B8: follow-ups if open.
 
 Image job without T-real, measured: 626, 644 and 737 s (ruling R13's table, PR #150). T-real locally: 299 s. 737 + 299 = 1036 s, over 1020 before G13's new file is added.
 The rule at the gate: worst case = the slowest measured `image` job without T-real (737 s, or a slower one seen) + G13's file + T-real's step, both measured on CI. Over 1020 s, T-real moves to its own job; one fast run does not settle it.
+
+## Follow-ups (POLY-160, or POLY-161 where named)
+
+1. D2: the lint compares only web's `healthcheck.test`; the guard the whole object. With seceng's U1, U2.
+2. Committed guard cases for prod's backup and uploader and for caddy.
+3. A check of what the undo leaves (U3).
+4. B6's lower bound shown red on its own.
+5. POLY-161: D1; a test that spawns `main.ts`; health not answered on 8081.
+
+**Not proven here:** real GitHub and attestation, a timer firing on schedule, prod, edge, the tools image (POLY-104 and the first prod deploy).
 
 ## ARCH
 
