@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 
-from lib import compose, compose_guard, guardhelp, release as rel, sauth, spool, stack, tokenexp
+from lib import compose, compose_guard, dirs, guardhelp, release as rel, sauth, spool, stack, tokenexp
 from lib.release import Refusal
 
 LOCK = "/run/polycarpic/deploy.lock"
@@ -50,6 +50,10 @@ def locked(project, ctx, first, wait=0, existing_data=False):
         return 0
     work = None
     try:
+        try:
+            dirs.ensure_shared(ctx, project)  # G1: every shared directory exactly 0755, or `render-path` and nothing repaired through a link
+        except Refusal as err:
+            return refuse(project, ctx, err)
         rel.clear_incoming(ctx)  # leftovers of an interrupted run, removed under the lock (F3)
         work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, project))
         os.chmod(work, 0o700)
@@ -136,27 +140,31 @@ def _handle_interrupted(project, ctx, cur):
     _unlink(ctx, project, "in-progress")
 
 
+def _note(ctx, project, *fields):
+    """A log line that can never end a run (G2, G6): a full disk is not a reason to leave a candidate half in."""
+    try:
+        rel.log(ctx, project, *fields)
+    except Exception:
+        pass
+
+
 def _internal(project, ctx, err, digest, run):
-    """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it R8's automatic rollback."""
-    rel.log(ctx, project, "refused", "internal", digest)
+    """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it the unwind (R8's automatic rollback)."""
+    ctx.err("deploy: internal error: %s" % err.__class__.__name__)
     if not run["up"]:
-        ctx.err("deploy: internal error: %s" % err.__class__.__name__)
-        rel.alert(ctx, project, "internal")
+        try:
+            rel.alert(ctx, project, "internal")
+        except Exception:
+            pass
+        _note(ctx, project, "refused", "internal", digest)
         ctx.err("deploy: refused internal")
         return 1
-    ctx.err("deploy: internal error: %s" % err.__class__.__name__)
-    try:
-        return _rollback_auto(project, ctx, digest, run["cur"], run["owns"], run["probe"])
-    except Exception:
-        rel.log(ctx, project, "rollback-unhealthy", digest)
-        rel.alert(ctx, project, "rollback-unhealthy")
-        ctx.err("deploy: rollback-unhealthy")
-        return 1
+    return _rollback_auto(project, ctx, digest, run["cur"], run["owns"], run["probe"], why="internal", run=run)
 
 
 def _deploy(project, ctx, work, first, existing_data):
     seen = {"digest": "-"}
-    run = {"up": False, "cur": None, "owns": False, "probe": None}
+    run = {"up": False, "cur": None, "owns": False, "probe": None, "held": False}
     try:
         try:
             return _deploy_checked(project, ctx, work, first, existing_data, seen, run)
@@ -165,8 +173,11 @@ def _deploy(project, ctx, work, first, existing_data):
         except Exception as err:
             return _internal(project, ctx, err, seen["digest"], run)
         finally:
-            if run["up"]:
-                _unlink(ctx, project, "in-progress")
+            if run["up"] and not run.get("held"):
+                try:
+                    _unlink(ctx, project, "in-progress")
+                except OSError:
+                    pass
     except rel.Transient as err:
         rel.log(ctx, project, "transient", str(err))
         mark_transient(ctx, project)
@@ -175,6 +186,8 @@ def _deploy(project, ctx, work, first, existing_data):
             return 1
         return 0
     except Refusal as err:
+        if run["up"]:  # G2: a refusal after the first `up` is not a clean refusal: the old release comes back first
+            return _rollback_auto(project, ctx, seen["digest"], run["cur"], run["owns"], run["probe"], reason=err.name if err.quarantine else None, why=err.name, run=run)
         return refuse(project, ctx, err, seen["digest"])
     except _Stop as stop:
         return stop.code
@@ -526,9 +539,9 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, r
     if owns:
         code = _edge_up(ctx, judged.get("edge"), digest)
         if code != 0:
-            return _rollback_auto(project, ctx, digest, cur, owns, live_probe)
+            return _rollback_auto(project, ctx, digest, cur, owns, live_probe, run=run)
     code, _, _ = _compose(ctx, stack.up_argv(judged[project], project))
-    rel.log(ctx, project, "up", digest)
+    _note(ctx, project, "up", digest)
     up_ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=live_probe, judged=judged[project])
     if up_ok and owns:
         up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=live_probe, judged=judged["edge"])
@@ -537,7 +550,7 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, r
         if probe and not baseline_ok:  # A13: the probe was not required, and the alert says so even when healthy
             rel.alert(ctx, project, "edge-probe-baseline")
         return code
-    return _rollback_auto(project, ctx, digest, cur, owns, live_probe)
+    return _rollback_auto(project, ctx, digest, cur, owns, live_probe, run=run)
 
 
 def _probe_baseline(project, ctx, first):
@@ -587,7 +600,7 @@ def _healthy(project, ctx, rdir, digest, tag, commit, cur):
     inter = rel.read(ctx, project, "interrupted")
     if inter is not None and inter.strip() == digest:  # that digest is healthy now (S33)
         _unlink(ctx, project, "interrupted")
-    rel.log(ctx, project, "healthy", digest)
+    _note(ctx, project, "healthy", digest)
     return 0
 
 
@@ -631,28 +644,57 @@ def _prune(ctx):
                     pass
 
 
-def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None):
-    """R8: the candidate did not become healthy; put `current` back from its own release, never migrating."""
-    rel.quarantine(ctx, project, digest, "unhealthy")
-    if cur is None:
-        if project == "prod" and owns:  # a first prod deploy that ups Caddy and fails puts Caddy back on edge's `current` (S23); the outcome stays unhealthy
-            from lib import edge
-            try:
-                ptr = rel.load_pointer(ctx, "edge", "current")
-            except Refusal:
-                ptr = None
-            if ptr:
-                edge.restore(ctx, ptr, wait_healthy=False)
-        rel.log(ctx, project, "rollback-unhealthy", digest)
-        rel.alert(ctx, project, "rollback-unhealthy")
-        ctx.err("deploy: rollback-unhealthy")
-        return 1
-    ok = restore(project, ctx, cur, owns, probe)
+def unwind(project, ctx, digest, restore_fn, reason=None, why=None, run=None):
+    """G2: the one exit of a run that started something and did not end healthy. Restore first; then quarantine, log, alert and clearing
+    `in-progress`, each in its own `try`, in that order, none able to stop the next. `in-progress` is cleared only after the quarantine line is
+    on disk, so a failed write leaves the next run to treat the digest as interrupted. The alert goes to stderr too, and the exit is never 0."""
+    try:
+        ok = bool(restore_fn())
+    except Exception:
+        ok = False
     name = "rolled-back" if ok else "rollback-unhealthy"
-    rel.log(ctx, project, name, digest)
-    rel.alert(ctx, project, name)
+    q_ok = True
+    if reason:
+        try:
+            rel.quarantine(ctx, project, digest, reason)
+        except Exception:
+            q_ok = False
+    try:
+        if why or reason:
+            rel.log(ctx, project, "refused", why or reason, digest)
+        rel.log(ctx, project, name, digest)
+    except Exception:
+        pass
+    try:
+        rel.alert(ctx, project, name)
+    except Exception:
+        pass
     ctx.err("deploy: " + name)
+    if q_ok:
+        try:
+            _unlink(ctx, project, "in-progress")
+        except OSError:
+            pass
+    elif run is not None:
+        run["held"] = True
     return 1
+
+
+def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None, reason="unhealthy", why=None, run=None):
+    """R8: the candidate did not end healthy; put `current` back from its own release, never migrating."""
+    def back():
+        if cur is None:
+            if project == "prod" and owns:  # a first prod deploy that ups Caddy and fails puts Caddy back on edge's `current` (S23); the outcome stays unhealthy
+                from lib import edge
+                try:
+                    ptr = rel.load_pointer(ctx, "edge", "current")
+                except Refusal:
+                    ptr = None
+                if ptr:
+                    edge.restore(ctx, ptr, wait_healthy=False)
+            return False
+        return restore(project, ctx, cur, owns, probe)
+    return unwind(project, ctx, digest, back, reason, why, run)
 
 
 def restore(project, ctx, ptr, owns=None, probe=None):

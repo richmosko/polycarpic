@@ -4,7 +4,7 @@ Quarantines `current`, re-checks `previous`'s tree hash, runs the installed guar
 """
 import os
 
-from lib import deployer as deploy, edge, release as rel
+from lib import deployer as deploy, dirs, edge, release as rel
 
 HELP = "rollback prod|staging|edge (bring back the previous release; no network)"
 WAIT = 10 * 60
@@ -25,6 +25,7 @@ def run(args, ctx):
     try:
         try:
             deploy.require_data_mount(ctx)  # F13
+            dirs.ensure_shared(ctx, project)  # G1
         except rel.Refusal as err:
             ctx.err("rollback: refused %s" % err.name)
             return err.code
@@ -36,26 +37,41 @@ def run(args, ctx):
         if not cur or not prev:
             ctx.err("rollback: there is no previous release")
             return 4
-        rel.quarantine(ctx, project, cur["digest"], "rollback")
-        try:
+        try:  # G2: restore first, then the records
             ok = deploy.restore(project, ctx, prev)
         except Exception:  # F2: an exception inside the rollback is `rollback-unhealthy`, always with an alert
             ok = False
+        code = 0
+        try:
+            rel.quarantine(ctx, project, cur["digest"], "rollback")
+        except Exception:
+            ctx.err("rollback: the quarantine line could not be written")
+            code = 1
         if not ok:
-            rel.log(ctx, project, "rollback-unhealthy", cur["digest"])
-            rel.alert(ctx, project, "rollback-unhealthy")
+            deploy._note(ctx, project, "rollback-unhealthy", cur["digest"])
+            try:
+                rel.alert(ctx, project, "rollback-unhealthy")
+            except Exception:
+                pass
             ctx.err("rollback: previous release is not healthy")
             return 1
-        rel.save_pointer(ctx, project, "current", prev)
-        rel.save_pointer(ctx, project, "previous", cur)
-        link = ctx.p("%s/%s-current" % (rel.RELEASES, project))
-        tmp = link + ".new"
-        if os.path.lexists(tmp):
-            os.unlink(tmp)
-        os.symlink("sha256-" + prev["digest"].split(":", 1)[1], tmp)
-        os.replace(tmp, link)
-        rel.log(ctx, project, "rolled-back", cur["digest"])
-        rel.clear_alert(ctx, project)
-        return 0
+        try:  # the pointers after the restore: a failed write is reported, exit 1, with the old release up
+            rel.save_pointer(ctx, project, "current", prev)
+            rel.save_pointer(ctx, project, "previous", cur)
+            link = ctx.p("%s/%s-current" % (rel.RELEASES, project))
+            tmp = link + ".new"
+            if os.path.lexists(tmp):
+                os.unlink(tmp)
+            os.symlink("sha256-" + prev["digest"].split(":", 1)[1], tmp)
+            os.replace(tmp, link)
+        except Exception:
+            ctx.err("rollback: the previous release is up but the pointers could not be written")
+            return 1
+        deploy._note(ctx, project, "rolled-back", cur["digest"])
+        try:
+            rel.clear_alert(ctx, project)
+        except Exception:
+            pass
+        return code
     finally:
         os.close(fd)

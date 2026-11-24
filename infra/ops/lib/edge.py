@@ -6,7 +6,7 @@ import os
 import re
 import tempfile
 
-from lib import compose, compose_guard, deployer, release as rel, sauth, stack
+from lib import compose, compose_guard, deployer, dirs, release as rel, sauth, stack
 from lib.release import Refusal
 
 EDGE_TAG = re.compile(r"edge-(0|[1-9][0-9]*)")
@@ -62,6 +62,10 @@ def deploy(tag, ctx):
     seen = {"digest": "-"}
     run = {"up": False, "cur": None}
     try:
+        try:
+            dirs.ensure_shared(ctx, "edge")
+        except Refusal as err:
+            return deployer.refuse("edge", ctx, err)
         rel.clear_incoming(ctx)
         work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, "edge"))
         os.chmod(work, 0o700)
@@ -69,27 +73,32 @@ def deploy(tag, ctx):
             return _run(tag, ctx, work, seen, run)
         except (rel.Transient, Refusal, deployer._Stop):
             raise
-        except Exception as err:  # F2: one handler: before the first `up` a refusal, after it a rollback to edge's previous
-            rel.log(ctx, "edge", "refused", "internal", seen["digest"])
+        except Exception as err:  # F2: one handler: before the first `up` a refusal, after it the unwind to edge's previous
             ctx.err("deploy: internal error: %s" % err.__class__.__name__)
             if not run["up"]:
-                rel.alert(ctx, "edge", "internal")
+                try:
+                    rel.alert(ctx, "edge", "internal")
+                except Exception:
+                    pass
+                deployer._note(ctx, "edge", "refused", "internal", seen["digest"])
                 ctx.err("deploy: refused internal")
                 return 1
-            return _unhealthy(ctx, seen["digest"], run["cur"], guarded=True)
+            return _unhealthy(ctx, seen["digest"], run["cur"], run, why="internal")
     except rel.Transient as err:
         rel.log(ctx, "edge", "transient", str(err))
         deployer.mark_transient(ctx, "edge")
         ctx.err("edge-deploy: transient: %s" % err)  # F7: a foreground command says why it did nothing
         return 1
     except Refusal as err:
+        if run["up"]:  # G2: a refusal after the first `up` restores first
+            return _unhealthy(ctx, seen["digest"], run["cur"], run, reason=err.name if err.quarantine else None, why=err.name)
         return deployer.refuse("edge", ctx, err, seen["digest"])
     except deployer._Stop as stop:
         return stop.code
     finally:
         if work:
             rel.remove_tree(work)
-        if run["up"]:
+        if run["up"] and not run.get("held"):
             try:
                 os.unlink(os.path.join(rel.sdir(ctx, "edge"), "in-progress"))
             except OSError:
@@ -146,25 +155,17 @@ def _up(ctx, rdir, digest, tag, commit, cur, judged, run):
     rel.put(ctx, "edge", "in-progress", digest + "\n")
     run["up"] = True
     code = deployer._edge_up(ctx, judged, digest)  # only Caddy of this release is started
-    rel.log(ctx, "edge", "up", digest)
+    deployer._note(ctx, "edge", "up", digest)
     ok = code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, judged=judged)
     if ok:
         _promote(ctx, rdir, digest, tag, commit, cur)
         return 0
-    rel.quarantine(ctx, "edge", digest, "unhealthy")
-    return _unhealthy(ctx, digest, cur)
+    return _unhealthy(ctx, digest, cur, run)
 
 
-def _unhealthy(ctx, digest, cur, guarded=False):
-    try:
-        restored = bool(cur) and restore(ctx, cur)
-    except Exception:
-        restored = False
-    name = "rolled-back" if restored else "rollback-unhealthy"
-    rel.log(ctx, "edge", name, digest)
-    rel.alert(ctx, "edge", name)
-    ctx.err("deploy: " + name)
-    return 1
+def _unhealthy(ctx, digest, cur, run=None, reason="unhealthy", why=None):
+    """G2: edge's unwind: edge's previous release first, then the records, none able to stop the next."""
+    return deployer.unwind("edge", ctx, digest, lambda: bool(cur) and restore(ctx, cur), reason, why, run)
 
 
 def _promote(ctx, rdir, digest, tag, commit, cur):
@@ -174,7 +175,7 @@ def _promote(ctx, rdir, digest, tag, commit, cur):
     deployer.link_current(ctx, "edge", rdir)
     deployer._prune(ctx)
     rel.clear_alert(ctx, "edge")
-    rel.log(ctx, "edge", "healthy", digest)
+    deployer._note(ctx, "edge", "healthy", digest)
 
 
 def restore(ctx, ptr, wait_healthy=True):
@@ -213,6 +214,7 @@ def rollback(ctx):
             return why.code
         try:
             deployer.require_data_mount(ctx)
+            dirs.ensure_shared(ctx, "edge")  # G1
         except Refusal as err:
             ctx.err("rollback: refused %s" % err.name)
             return err.code
@@ -224,21 +226,36 @@ def rollback(ctx):
         if not cur or not prev:
             ctx.err("rollback: there is no previous edge release")
             return 4
-        rel.quarantine(ctx, "edge", cur["digest"], "rollback")
-        try:
+        try:  # G2: restore first, then the records
             ok = restore(ctx, prev)
         except Exception:
             ok = False
+        code = 0
+        try:
+            rel.quarantine(ctx, "edge", cur["digest"], "rollback")
+        except Exception:
+            ctx.err("rollback: the quarantine line could not be written")
+            code = 1
         if not ok:
-            rel.log(ctx, "edge", "rollback-unhealthy", cur["digest"])
-            rel.alert(ctx, "edge", "rollback-unhealthy")
+            deployer._note(ctx, "edge", "rollback-unhealthy", cur["digest"])
+            try:
+                rel.alert(ctx, "edge", "rollback-unhealthy")
+            except Exception:
+                pass
             ctx.err("rollback: previous edge release is not healthy")
             return 1
-        rel.save_pointer(ctx, "edge", "current", prev)
-        rel.save_pointer(ctx, "edge", "previous", cur)
-        deployer.link_current(ctx, "edge", rel.release_dir(ctx, prev["digest"]))
-        rel.log(ctx, "edge", "rolled-back", cur["digest"])
-        rel.clear_alert(ctx, "edge")
-        return 0
+        try:
+            rel.save_pointer(ctx, "edge", "current", prev)
+            rel.save_pointer(ctx, "edge", "previous", cur)
+            deployer.link_current(ctx, "edge", rel.release_dir(ctx, prev["digest"]))
+        except Exception:
+            ctx.err("rollback: the previous release is up but the pointers could not be written")
+            return 1
+        deployer._note(ctx, "edge", "rolled-back", cur["digest"])
+        try:
+            rel.clear_alert(ctx, "edge")
+        except Exception:
+            pass
+        return code
     finally:
         os.close(fd)

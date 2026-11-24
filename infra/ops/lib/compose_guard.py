@@ -10,6 +10,7 @@ import os
 import posixpath
 import re
 
+from lib import dirs
 from lib.release import Refusal
 
 POLICY = "infra/deploy/compose-allow.json"
@@ -88,10 +89,7 @@ def stdin_render(project):
 
 
 def _render_env(ctx):
-    home = ctx.p(HOME)
-    if not os.path.isdir(home):
-        os.makedirs(home, mode=0o755, exist_ok=True)
-    os.chmod(home, 0o755)
+    home = dirs.ensure(ctx, dirs.RENDER_HOME)  # root, exactly 0755, empty; a link or another owner is `render-path` and is never repaired (S37)
     return {"HOME": home, "XDG_CACHE_HOME": home, "COMPOSE_EXPERIMENTAL_GIT_REMOTE": "0", "COMPOSE_EXPERIMENTAL_OCI_REMOTE": "0"}
 
 
@@ -174,17 +172,22 @@ def pair_ok(path):
     return want is not None and sha_of(path) == want
 
 
-def save(ctx, project, digest, data):
+def write_pair(ctx, project, digest, data):
     """S35, G5: the file, then `render-<…>.sha256` beside it. Nothing is written when both already hold exactly these bytes (S36). -> the path."""
     d = ctx.p("%s/%s" % (STATE, project))
     path = render_path(ctx, project, digest)
     want = hashlib.sha256(data).hexdigest()
     if pair_ok(path) and stored_sha(path) == want:
         return path
-    os.makedirs(d, mode=0o755, exist_ok=True)
+    dirs.ensure(ctx, "%s/%s" % (dirs.STATE, project))
     _write_file(ctx, path, data)
     _write_file(ctx, sidecar(path), (want + "\n").encode("ascii"))
     return path
+
+
+def save(ctx, project, digest, data):
+    """A restore's write (S36): the same as the candidate's first write, named apart because only a restore can survive its failure."""
+    return write_pair(ctx, project, digest, data)
 
 
 def sha_of(path):
@@ -221,6 +224,10 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore
     if not render_user_ok(ctx):
         raise Refusal("render-user", code=4)
     policy = load_policy(ctx)
+    named = ["%s/infra/compose/%s.yml" % (rdir, project)] + list(env_files)  # G1: before any render, what it names must be readable to it
+    for sp in (policy.get("projects", {}).get(project, {}).get("services") or {}).values():
+        named += [ctx.p(e) for e in sp.get("env_files") or []]
+    dirs.check_readable(ctx, named)
     raw, plain = renders(ctx, rdir, project, env_files)
     corrected = correct(plain, policy, project, strict=False)  # the policy's own refusals come first; a stray empty number is `guard-render` after
     check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
@@ -230,7 +237,7 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore
     if canonical(correct(again, policy, project)) != data:
         fail("render")
     try:
-        path = save(ctx, project, digest, data)
+        path = (save if restore else write_pair)(ctx, project, digest, data)
     except OSError:
         if not restore:
             raise Refusal("state")
