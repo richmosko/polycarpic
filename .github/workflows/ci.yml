@@ -693,9 +693,9 @@ jobs:
         if: needs.changes.outputs.backup == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.backup.config.ts
 
-      # T-real is switched off until POLY-162 gets it to pass: it runs only where the repository variable POLY_DEPLOY_REAL is 'true' (unset today).
+      # T-real is switched off until POLY-162 gets it to pass: the three steps below carry the literal `if: false` (a tests/ci pin holds all three).
       - name: Real deploy (T-real, first-deploy and the rollback case on one real box)
-        if: needs.changes.outputs.deploy == 'true' && vars.POLY_DEPLOY_REAL == 'true'
+        if: false # POLY-162 switches it on
         # No GH_TOKEN and no persisted credentials reach this step (S38 e): the checkout above persists none, and nothing here sets a token.
         env:
           POLY_APP_TEST_IMAGE: polycarpic:ci
@@ -724,11 +724,11 @@ jobs:
           if-no-files-found: warn
 
       - name: Undo what the real deploy put on the runner
-        if: always() && needs.changes.outputs.deploy == 'true' && vars.POLY_DEPLOY_REAL == 'true'
+        if: false # POLY-162 switches it on (with the step above)
         run: bash infra/ci/deploy-real-undo.sh
 
       - name: Keep the real deploy's log (the step's own output and deploy.log only)
-        if: always() && needs.changes.outputs.deploy == 'true' && vars.POLY_DEPLOY_REAL == 'true'
+        if: false # POLY-162 switches it on (with the step above)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deploy-real-log
