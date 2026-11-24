@@ -11,7 +11,7 @@ const find = (id: string, re: RegExp) => job(id).find((s) => re.test(s.run ?? ''
 
 describe('CI wiring for POLY-97 (R3, CI remedy)', () => {
   it('the job set is the POLY-102 set plus `provision`', () => {
-    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'guard', 'image', 'lint', 'provision', 'unit']);
+    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'deploy-real', 'guard', 'image', 'lint', 'provision', 'unit']);
   });
   it('provision runs only on its own filter output and needs `changes`', () => {
     const j = wf('ci.yml').jobs.provision!;
@@ -37,7 +37,7 @@ describe('CI wiring for POLY-97 (R3, CI remedy)', () => {
     expect(JSON.stringify(wf('ci.yml').jobs.app!.needs)).toContain('provision');
     const agg = readFileSync(join(ROOT, 'infra/ci/aggregate.mjs'), 'utf8');
     expect(agg).toMatch(/provision: \['provision'\]/);
-    expect(agg).toMatch(/'image', 'provision'\]/);
+    expect(agg).toMatch(/'image', 'provision', 'deploy-real'\]/);
     const budgets = JSON.parse(readFileSync(join(ROOT, 'infra/ci/budgets.json'), 'utf8'));
     expect(budgets.jobs.provision).toBe(200);
   });

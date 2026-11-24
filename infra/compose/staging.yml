@@ -39,6 +39,7 @@ services:
   web:
     <<: *hardened
     image: *app-image
+    command: ["web"]
     user: "10101:10101"
     env_file: [/etc/polycarpic/staging-host.env]
     environment:
@@ -60,7 +61,7 @@ services:
     mem_limit: 384m
     tmpfs: [/tmp]
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
 
@@ -100,6 +101,7 @@ services:
   worker:
     <<: *hardened
     image: *app-image
+    command: ["worker"]
     user: "10102:10102"
     env_file: [/etc/polycarpic/staging-host.env, /etc/polycarpic/staging-mail.env]
     environment:
@@ -127,6 +129,7 @@ services:
   migrate:
     <<: *hardened
     image: *app-image
+    command: ["migrate"]
     user: "10103:10103"
     restart: "no"
     profiles: [migrate]

@@ -1,0 +1,17 @@
+2026-11-24T23:16:48Z
+compose-policy: clean
+compose-policy rc=0
+layers-check rc=0
+
+ RUN  v5.1.1 /Users/mosko/Projects/polycarpic/.claude/worktrees/qa-162
+
+(node:47768) DeprecationWarning: The 'argument' property is deprecated on TSImportType nodes. Use source instead. See https://tseslint.com/key-property-deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:47768) DeprecationWarning: The 'argument' property is deprecated on TSImportType nodes. Use source instead. See https://tseslint.com/key-property-deprecated.
+
+ Test Files  9 passed (9)
+      Tests  556 passed (556)
+   Start at  15:16:49
+   Duration  17.58s (tests 96%, import 3%, transform 1%)
+
+2026-11-24T23:17:06Z

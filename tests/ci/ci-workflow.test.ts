@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { needsOf, runBodies, steps, wf, wfText, type Job } from './helpers.ts';
 
 const w = wf('ci.yml');
-const NEW = ['changes', 'guard', 'lint', 'unit', 'db', 'image', 'provision'];
+const NEW = ['changes', 'guard', 'lint', 'unit', 'db', 'image', 'provision', 'deploy-real'];
 const all = (j: Job) => JSON.stringify(j);
 const runOf = (j: Job) => steps(j).map((s) => s.run ?? '').join('\n');
 
@@ -16,7 +16,7 @@ describe('ci.yml: shape and the untouched cairn check', () => {
   it('triggers stay pull_request + workflow_dispatch, no workflow-level paths:, no secrets (S96-6)', () => {
     expect(Object.keys(w.on).sort()).toEqual(['pull_request', 'workflow_dispatch']);
     expect(JSON.stringify(w.on)).not.toMatch(/"paths/);
-    expect(wfText('ci.yml')).not.toMatch(/secrets\./);
+    expect(wfText('ci.yml')).not.toMatch(/\$\{\{\s*secrets\./); // a `secrets.` expression, not a file named secrets.json
     expect(wfText('ci.yml')).not.toMatch(/pull_request_target/);
   });
   it('workflow_dispatch takes an optional `base` input', () => {

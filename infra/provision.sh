@@ -541,6 +541,19 @@ stage_database() {
   "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 
+  # G13: the database itself, before roles.sql (POSTGRES_DB acts only on an empty data directory, never on one already initialised). Both statements are
+  # fixed text on stdin to the local socket on the `postgres` database; a failed read stops, an existing database is left alone.
+  local have
+  have=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname = 'polycarpic';" \
+    | "${dc[@]}" exec -T postgres psql -X -tA -v ON_ERROR_STOP=1 -U postgres -d postgres) || die "could not read the database list of $project; nothing created"
+  if [ -z "$have" ]; then
+    printf '%s\n' "CREATE DATABASE polycarpic TEMPLATE template0;" | "${dc[@]}" exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres > /dev/null \
+      || die "CREATE DATABASE polycarpic failed on $project"
+    change "created database polycarpic on $project"
+  elif [ "$have" != 1 ]; then
+    die "unexpected answer reading the database list of $project; nothing created"
+  fi
+
   "${dc[@]}" exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U postgres -d polycarpic < "$roles_sql" > /dev/null \
     || die "roles.sql failed on $project"
   echo "roles.sql applied on $project"

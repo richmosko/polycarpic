@@ -75,7 +75,29 @@ describe.concurrent('compose-policy lint: pass fixtures', () => {
 
 // [name, mutation applied to the pass set, expected rule id, what turns the test red]
 type Row = [string, (s: FxSet) => void, string, string];
+// B5 (verdict.md): G14 says EVERY service of the three files; one generated row per service and key: missing, replaced, extended, added.
+const G14_ROWS: Row[] = (() => {
+  const rows: Row[] = [];
+  const b = baseline();
+  for (const kind of ['edge', 'prod', 'staging'] as const) {
+    for (const [name, def] of Object.entries(b[kind].services as Record<string, Record<string, unknown>>)) {
+      for (const key of ['command', 'entrypoint'] as const) {
+        const want = def[key] as string[] | undefined;
+        const at = `${kind}/${name} ${key}`;
+        if (want) {
+          rows.push([`${at} removed`, (s) => { delete svc(s, kind, name)[key]; }, 'app-command', 'a missing value accepted']);
+          rows.push([`${at} replaced`, (s) => { svc(s, kind, name)[key] = ['/bin/sh']; }, 'app-command', 'another value accepted']);
+          rows.push([`${at} extended`, (s) => { svc(s, kind, name)[key] = [...want, '--extra']; }, 'app-command', 'an extended value accepted']);
+        } else {
+          rows.push([`${at} added`, (s) => { svc(s, kind, name)[key] = ['/bin/sh']; }, 'app-command', 'an added value accepted']);
+        }
+      }
+    }
+  }
+  return rows;
+})();
 const ROWS: Row[] = [
+  ...G14_ROWS,
   // INFRA §2.2 hardening list, per service shape
   ['root user (uid 0)', (s) => { svc(s, 'prod', 'web').user = '0:0'; }, 'user-nonroot', 'uid 0 accepted'],
   ['user missing', (s) => { delete svc(s, 'prod', 'worker').user; }, 'user-nonroot', 'missing user: accepted (image default may be root)'],
@@ -85,6 +107,18 @@ const ROWS: Row[] = [
   ['no-new-privileges missing', (s) => { delete svc(s, 'staging', 'web').security_opt; }, 'no-new-privs', 'security_opt not required'],
   ['restart missing', (s) => { delete svc(s, 'prod', 'web').restart; }, 'restart', 'restart policy not required'],
   ['healthcheck missing', (s) => { delete svc(s, 'prod', 'worker').healthcheck; }, 'healthcheck', 'healthcheck not required'],
+  // G14: command and entrypoint are the exact value or absent, for every service
+  ['worker with no command (the image default is web)', (s) => { delete svc(s, 'prod', 'worker').command; }, 'app-command', 'a missing command accepted'],
+  ['worker command web', (s) => { svc(s, 'staging', 'worker').command = ['web']; }, 'app-command', 'worker command not compared'],
+  ['migrate with no command', (s) => { delete svc(s, 'staging', 'migrate').command; }, 'app-command', 'migrate command not required'],
+  ['web with an entrypoint', (s) => { svc(s, 'prod', 'web').entrypoint = ['/bin/sh']; }, 'app-command', 'entrypoint not pinned'],
+  ['operator with no entrypoint', (s) => { delete svc(s, 'prod', 'operator').entrypoint; }, 'app-command', 'operator entrypoint not required'],
+  ['operator with a command', (s) => { svc(s, 'staging', 'operator').command = ['x']; }, 'app-command', 'a stray command accepted'],
+  ['postgres command changed', (s) => { svc(s, 'prod', 'postgres').command = ['postgres']; }, 'app-command', 'postgres command not compared'],
+  // G15: web's health check is /api/v1/health and requires exactly 200
+  ['web healthcheck on / and below 500', (s) => { svc(s, 'prod', 'web').healthcheck.test = ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]; }, 'web-health', 'the old check accepted'],
+  ['web healthcheck on the health path and below 500', (s) => { svc(s, 'staging', 'web').healthcheck.test = ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]; }, 'web-health', 'a 404 passes the check'],
+  ['web healthcheck missing', (s) => { delete svc(s, 'prod', 'web').healthcheck; }, 'web-health', 'no health check required of web'],
   ['image by tag only', (s) => { svc(s, 'prod', 'web').image = 'ghcr.io/richmosko/polycarpic:latest'; }, 'image-digest', 'tag-only image accepted'],
   ['image digest truncated', (s) => { svc(s, 'prod', 'uploader').image = 'ghcr.io/x/tools@sha256:abc'; }, 'image-digest', 'digest length/hex not validated'],
   ['build: present', (s) => { svc(s, 'prod', 'web').build = '.'; }, 'no-build', 'build: allowed'],

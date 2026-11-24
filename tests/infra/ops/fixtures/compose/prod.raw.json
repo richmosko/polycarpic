@@ -238,6 +238,9 @@
       "cap_drop": [
         "ALL"
       ],
+      "command": [
+        "migrate"
+      ],
       "env_file": [
         {
           "path": "/etc/polycarpic/host.env",
@@ -539,6 +542,9 @@
       "cap_drop": [
         "ALL"
       ],
+      "command": [
+        "web"
+      ],
       "env_file": [
         {
           "path": "/etc/polycarpic/host.env",
@@ -561,7 +567,7 @@
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=\u003eprocess.exit(r.status===200?0:1)).catch(()=\u003eprocess.exit(1))"
         ],
         "timeout": "5s"
       },
@@ -601,6 +607,9 @@
     "worker": {
       "cap_drop": [
         "ALL"
+      ],
+      "command": [
+        "worker"
       ],
       "env_file": [
         {

@@ -13,17 +13,18 @@ export const BASE_IMAGE = /^FROM (\S+)/m.exec(readFileSync(join(ROOT, 'infra', '
 export type Names = { good: string; bad: string; fail: string; stg: string };
 export const namesFor = (tag: string): Names => ({ good: `poly97-${tag}A-${process.pid}`, bad: `poly97-${tag}B-${process.pid}`, fail: `poly97-${tag}C-${process.pid}`, stg: `poly97-${tag}D-${process.pid}` });
 
-export function startPg(name: string, net: string, image: string, superPw: string, extra: string[] = []) {
+/** `withDb` false: a cluster with no `polycarpic` database, as a real first deploy has it (G13: the helper must not make it; POSTGRES_DB acts on an empty data directory and the real compose sets none). */
+export function startPg(name: string, net: string, image: string, superPw: string, extra: string[] = [], withDb = true) {
   const r = sh('docker', ['run', '-d', '--name', name, '--network', net, '--user', '999:999',
-    '-e', `POSTGRES_PASSWORD=${superPw}`, '-e', 'POSTGRES_DB=polycarpic',
+    '-e', `POSTGRES_PASSWORD=${superPw}`, ...(withDb ? ['-e', 'POSTGRES_DB=polycarpic'] : []),
     '--tmpfs', '/var/lib/postgresql/data:uid=999,gid=999,mode=0700', '--tmpfs', '/var/run/postgresql:uid=999,gid=999,mode=0755',
     '-v', `${conf}:/etc/postgresql/postgresql.conf:ro`, '-v', `${hba}:/etc/postgresql/pg_hba.conf:ro`,
     image, 'postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf', '-c', 'archive_command=/bin/true', ...extra]);
   if (r.code !== 0) throw new Error(`pg start ${name}: ${r.err}`);
 }
-export function waitPg(name: string) {
+export function waitPg(name: string, db = 'polycarpic') {
   for (let i = 0; i < 90; i++) {
-    const r = sh('docker', ['exec', name, 'psql', '-U', 'postgres', '-d', 'polycarpic', '-tAc', 'select 1']);
+    const r = sh('docker', ['exec', name, 'psql', '-U', 'postgres', '-d', db, '-tAc', 'select 1']);
     if (r.out.trim() === '1') return;
     sh('sleep', ['1']);
   }

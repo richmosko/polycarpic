@@ -1,10 +1,11 @@
 // The web entrypoint (POLY-85): `polycarpic web` runs this; `polycarpic web check-config` validates and exits.
 // Order matters: crash handlers first (S-7b), then the configuration (refuse before any pool exists), then the schema
-// guard, then the status listener. The public server arrives with POLY-88.
+// guard, then the status listener, then the public health listener (POLY-162; POLY-161's web server replaces it).
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
 import { init } from './startup.ts';
 import { startStatusServer } from './ops/status.ts';
+import { startPublicHealth } from './ops/public-health.ts';
 
 const log = createLogger({ service: 'web' });
 
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
   }
   await init();
   await startStatusServer({ port: config.statusPort });
+  await startPublicHealth();
   log.info('web.started', { outcome: 'ok', ...(config.imageRevision ? { commit: config.imageRevision } : {}) });
   process.on('SIGTERM', () => process.exit(0));
 }

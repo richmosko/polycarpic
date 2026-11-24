@@ -18,6 +18,8 @@ export type FxSet = {
   text: Record<string, string>;
 };
 
+/** G15: web's health check, the one literal the lint and the guard pin. */
+export const WEB_HEALTH = ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"];
 const hard = (uid: number, extra: Y = {}): Y => ({
   user: `${uid}:${uid}`, read_only: true, cap_drop: ['ALL'], security_opt: ['no-new-privileges:true'],
   restart: 'unless-stopped', healthcheck: { test: ['CMD', 'true'], interval: '30s' }, tmpfs: ['/tmp'], ulimits: { core: 0 }, ...extra, // POLY-99 C2: core 0 in x-hardened
@@ -66,10 +68,10 @@ function project(kind: 'prod' | 'staging'): Y {
         ...(prod ? ['/etc/polycarpic/age-recipients.txt:/etc/postgresql/age-recipients.txt:ro', '/srv/polycarpic/spool/wal:/spool/wal'] : []),
       ],
     }),
-    web: hard(10001, { image: APP, networks: { default: {}, [E]: { aliases: [`${kind}-web`] } } }),
+    web: hard(10001, { image: APP, command: ['web'], healthcheck: { test: WEB_HEALTH, interval: '30s', timeout: '5s' }, networks: { default: {}, [E]: { aliases: [`${kind}-web`] } } }),
     auth: hard(prod ? 10007 : 10107, { image: APP, command: ['auth'], networks: { default: {}, [E]: { aliases: [`${kind}-auth`] } } }),
-    worker: hard(10002, { image: APP, networks: ['default'] }),
-    migrate: hard(10003, { image: APP, networks: ['default'] }),
+    worker: hard(10002, { image: APP, command: ['worker'], networks: ['default'] }),
+    migrate: hard(10003, { image: APP, command: ['migrate'], networks: ['default'] }),
     // POLY-146 R3: the one-shot operator service. Its own profile, restart "no", the one secret; no long-running service holds it.
     operator: hard(prod ? 10006 : 10106, { image: APP, networks: ['default'], restart: 'no', profiles: ['operator'], logging: { driver: 'none' }, entrypoint: ['/app/bin/polycarpic', 'cli'], mem_limit: '256m' }),
   };

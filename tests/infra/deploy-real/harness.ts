@@ -161,7 +161,7 @@ function registry(): void {
     && printf 'subjectAltName=DNS:ghcr.io\\n' > san.ext && openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 1 -extfile san.ext 2> /dev/null \
     && chmod 0644 server.key ca.crt server.crt`), 'registry certificates');
   must(sh(`install -d -m 0755 /etc/docker/certs.d/ghcr.io && cp ${certs}/ca.crt /etc/docker/certs.d/ghcr.io/ca.crt && printf '127.0.0.1 ghcr.io # poly-deploy-real\\n' >> /etc/hosts`), 'hosts and CA');
-  must(sh(`docker run -d --name poly-deploy-real-registry -p 127.0.0.1:443:5000 -v ${certs}:/certs:ro -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt -e REGISTRY_HTTP_TLS_KEY=/certs/server.key registry:2`), 'registry container');
+  must(sh(`docker run -d --name poly-deploy-real-registry -p 127.0.0.1:443:5000 -v ${certs}:/certs:ro -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt -e REGISTRY_HTTP_TLS_KEY=/certs/server.key registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373`), 'registry container');
   for (let i = 0; i < 30; i++) {
     if (run(['curl', '-sf', '--cacert', '/dev/null', '--resolve', 'ghcr.io:443:127.0.0.1', '-k', 'https://ghcr.io/v2/']).code === 0) return;
     run(['sleep', '2']);
@@ -297,7 +297,15 @@ export const containers = (): { name: string; image: string; status: string }[] 
     const [name, image, status] = l.split('|');
     return { name: name!, image: image!, status: status! };
   });
-export const containerImages = (): Record<string, string> => {
+/** Every container of the staging project (running or not) with its compose service label, as the project holds them. */
+export const projectContainers = (): { service: string; name: string; status: string }[] =>
+  must(dockerRoot(['ps', '-a', '--filter', 'label=com.docker.compose.project=polycarpic-staging', '--format', '{{.Label "com.docker.compose.service"}}|{{.Names}}|{{.Status}}']), 'docker ps (services)').out.trim().split('\n').filter(Boolean).map((l) => {
+    const [service, name, status] = l.split('|');
+    return { service: service!, name: name!, status: status! };
+  });
+/** The project's `RestartCount` of one container, by name. */
+export const restartCount = (name: string): string => dockerRoot(['inspect', '-f', '{{.RestartCount}}', name]).out.trim();
+export const containerImages =(): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const c of containers()) {
     const r = dockerRoot(['inspect', '-f', '{{.Config.Image}}', c.name]);

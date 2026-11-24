@@ -140,7 +140,9 @@
       "cap_drop": [
         "ALL"
       ],
-      "command": null,
+      "command": [
+        "migrate"
+      ],
       "entrypoint": null,
       "environment": {
         "APP_ENV": "staging",
@@ -319,7 +321,9 @@
       "cap_drop": [
         "ALL"
       ],
-      "command": null,
+      "command": [
+        "web"
+      ],
       "entrypoint": null,
       "environment": {
         "APP_ENV": "staging",
@@ -367,7 +371,7 @@
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then(r=\u003eprocess.exit(r.status\u003c500?0:1)).catch(()=\u003eprocess.exit(1))"
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=\u003eprocess.exit(r.status===200?0:1)).catch(()=\u003eprocess.exit(1))"
         ],
         "timeout": "5s",
         "interval": "30s"
@@ -378,7 +382,9 @@
       "cap_drop": [
         "ALL"
       ],
-      "command": null,
+      "command": [
+        "worker"
+      ],
       "entrypoint": null,
       "environment": {
         "APP_ENV": "staging",

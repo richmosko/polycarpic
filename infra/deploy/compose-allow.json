@@ -27,6 +27,8 @@
        "target": "/config"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "env_exact": [
       "POLY_DOMAIN",
       "POLY_STAGING_ALLOW",
@@ -126,6 +128,10 @@
    },
    "services": {
     "auth": {
+     "command": [
+      "auth"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -198,6 +204,8 @@
        "target": "/etc/backup/age-recipients.txt"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -240,6 +248,10 @@
      "user": "10004:10004"
     },
     "migrate": {
+     "command": [
+      "migrate"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -285,6 +297,11 @@
      "user": "10003:10003"
     },
     "operator": {
+     "command": null,
+     "entrypoint": [
+      "/app/bin/polycarpic",
+      "cli"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -366,6 +383,12 @@
        "target": "/spool/wal"
       }
      ],
+     "command": [
+      "postgres",
+      "-c",
+      "config_file=/etc/postgresql/postgresql.conf"
+     ],
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -431,6 +454,8 @@
        "target": "/etc/uploader/host.env"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "image": "tools",
      "keys": [
       "cap_drop",
@@ -472,6 +497,10 @@
      "user": "10005:10005"
     },
     "web": {
+     "command": [
+      "web"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -501,6 +530,16 @@
       ]
      },
      "pins": {
+      "healthcheck": {
+       "interval": "30s",
+       "test": [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+       ],
+       "timeout": "5s"
+      },
       "mem_limit": "805306368",
       "tmpfs": [
        "/tmp"
@@ -520,6 +559,10 @@
      "user": "10001:10001"
     },
     "worker": {
+     "command": [
+      "worker"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -588,6 +631,10 @@
    },
    "services": {
     "auth": {
+     "command": [
+      "auth"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"
@@ -638,6 +685,10 @@
      "user": "10107:10107"
     },
     "migrate": {
+     "command": [
+      "migrate"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -683,6 +734,11 @@
      "user": "10103:10103"
     },
     "operator": {
+     "command": null,
+     "entrypoint": [
+      "/app/bin/polycarpic",
+      "cli"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -749,6 +805,12 @@
        "target": "/etc/postgresql/pg_hba.conf"
       }
      ],
+     "command": [
+      "postgres",
+      "-c",
+      "config_file=/etc/postgresql/postgresql.conf"
+     ],
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -791,6 +853,10 @@
      "user": "999:999"
     },
     "web": {
+     "command": [
+      "web"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -820,6 +886,16 @@
       ]
      },
      "pins": {
+      "healthcheck": {
+       "interval": "30s",
+       "test": [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+       ],
+       "timeout": "5s"
+      },
       "mem_limit": "402653184",
       "tmpfs": [
        "/tmp"
@@ -839,6 +915,10 @@
      "user": "10101:10101"
     },
     "worker": {
+     "command": [
+      "worker"
+     ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"

@@ -1,0 +1,44 @@
+2026-11-24T23:17:06Z
+@poly/web:test: 
+@poly/web:test:  ✓ src/routes/second-step-rc.test.ts (9 tests) 14ms
+@poly/web:test:  ✓ src/lib/second-step-actions.test.ts (6 tests) 10ms
+@poly/web:test:  ✓ src/auth-pages-137.test.ts (22 tests) 35ms
+@poly/web:test:  ✓ src/tokens.test.ts (8 tests) 11ms
+@poly/web:test:  ✓ src/routes/second-step-boundary.test.ts (9 tests) 10ms
+@poly/web:test:  ✓ src/lib/safe-next.test.ts (14 tests) 3ms
+@poly/web:test:  ✓ src/web-boundary.test.ts (5 tests) 4ms
+@poly/web:test:  ✓ src/routes/layout.server.test.ts (2 tests) 2ms
+@poly/web:test:  ✓ src/lib/shell/nav.test.ts (2 tests) 2ms
+@poly/web:test:  ✓ src/hooks.server.test.ts (3 tests) 15ms
+@poly/web:test:  ✓ src/hooks.server.authtree.test.ts (16 tests) 17ms
+@poly/web:test:  ✓ src/hooks.server.gate.test.ts (4 tests) 16ms
+@poly/web:test:  ✓ src/routes/page.server.test.ts (2 tests) 493ms
+@poly/web:test:    ✓ root +page.server load (2)
+@poly/web:test:      ✓ redirects a signed-in user to /dashboard?entity=<landing entity> by the handle  [red if: the redirect drops the entity, or ignores locals.handle] 492ms
+@poly/web:test:  ✓ src/index.test.ts (1 test) 2ms
+@poly/web:test: {"level":"error","ts":"2026-11-24T23:17:10.085Z","service":"web","event":"session.provision_failed","outcome":"error","err":{"type":"Error","code":"23505"}}
+@poly/web:test:  ✓ src/hooks.server.auth.test.ts (61 tests) 28ms
+@poly/web:typecheck: Loading svelte-check in workspace: /Users/mosko/Projects/polycarpic/.claude/worktrees/qa-162/apps/web
+@poly/web:typecheck: Getting Svelte diagnostics...
+@poly/web:typecheck: 
+@poly/web:typecheck: svelte-check found 0 errors and 0 warnings
+@poly/web:test:  ✓ src/ops/public-health.test.ts (16 tests) 6755ms
+@poly/web:test:    ✓ G15: the public health listener (real sockets) (13)
+@poly/web:test:      ✓ every other request is the fixed 404 with the same headers: query, trailing slash, //, %2e, upper case, absolute form, HEAD, POST with a body, OPTIONS, other paths 323ms
+@poly/web:test:      ✓ slow headers and a body never finished are closed in time (headersTimeout and requestTimeout 5 s) 5062ms
+@poly/web:test:      ✓ the 65th connection is refused while the first 64 stay served 851ms
+@poly/web:test: 
+@poly/web:test:  Test Files  16 passed (16)
+@poly/web:test:       Tests  180 passed (180)
+@poly/web:test:    Start at  15:17:09
+@poly/web:test:    Duration  7.00s (tests 74%, import 19%, transform 6%)
+@poly/web:test: 
+
+  Tasks:    39 successful, 39 total
+ Cached:    35 cached, 39 total
+   Time:    8.008s 
+Summary:    /Users/mosko/Projects/polycarpic/.claude/worktrees/qa-162/.turbo/runs/3MZdtHbpraLODAu2poBmkrTxbUQ.json
+
+eslint rc=0
+$ node scripts/check-migrations.ts
+2026-11-24T23:17:19Z

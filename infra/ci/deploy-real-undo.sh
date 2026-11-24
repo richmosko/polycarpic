@@ -18,7 +18,11 @@ as_root docker rm -f poly-deploy-real-registry > /dev/null 2>&1 || true
 ids=$(docker ps -aq --filter 'name=polycarpic-staging' 2> /dev/null || true)
 # shellcheck disable=SC2086 # the id list is meant to word-split
 [ -z "$ids" ] || docker rm -f -v $ids > /dev/null 2>&1 || true
+docker network rm polycarpic-staging_default > /dev/null 2>&1 || true
 docker network rm polycarpic-edge-staging > /dev/null 2>&1 || true
+vols=$(docker volume ls -q --filter 'label=com.docker.compose.project=polycarpic-staging' 2> /dev/null || true)
+# shellcheck disable=SC2086 # the volume list is meant to word-split
+[ -z "$vols" ] || docker volume rm -f $vols > /dev/null 2>&1 || true
 
 # the images the test pushed or built for itself
 docker images --format '{{.Repository}}:{{.Tag}}' 2> /dev/null | grep -E '^(ghcr\.io/richmosko/|polycarpic-deploy-real-)' | while read -r img; do

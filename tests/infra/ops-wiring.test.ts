@@ -25,7 +25,7 @@ describe('CI wiring for POLY-98 (R11)', () => {
     expect(vt).toBeGreaterThan(ops);
   });
   it('the job set and the budget are unchanged (no new job)', () => {
-    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'guard', 'image', 'lint', 'provision', 'unit']);
+    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'deploy-real', 'guard', 'image', 'lint', 'provision', 'unit']);
     expect(JSON.parse(readFileSync(join(ROOT, 'infra/ci/budgets.json'), 'utf8')).jobs.provision).toBe(200);
   });
   it('shellcheck covers infra/ops/install.sh alongside the three provisioning scripts', () => {

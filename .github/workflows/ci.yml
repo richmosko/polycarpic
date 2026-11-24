@@ -606,7 +606,7 @@ jobs:
   image:
     name: image
     needs: changes
-    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.backup == 'true' || needs.changes.outputs.deploy == 'true'
+    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true' || needs.changes.outputs.backup == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -621,29 +621,29 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Set up Node
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "26"
 
       - name: Install pnpm
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
 
       - name: Locate pnpm store
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         id: store
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.store.outputs.path }}
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install the pinned Compose (infra/deploy/compose-version)
@@ -667,7 +667,7 @@ jobs:
         run: bash infra/ci/image.sh scan polycarpic:ci
 
       - name: Build the Postgres and Caddy derivatives
-        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.deploy == 'true'
+        if: needs.changes.outputs.image == 'true'
         run: |
           docker build -t polycarpic-postgres:ci infra/postgres
           docker build -t polycarpic-caddy:ci infra/caddy
@@ -693,7 +693,6 @@ jobs:
         if: needs.changes.outputs.backup == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.backup.config.ts
 
-      # The end-to-end deploy test (tests/infra/deploy-real, key `deploy`) has no step here: POLY-162 adds it back (feature/poly-162-deploy-test-passing).
       - name: Record timing
         if: always()
         run: node infra/ci/job-report.mjs
@@ -718,6 +717,123 @@ jobs:
         env:
           REPORT_ONLY: summary
           JOB_NAME: image
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+  # T-real (POLY-100 ruling "T-real", POLY-162): one real first deploy on a real runner, in its own job (`contents: read`, no token, never in build.yml).
+  # It builds the app, Postgres and Caddy images itself. The sweep runs before the undo (which deletes the secret list); the upload waits for the sweep's success.
+  deploy-real:
+    name: deploy-real
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the pinned Compose (infra/deploy/compose-version)
+        run: bash infra/ci/install-compose.sh
+
+      - name: The running Compose is the pinned one (fails on any other)
+        run: test "$(docker compose version --short)" = "$(tr -d '[:space:]' < infra/deploy/compose-version)"
+
+      - name: Build the image (local, no push)
+        env:
+          GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash infra/ci/image.sh build
+
+      - name: Build the Postgres and Caddy derivatives
+        run: |
+          docker build -t polycarpic-postgres:ci infra/postgres
+          docker build -t polycarpic-caddy:ci infra/caddy
+
+      - name: Real deploy (T-real, first-deploy and the rollback case on one real box)
+        if: needs.changes.outputs.deploy == 'true'
+        # No GH_TOKEN and no persisted credentials reach this step (S38 e): the checkout above persists none, and nothing here sets a token.
+        # `CI` and the summary path go through sudo by name: without CI the suite would skip a missing tool instead of failing.
+        env:
+          CI: "true"
+          POLY_APP_TEST_IMAGE: polycarpic:ci
+          DEPLOY_REAL_LOG: ${{ runner.temp }}/deploy-real/harness.log
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/deploy-real"
+          sudo --preserve-env=CI,GITHUB_STEP_SUMMARY,POLY_APP_TEST_IMAGE,DEPLOY_REAL_LOG env "PATH=$PATH" pnpm exec vitest run -c tests/infra/vitest.deploy-real.config.ts 2>&1 | tee -a "$RUNNER_TEMP/deploy-real/step.log"
+
+      - name: Sweep the kept log (nothing is published unless this passes)
+        id: sweep
+        if: always() && needs.changes.outputs.deploy == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/deploy-real"
+          sudo env "PATH=$PATH" node infra/ci/deploy-real-sweep.mjs --secrets /run/poly-deploy-real/secrets.json --step-log "$RUNNER_TEMP/deploy-real/step.log" --harness-log "$RUNNER_TEMP/deploy-real/harness.log" --deploy-log /var/lib/polycarpic/state/deploy/staging/deploy.log --out "$RUNNER_TEMP/deploy-real/kept.log"
+          sudo chmod 0644 "$RUNNER_TEMP/deploy-real/kept.log"
+
+      - name: Undo what the real deploy put on the runner
+        if: always() && needs.changes.outputs.deploy == 'true'
+        run: bash infra/ci/deploy-real-undo.sh
+
+      - name: Keep the real deploy's log (the swept file alone)
+        if: always() && needs.changes.outputs.deploy == 'true' && steps.sweep.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deploy-real-log
+          path: ${{ runner.temp }}/deploy-real/kept.log
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: deploy-real
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-deploy-real
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: deploy-real
           JOB_STATUS: ${{ job.status }}
           CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
 
@@ -803,7 +919,7 @@ jobs:
 
   app:
     name: app
-    needs: [changes, guard, lint, unit, db, image, provision]
+    needs: [changes, guard, lint, unit, db, image, provision, deploy-real]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

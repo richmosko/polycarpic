@@ -14,6 +14,11 @@ import { parse } from 'yaml';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KINDS = ['edge', 'prod', 'staging'];
 const violations = [];
+const SERVICE_EXEC = {
+  postgres: { command: ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf'] },
+  web: { command: ['web'] }, auth: { command: ['auth'] }, worker: { command: ['worker'] }, migrate: { command: ['migrate'] },
+  operator: { entrypoint: ['/app/bin/polycarpic', 'cli'] },
+};
 const v = (id, file, msg) => violations.push(`[${id}] ${file}: ${msg}`);
 const HOST_SECRETS = /(^|\/)secrets\/host(\/|$)/;
 
@@ -131,6 +136,15 @@ for (const [kind, path] of Object.entries(files)) {
       if (s.command !== undefined || s.entrypoint !== undefined) v('caddy-env', rel, 'caddy must have no command or entrypoint');
     }
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
+    // G15: web's health check asks /api/v1/health and requires exactly 200 (a 404 must not pass)
+    if (sn === 'web' && JSON.stringify(s.healthcheck?.test ?? null) !== JSON.stringify(['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]))
+      v('web-health', rel, 'web healthcheck must fetch /api/v1/health and require 200');
+    // G14: every service's `command` and `entrypoint` is the exact value below or absent (the image's own default is `web`, so each app service names its own)
+    {
+      const want = SERVICE_EXEC[sn] ?? {};
+      for (const k of ['command', 'entrypoint'])
+        if (JSON.stringify(s[k] ?? null) !== JSON.stringify(want[k] ?? null)) v('app-command', rel, `${sn}: ${k} must be ${JSON.stringify(want[k] ?? null)}`);
+    }
     for (const key of ['networks', 'secrets', 'volumes', 'user', 'cap_drop', 'cap_add', 'security_opt', 'healthcheck', 'command', 'tmpfs'])
       if (hasVar(s[key])) v('raw-interpolation', rel, `${sn}: \${…} in ${key}`);
     for (const p of list(s.ports)) {

@@ -1,7 +1,7 @@
 // POLY-100 T-real, part 2: the rollback case (ruling.md 3765f358). SEPARABLE: only the lead may make it optional (the first-deploy half stays); this file shares nothing with part 1 but the box part 1 left.
 // A second release whose web never answers: rolled back within the window, quarantined, the first release healthy again, and the next poll skips it. Needs part 1 to have run (a healthy `current`).
 import { describe, expect, it } from 'vitest';
-import { IN_CI, commits, containerImages, containers, missing, offer, ops, release, root, run, stateFile, step } from './harness.ts';
+import { IN_CI, commits, containerImages, containers, projectContainers, missing, offer, ops, release, root, run, stateFile, step } from './harness.ts';
 
 const gap = missing();
 if (gap.length && IN_CI) throw new Error(`deploy-real: ${gap.join(', ')} missing in CI: T-real must run, not skip`);
@@ -23,8 +23,14 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     offer(rel2, 102);
     const r = step('rollback poll', () => ops(['deploy', 'staging'], 'deploy staging (release 2: web never answers)'));
     expect(r.code, r.err).toBe(1);
-    expect(r.err.trim().split('\n').pop(), r.err).toBe('deploy: rolled-back');
+    expect(r.err.split('\n--- deploy.log ---')[0]!.trim().split('\n').pop(), r.err).toBe('deploy: rolled-back'); // the harness appends deploy.log to a failed run's err
     expect(r.secs, 'the rollback window is 120 s; the restored worker needs its own first health report (60 s): 6 minutes at most').toBeLessThanOrEqual(360);
+    expect(r.secs, 'B6: a poll that gave the candidate no window (rolled back at once, or its web crashed at start) is not the case under test').toBeGreaterThanOrEqual(120);
+    const dl = stateFile('deploy.log') ?? '';
+    expect(dl, 'B6: the candidate was started (an `up` line for its digest)').toMatch(new RegExp(`up ${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    expect(dl, 'B6: refused for being unhealthy, not for another reason').toMatch(new RegExp(`refused unhealthy ${second}`));
+    expect(stateFile('quarantine') ?? '', 'B6: quarantined with its reason').toMatch(new RegExp(`${second} \\S+ unhealthy`));
+    expect(stateFile('alert') ?? '', 'B6: the alert says rolled-back').toMatch(/rolled-back/);
     expect((stateFile('current') ?? '').split(' ')[0], 'the first release is current again').toBe(first);
     expect(stateFile('quarantine') ?? '', 'the second digest is quarantined').toContain(second);
     expect(stateFile('alert') ?? '', 'an alert says so').not.toBe('');
@@ -35,6 +41,10 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     expect(imgs.length).toBeGreaterThanOrEqual(3);
     for (const [n, i] of imgs) expect(i, `${n} runs the first release`).toBe(i.replace(/@.*/, '') + '@' + first);
     for (const c of containers().filter((x) => /-(web|auth|worker|postgres)-/.test(x.name))) expect(c.status, c.name).toMatch(/\(healthy\)/);
+    // B3: exactly one container per service, all healthy, nothing else (no leftover candidate)
+    const all = projectContainers();
+    expect(all.map((c) => c.service).sort(), `the project's containers: ${all.map((c) => c.name).join(', ')}`).toEqual(['auth', 'postgres', 'web', 'worker']);
+    for (const c of all) expect(c.status, c.name).toMatch(/\(healthy\)/);
   });
 
   it('the next poll skips the quarantined digest: exit 0, nothing started', () => {

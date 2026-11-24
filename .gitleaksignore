@@ -13,3 +13,12 @@ df6ed74352bcff1f0486994fdbc37d694ff5f860:tests/infra/image/provision-create.test
 # POLY-97 (seceng-97): build-review.md at 59662a5f quoted the same fixture as the entry above while recording that review.
 # It is a quotation of a fixture, not a secret; the next commit rewords the line.
 59662a5f983706a05187b3fa01ed1e6b915738fa:process/cairn/reviews/POLY-97/build-review.md:generic-api-key:76
+
+# POLY-162 (seceng-162): five hand-written fixture values that tests/ci/deploy-real-sweep.test.ts planted in temporary log files to
+# show that the sweep refuses them. One decodes to a "foobar" phrase; none has its provider's key form. They appear in no other
+# file's history, reach only the sweep in a temporary directory and protect nothing. Later commits replaced the lines; the commit stays in history.
+b0cca50690f9ea9fc4369f33fb75c146b3cd2be4:tests/ci/deploy-real-sweep.test.ts:generic-api-key:24
+b0cca50690f9ea9fc4369f33fb75c146b3cd2be4:tests/ci/deploy-real-sweep.test.ts:generic-api-key:25
+b0cca50690f9ea9fc4369f33fb75c146b3cd2be4:tests/ci/deploy-real-sweep.test.ts:generic-api-key:26
+b0cca50690f9ea9fc4369f33fb75c146b3cd2be4:tests/ci/deploy-real-sweep.test.ts:generic-api-key:28
+b0cca50690f9ea9fc4369f33fb75c146b3cd2be4:tests/ci/deploy-real-sweep.test.ts:generic-api-key:29

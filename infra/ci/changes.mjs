@@ -75,15 +75,15 @@ export const TABLE = {
   backup: [/^infra\/backup\//, /^infra\/(restore|drill)\.sh$/, /^infra\/postgres\//, /^packages\/db\/sql\/roles\.sql$/, /^infra\/compose\/prod\.yml$/,
     /^infra\/ops\/commands\/(backup|upload)\.py$/, /^tests\/infra\/backup\//, /^tests\/infra\/vitest\.backup\.config\.ts$/],
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
-  // POLY-100 T-real (ruling 3765f358): the one real deploy, the last step of the `image` job. Only what a real deploy touches: the image and its entrypoint,
+  // POLY-100 T-real (ruling 3765f358): the one real deploy, the `deploy-real` job. Only what a real deploy touches: the image and its entrypoint,
   // the tool and what the bundle holds, the settings contract, migrations and their runner, startup code and the health route, and the test itself.
   deploy: [
     /^Dockerfile$/, /^\.dockerignore$/, /^bin\/polycarpic$/,
-    /^infra\/(ops|deploy|compose|caddy|postgres|backup)\//, /^infra\/postgres-major$/, /^infra\/provision(-check)?\.sh$/, /^infra\/ci\/(image|images-env)\.sh$/,
+    /^infra\/(ops|deploy|compose|caddy|postgres|backup)\//, /^infra\/postgres-major$/, /^infra\/provision(-check)?\.sh$/, /^infra\/ci\/(image|images-env|install-compose|deploy-real-undo)\.sh$/, /^infra\/ci\/deploy-real-sweep\.mjs$/,
     /^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)/,
     /^packages\/db\/(migrations|sql)\//, /^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$/,
     /^apps\/migrate\/src\/(cli|run|index)\.ts$/, /^apps\/(web|worker)\/src\/(main|startup)\.ts$/, /^apps\/auth\/src\/(main|bind|http)\.ts$/,
-    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe)\.ts$/,
+    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe|public-health)\.ts$/,
     /^tests\/infra\/deploy-real\//, /^tests\/infra\/vitest\.deploy-real\.config\.ts$/, /^infra\/ci\/changes\.mjs$/, /^\.github\/workflows\/ci\.yml$/,
   ],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):

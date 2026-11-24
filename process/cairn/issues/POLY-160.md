@@ -10,7 +10,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 The lesser findings from POLY-100's third build review, and other deploy items POLY-100 deferred. By the Principal's decision of 2026-11-24 (`process/DECISIONS.md`), POLY-100's third review holds the PR only for a fault that lets an unverified release run, bypasses the compose guard, loses or exposes data, or leaves a bad release running; every other finding lands here. This issue must be done before the first staging deploy (POLY-104). seceng reviews the ruling and the build. Add later deploy nits here rather than filing one issue each.
@@ -44,3 +44,15 @@ GATE, by the Principal's decision of 2026-11-24 (`process/DECISIONS.md`): seceng
 ### @team-lead — 2026-11-23
 
 From the architect's verdict (`process/cairn/reviews/POLY-100/verdict.md` @ 82b8b1c2, "For POLY-160", items 1–8), so none is lost: (2) a crash between `_healthy`'s pointers and clearing `in-progress`, twice, quarantines the running digest; (3) a slow `check-config` is a quarantine; (4) `rel.log` in the `Transient` handlers can raise on a full disk, leaving no `transient-since` and no alert; (5) `infra/ci/deploy-real-undo.sh` is outside the `deploy` trigger; (7) INFRA §4.4, §4.5 and §4.6 do not match the code under H1, and the runbook should say that after Ctrl-C in `edge-deploy` the operator runs `edge-deploy` again, not `rollback` (by reading, not run); (8) re-measure the provision CI job against a same-day control: the budget is not established (qa read +91 s against the 60 s allowance on two runs). Items 1 (H2) and 6 (`provision.sh` by a relative path) are already above.
+
+### @team-lead — 2026-11-24
+
+Items placed here from the POLY-162 loop (2026-11-24). Sources: `process/cairn/reviews/POLY-162/build-review.md` (seceng, U1-U5), `verdict.md` (architect, follow-ups 1-4), `gate.md` (qa).
+- **Done in POLY-162, strike from this issue:** T-real's undo script is in T-real's trigger list; `infra/ci/install-compose.sh` joined it too (seceng U4).
+- **U1, before the first prod deploy and any `v1.*` tag:** pin every service's `healthcheck`, and refuse environment keys outside a per-service list (the `NODE_OPTIONS`, `LD_PRELOAD`, `PG*`, `RCLONE_*` class). Measured by seceng: `NODE_OPTIONS=--import=data:…` in `environment` passes the guard's service check for every app service, the worker included. The compose file comes from the same attested commit as the image.
+- **U2:** the lint holds its own copy of the G14 and web-health values beside `compose-allow.json`; read them from the one file. With it: committed guard cases for prod's `backup` and `uploader` and for caddy (only staging's services have them; the lint covers every service), and the lint comparing web's whole healthcheck object, not `test` alone (architect D2).
+- **U3:** no test runs the undo and looks at what is left.
+- **A candidate whose `check-config` hangs** blocks the poll for the tool's full 600 s before `refused check-config` (qa, T-real part 2).
+- **T-real's rollback lower bound** (poll ≥ 120 s) has no red of its own: shortening the tool's window fails on `rollback-unhealthy` first (`faulted-runs.md`).
+- **In CI the sweep's "absent input fails" never fires**, because the workflow creates both logs first; the missing-secret-list refusal does (seceng, accepted).
+- **For POLY-104:** T-real's fake `gh` attests; real attestation is first shown on staging (U5).
