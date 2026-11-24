@@ -604,6 +604,15 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | db | ≤ 10 s after the restructure below; if qa then measures more, ≤ 15 s stands with no case dropped. Today: +12 to +20 s (qa, same day; main 13.1–13.4 s) | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 20 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
+**Measured on CI**, ci.yml run 45343856328 at `a9d35481`, seconds. "Before" is run 45288873465 at `2825b6f7` (first build, same CI, one day earlier); PR #150's job totals (POLY-99) are the nearest stand-in for a control: there is no same-day run of `main` on CI, so the provision and lint budgets, set against one, are judged on these.
+
+| Job | Now | Before | PR #150 | Reading |
+|---|---|---|---|---|
+| provision | 240 | 149 | 150 | Mostly runner speed. The box tests and the scripts they run are identical at `9835c753` and `77955317`: the dry run took 82 s and 145 s. The 93 operator-tool tests, untouched by this loop, took 0.064 and 0.078 s on the two fast runs and 0.112 and 0.111 s on the two slow ones, 1.7 times apart. Divided by that, `a9d35481`'s dry run (157) is about 91 s against 86 before, and the unit step (31 s for 555 tests) about 18 against 15.5 for 469: **this loop's share is about +5 s and +2.5 s since `2825b6f7`, inside the 60 and 46 s.** No remedy is owed. The estimate rests on one control step; a rerun on a fast runner would measure it. |
+| image | 644 | 626 | 737 | +18, of which the backup suite +17 (333 → 350; its files are unchanged) and the container tests −8 are variation. This loop's own: the pinned Compose install, 1 s. Inside the 17 min cap and ≤ 5 s. T-real is not in it. |
+| lint | 117 | 100 | — | +17: the fixtures 33 → 42, the rest steps of 1–2 s. Inside ≤ 20 s. |
+| db | 275 | 196 | 244 | Not this loop's: no file of `packages/`, `apps/` or `tests/db/` differs between the two shas, and the battery has measured 174, 245, 254, 270, 272 and 246 on that same code. The low 174 is the outlier. This loop's `runner.test.ts` cost is the +7.9 s of the gate, inside 10. |
+
 **T-pre restructure** (qa; every fault stays, apply and `--plan` each). All faults share one database and one sibling, created once with the
 fault objects; each fault stays its own `it` and undoes itself. Sharing is sound only with these, which the present cases lack:
 - **Each refusal names its own fault:** the match is `refused (backup-acl)` **and** a per-fault pattern (the object or class, the privilege, the attribute, the
