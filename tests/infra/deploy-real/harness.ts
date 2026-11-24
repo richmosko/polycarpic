@@ -244,12 +244,22 @@ export function install(): Res {
 /** The product keeps the render's stderr to itself (`guard-render` says only that it failed). On that refusal the harness re-runs the same render by hand, isolated as the tool does and once as plain root, and logs both
  * answers (the output holds a compose file, never a secret value: secrets are file mounts) so the failure names its own cause. Nothing here changes the product's check. */
 export function diagnoseRender(): string {
-  const rd = root(['sh', '-c', 'ls -dt /opt/polycarpic/releases/sha256-* 2>/dev/null | head -1']).out.trim();
-  if (!rd) return 'diagnose: no release directory under /opt/polycarpic/releases';
+  let rd = root(['sh', '-c', 'ls -dt /opt/polycarpic/releases/sha256-* 2>/dev/null | head -1']).out.trim();
+  if (!rd) {
+    // the tool removes the release it created when it refuses (F3): render from the job's own image instead, the same /release/infra the bundle holds
+    rd = '/tmp/poly-diag';
+    root(['rm', '-rf', rd]);
+    const id = dockerRoot(['create', APP_IMAGE]).out.trim();
+    const cp = dockerRoot(['cp', `${id}:/release/infra`, `${rd}-x`]);
+    dockerRoot(['rm', id]);
+    if (cp.code !== 0) return `diagnose: no release directory and no /release/infra in ${APP_IMAGE}: ${cp.err.trim()}`;
+    root(['sh', '-c', `mkdir -p ${rd} && mv ${rd}-x ${rd}/infra && chmod -R go+rX ${rd}`]);
+    root(['sh', '-c', `printf 'POLY_APP_IMAGE=${REG}/polycarpic@sha256:${'0'.repeat(64)}\nPOLY_POSTGRES_IMAGE=${REG}/polycarpic-postgres@sha256:${'0'.repeat(64)}\nPOLY_TOOLS_IMAGE=${REG}/polycarpic-tools@sha256:${'0'.repeat(64)}\nPOLY_CADDY_IMAGE=${REG}/polycarpic-caddy@sha256:${'0'.repeat(64)}\n' > ${rd}/images.env`]);
+  }
   const cdir = `${rd}/infra/compose`;
   const home = '/var/lib/polycarpic/state/deploy/render-home';
   const env = ['HOME=' + home, 'XDG_CACHE_HOME=' + home, 'COMPOSE_EXPERIMENTAL_GIT_REMOTE=0', 'COMPOSE_EXPERIMENTAL_OCI_REMOTE=0'];
-  const base = ['docker', 'compose', '-p', 'polycarpic-staging', '--project-directory', cdir, '-f', `${cdir}/staging.yml`, '--env-file', `${ETC}/staging-host.env`, '--env-file', `${ETC}/staging-mail.env`, '--profile', '*', 'config', '--format', 'json'];
+  const base = ['docker', 'compose', '-p', 'polycarpic-staging', '--project-directory', cdir, '-f', `${cdir}/staging.yml`, '--env-file', `${ETC}/staging-host.env`, '--env-file', `${ETC}/staging-mail.env`, '--env-file', `${rd}/images.env`, '--profile', '*', 'config', '--format', 'json'];
   const iso = ['unshare', '--net', '--', 'setpriv', '--reuid', '10020', '--regid', '10020', '--clear-groups', '--no-new-privs', '--'];
   const out: string[] = [`diagnose: release ${rd}`, `ls -ld parents: ${root(['sh', '-c', `ls -ld / /opt /opt/polycarpic /opt/polycarpic/releases ${rd} ${cdir} ${cdir}/staging.yml ${rd}/images.env ${ETC} ${ETC}/staging-host.env ${ETC}/staging-mail.env ${home} 2>&1`]).out.trim()}`];
   const a = root(['env', ...env, ...iso, ...base]);
@@ -263,7 +273,12 @@ export function diagnoseRender(): string {
 export function ops(args: string[], label: string, timeout = 1_200_000): Res {
   const r = root(['sh', '-c', 'umask 077; exec "$@"', 'sh', TOOL, ...args], { timeout });
   logRun(label, r);
-  if (/refused guard-render/.test(r.err)) {
+  if (r.code !== 0) {
+    const dl = readRoot(`${STATE}/deploy.log`) ?? '(no deploy.log)';
+    log('## deploy.log after exit ' + r.code + '\n' + dl.trimEnd());
+    r.err += '\n--- deploy.log ---\n' + dl; // any refusal prints the whole deploy.log (it holds the render-error line)
+  }
+  if (/refused guard-render|refused render-env/.test(r.err)) {
     const why = diagnoseRender();
     log(why);
     r.err += '\n' + why; // the assertion that fails on this refusal prints the render's own answer
