@@ -265,6 +265,15 @@ state_files() {
   if [ -f "$STATE/last-dump" ] && [ ! -s "$STATE/last-dump" ]; then rm -f "$STATE/last-dump"; change "removed the unused $STATE/last-dump"; fi
 }
 
+# The directories every deploy run shares (POLY-100 G1): root, exactly 0755, so the unprivileged render user can reach what it must read.
+deploy_dirs() {
+  local d
+  for d in /opt/polycarpic /opt/polycarpic/releases "$STATE/deploy" "$STATE/deploy/render-home"; do
+    ensure_dir "$d" 0755 0:0
+    [ "$(stat -c %a "$d")" = 755 ] || { chmod 0755 "$d"; change "mode of $d set to 0755"; }
+  done
+}
+
 # ops.conf: root:root 0644. The endpoint line is ours; polycarpic-ops writes the bucket line and keeps this one.
 ops_endpoint() {
   local conf=$ETC/ops.conf other want current=''
@@ -448,6 +457,7 @@ stage_host() {
   data_volume "$state"
   data_dirs
   state_files
+  deploy_dirs
   secrets_for "$ETC/secrets" "$PROD_SERVICES" "$PROD_GENERATED"
   host_secrets
   if [ "$b2_endpoint_set" = 1 ]; then ops_endpoint; fi
