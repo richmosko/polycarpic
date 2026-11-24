@@ -33,7 +33,7 @@ Tip `a975ba56` (tests, wiring), on a machine the lead declared quiet (nobody els
 Open, said plainly:
 - B6's lower bound (poll ≥ 120 s) has no red of its own: cutting the tool's window to 3 s fails on `rollback-unhealthy` first. A crash-at-start candidate takes the whole window, so that case is not missed.
 - The S42 clause "flushed before the close" is not caught by the G15 test (a small loopback body flushes before a destroy); mutant "destroy before the flush" survives.
-- `compose_guard` is not exercised for prod's backup/uploader (the tool deploys staging only).
+- `compose_guard` is not exercised for prod's backup/uploader: the guard test file (`test_deploy_guard.py`) and T-real both deploy the staging bundle only. The tool itself deploys prod and edge too; those two bundles are held by the lint rows alone.
 
 ## Time (limit 17 of 20 minutes for `image`, now moot: T-real is its own job)
 
