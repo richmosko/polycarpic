@@ -970,3 +970,10 @@ Add new decisions ABOVE this comment, newest first.
 - Without the rollback case, saving about two minutes on those PRs.
 - A follow-up issue, which would merge the deploy code with no test that it can deploy.
 **Approved by:** Mosko
+
+### 2026-11-24 — POLY-100's third build review is limited; lesser findings go to one follow-up issue
+**Decision:** seceng's third review of POLY-100's build covers only what changed since its second review, plus the end-to-end deploy test. It holds the PR only for a fault that lets an unverified release run, bypasses the compose guard, loses or exposes data, or leaves a bad release running. Every other finding is recorded on POLY-160 (Deploy follow-ups), which must be done before the first staging deploy (POLY-104).
+**Why:** The first review found sixteen faults and the second eight more, some introduced by fixing the first; nothing bounded a third, and the loop had passed twice its estimated cost. Nothing is deployed anywhere, so a lesser fault merged now sits in code, not on a running box, and POLY-104 cannot start until the follow-up is done. The Principal: "lets limit and move on. tackle the rest in another issue."
+**Alternatives considered:**
+- Keep fixing every finding before the merge, with no bound on rounds.
+**Approved by:** Mosko

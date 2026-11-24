@@ -4,7 +4,7 @@ title: First staging deploy
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101]
+blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160]
 assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/index.html]
 labels: [ops, verification]
