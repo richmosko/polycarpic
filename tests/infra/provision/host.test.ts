@@ -294,14 +294,38 @@ describe('provision-check: positive case and the R4 output contract', () => {
   const g8 = (exe: string, how: string) => `${b2Fixture({})}\ncp /usr/bin/tail /tmp/${exe}; ( setpriv --reuid 10020 --regid 10020 --clear-groups ${how} & ) ; sleep 1; ${CHECK}${rc}`;
   const h23 = (out: string) => lines(out).find((l) => l.id === 'H23')?.kind;
 
+  it('G1 (8635f525) in provision and provision-check: 0750 is repaired; 0777, 0775, 1755, 2755, a link and a foreign owner stop provision.sh, name the path and leave it as found; H24 names it', () => {
+    const dirs = ['/opt/polycarpic', '/opt/polycarpic/releases', '/var/lib/polycarpic/state/deploy'];
+    for (const d of dirs) {
+      const fix = run(`${b2Fixture({})}\nchmod 0750 ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; stat -c %a ${d}`, { image: COMPLETE });
+      expect(fix.out.trim().split('\n').slice(-2), `${d} 0750`).toEqual(['rc=0', '755']);
+      for (const bad of ['0777', '0775', '1755', '2755']) {
+        const r = run(`${b2Fixture({})}\nchmod ${bad} ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; cat /tmp/p.out | tail -3; stat -c %a ${d}; ${CHECK}${rc}`, { image: COMPLETE });
+        expect(r.out, `${d} ${bad}: provision stops`).toMatch(/rc=[1-9]/);
+        expect(r.out, `${d} ${bad}: the path is named`).toContain(d);
+        expect(r.out, `${d} ${bad}: left as found`).toContain(bad.replace(/^0/, ''));
+        const h24 = lines(r.out).find((l) => l.id === 'H24');
+        expect(h24?.kind, `${d} ${bad}: provision-check`).toBe('FAIL');
+        expect(h24?.text, `${d} ${bad}: provision-check names the path`).toContain(d);
+      }
+      const link = run(`${b2Fixture({})}\nmv ${d} ${d}.real && ln -s ${d}.real ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; ${CHECK}${rc}`, { image: COMPLETE });
+      expect(link.out, `${d} as a link`).toMatch(/rc=[1-9]/);
+      expect(lines(link.out).find((l) => l.id === 'H24')?.kind, `${d} as a link`).toBe('FAIL');
+      const foreign = run(`${b2Fixture({})}\nchown 1234:1234 ${d}; ${HOSTRUN} > /tmp/p.out 2>&1; echo "rc=$?"; stat -c %u ${d}; ${CHECK}${rc}`, { image: COMPLETE });
+      expect(foreign.out, `${d} with a foreign owner: provision stops`).toMatch(/rc=[1-9]/);
+      expect(foreign.out, `${d} with a foreign owner: left as found`).toMatch(/^1234$/m);
+      expect(lines(foreign.out).find((l) => l.id === 'H24')?.kind, `${d} with a foreign owner`).toBe('FAIL');
+    }
+  });
+
   it('H23 (G8): a real render, executable docker with compose and config among its arguments, passes', () => {
     // tail stands in for docker (it follows /dev/null and complains about the two names, which is all this needs)
-    const real = run(g8('docker', '/tmp/docker -f /dev/null compose config'), { image: COMPLETE });
-    expect(h23(real.out), real.out.slice(-600)).toBe('PASS');
+    const real = run(g8('docker', '/tmp/docker -f /dev/null compose -p polycarpic-staging config'), { image: COMPLETE });
+    expect(h23(real.out), JSON.stringify(lines(real.out).find((l) => l.id === 'H23'))).toBe('PASS');
   });
 
   it('H23 (G8): a script of any name whose argument vector only carries the words is a FAIL', () => {
-    const faked = run(g8('looks-ish', `bash -c 'exec -a "docker compose config" /tmp/looks-ish -f /dev/null'`), { image: COMPLETE });
+    const faked = run(g8('looks-ish', `bash -c 'exec -a "docker compose -p polycarpic-staging config" /tmp/looks-ish -f /dev/null'`), { image: COMPLETE });
     expect(h23(faked.out), faked.out.slice(-600)).toBe('FAIL');
   });
 

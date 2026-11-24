@@ -295,3 +295,14 @@ Mutants not made: S35's secret-in-render check (the build never saves a secret v
 | G1: file checked, parents not | test_deploy_paths.py | red: non-`o+x` parent |
 | G1: `render-path` quarantines | test_deploy_paths.py | red ×2 |
 Still to do: G8 (one container run), G6's `_handle_interrupted` ignoring the restore's answer (the test is red on devops-100's build: `_Stop` is caught as `internal`, reported to devops-100), G6 `mark_transient`, S36's three cases, G2 for prod-with-edge, G1's Linux case.
+
+## G1 (8635f525), G8, T-real, H24: mutants on devops-100's build (3b67f7de, fcafa305)
+
+| Mutant | Test | Result |
+|---|---|---|
+| G1: the tool repairs 0775 (`mode & ~0o775`) | test_deploy_paths.py | red: `test_a_mode_beyond_0755_is_refused_left_as_found_…` |
+| G1: provision.sh repairs 0775 (`~8#775`) | host.test.ts G1 provision case | red: "0775: left as found" |
+| G8: H23 judges the command line alone | host.test.ts G8 ×3 | GREEN at first: my "script" case also had adjacent `compose config`, which the glob rejects by itself; given realistic arguments (`compose -p … config`) it is red |
+| Fixture faults found (mine): the snapshot tar did not keep /opt/polycarpic (H24 failed on every box test); root in the container cannot read another user's /proc/<pid>/exe (added CAP_SYS_PTRACE: a real box's root can) | tests/infra/provision/box.ts | provision config 194/194 |
+| Product edge, told to devops-100: H23's glob ` compose `…` config ` cannot match `compose config` written adjacent (no flag between); a real render has `-p` and the files between, so nothing breaks today |
+T-real (tests/infra/deploy-real, tests/ci/deploy-key.test.ts): written, not run here; first CI run is its red/green record, and it must be red on 2825b6f7 (G1).

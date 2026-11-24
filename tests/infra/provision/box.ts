@@ -43,13 +43,13 @@ function mounts(): string[] {
 }
 
 const SNAPS = new Set<string>();
-const SAVE = 'tar --acls --xattrs --numeric-owner -cpf /snap/%TAG%.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf etc srv var/lib/polycarpic var/fake-state home root 2>/dev/null; true';
+const SAVE = 'tar --acls --xattrs --numeric-owner -cpf /snap/%TAG%.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf etc srv opt/polycarpic var/lib/polycarpic var/fake-state home root 2>/dev/null; true';
 const LOAD = (tag: string) => `tar --acls --xattrs --numeric-owner -xpf /snap/${tag}.tar -C / --exclude=etc/hosts --exclude=etc/hostname --exclude=etc/resolv.conf;`;
 
 /** Run `script` as root in a fresh container of the box, first restoring snapshot `o.image` (HOST or COMPLETE) when given. */
 export function run(script: string, o: { image?: string; network?: string; env?: Record<string, string> } = {}): R {
   build();
-  const a = ['run', '--rm', ...mounts(), '-v', `${SNAPDIR}:/snap`];
+  const a = ['run', '--rm', '--cap-add=SYS_PTRACE', ...mounts(), '-v', `${SNAPDIR}:/snap`]; // root on a real box can read /proc/<pid>/exe of another user (H23, G8)
   if (o.network) a.push('--network', o.network);
   for (const [k, v] of Object.entries(o.env ?? {})) a.push('-e', `${k}=${v}`);
   const load = o.image && SNAPS.has(o.image) ? LOAD(o.image) : '';
