@@ -960,3 +960,13 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - The release carries its own policy, checked by the installed code.
 **Approved by:** Mosko
+
+### 2026-11-24 — One real end-to-end deploy test in CI, on a narrow trigger, with its rollback case
+**Decision:** POLY-100 adds T-real: one real `first-deploy staging` as the last step of CI's `image` job, as real root, with the real operator tool, Docker, Compose and the job's own images; only GitHub is faked. It includes the rollback case (a release whose web never answers is rolled back and quarantined). It runs only on changes that can break a deploy (the Dockerfile, `infra/`, the config package's settings contract, the migrations and the app's startup code), not on every `apps/` or `packages/` change.
+**Why:** Three times in this loop the deploy passed every test and a green CI run and could not have deployed on a real box, each for a different cause (the bundle a real image ships, a Compose option that does not exist, release directories the render user cannot read). Each was found by seceng reading the code, a review round at a time, because every test checked a piece against a stand-in that agreed with the code. The architect and seceng both recommended the test. The narrow trigger is the Principal's condition: ordinary feature PRs must not pay for it. Estimated cost, unmeasured: about 250 lines and 2.5 to 4 minutes of the image job on the PRs that run it. It does not cover the timers, real GitHub or a prod deploy, and does not replace POLY-104.
+**Alternatives considered:**
+- Fix the review findings only and rely on a further review and the first staging deploy.
+- Run it on every `apps/` or `packages/` change, as first ruled.
+- Without the rollback case, saving about two minutes on those PRs.
+- A follow-up issue, which would merge the deploy code with no test that it can deploy.
+**Approved by:** Mosko
