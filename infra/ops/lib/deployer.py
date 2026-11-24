@@ -451,6 +451,8 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
     if fresh:  # an empty data directory and no `current`: a rerun after `roles-missing` may proceed without --existing-data
         rel.put(ctx, project, "first-attempt", rel.now_utc(ctx) + "\n")
     _start_postgres(project, ctx, pj, cdir, rows)
+    if not cur:
+        _check_roles(project, ctx, pj)  # G12: a fresh Postgres without poly_migrator is `roles-missing`, before any backup or one-off
     # S19: a rerun skips the backup only when its own earlier attempt left an empty database; a table, or a failed or unparsable read, requires it
     backup_needed = bool(cur or existing_data or (rerun and not _database_empty(project, ctx, pj)))
     if project == "prod" and backup_needed:
@@ -478,6 +480,29 @@ def _start_postgres(project, ctx, pj, cdir, rows):
     code, _, _ = _compose(ctx, stack.up_argv(pj, project, ["postgres"], ["--no-deps"]))
     if code != 0 or not stack.wait_healthy(ctx, project, cdir, ["postgres"], check_http=False, judged=pj):
         raise Refusal("postgres-start")
+
+
+SQL_ROLE = ("SET default_transaction_read_only = on;\n"
+            "SELECT count(*) FROM pg_roles WHERE rolname = 'poly_migrator';\n")
+
+
+def _check_roles(project, ctx, pj):
+    """G12: with no `current`, right after Postgres is healthy, ask over the container's local socket whether poly_migrator exists. `migrate --plan`
+    cannot tell: a missing role is 28P01, the same answer as a wrong password, and the tool never reads meaning into that. Exactly 0 is
+    `roles-missing` (the provision command, exit 4, no quarantine, no one-off started); exactly 1 goes on; anything else is `roles-read` (no quarantine)."""
+    argv = stack.base(pj, project) + ["exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "postgres", "-XAtq", "-v", "ON_ERROR_STOP=1"]
+    try:
+        code, out, _ = ctx.run(argv, stdin=SQL_ROLE, timeout=30)
+    except (TimeoutError, OSError):
+        raise Refusal("roles-read")
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    answer = lines[-1] if code == 0 and lines else None
+    if answer == "1":
+        return
+    if answer == "0":
+        ctx.err("run: sudo polycarpic-ops provision --stage database --project " + project)
+        raise Refusal("roles-missing", code=4)
+    raise Refusal("roles-read")
 
 
 SQL_TABLES = ("SET default_transaction_read_only = on;\n"
