@@ -79,7 +79,7 @@ export const TABLE = {
   // the tool and what the bundle holds, the settings contract, migrations and their runner, startup code and the health route, and the test itself.
   deploy: [
     /^Dockerfile$/, /^\.dockerignore$/, /^bin\/polycarpic$/,
-    /^infra\/(ops|deploy|compose|caddy|postgres|backup)\//, /^infra\/postgres-major$/, /^infra\/provision(-check)?\.sh$/, /^infra\/ci\/(image|images-env|deploy-real-undo)\.sh$/,
+    /^infra\/(ops|deploy|compose|caddy|postgres|backup)\//, /^infra\/postgres-major$/, /^infra\/provision(-check)?\.sh$/, /^infra\/ci\/(image|images-env|deploy-real-undo)\.sh$/, /^infra\/ci\/deploy-real-sweep\.mjs$/,
     /^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)/,
     /^packages\/db\/(migrations|sql)\//, /^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$/,
     /^apps\/migrate\/src\/(cli|run|index)\.ts$/, /^apps\/(web|worker)\/src\/(main|startup)\.ts$/, /^apps\/auth\/src\/(main|bind|http)\.ts$/,
