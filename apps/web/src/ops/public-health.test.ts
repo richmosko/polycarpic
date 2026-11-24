@@ -43,7 +43,7 @@ function raw(port: number, bytes: string | Buffer, ms = 3000, keepOpen = false):
     const sock = connect(port, '127.0.0.1');
     const chunks: Buffer[] = [];
     let closed = false;
-    sock.on('data', (d) => chunks.push(d));
+    sock.on('data', (d) => chunks.push(Buffer.from(d)));
     sock.on('close', () => { closed = true; });
     sock.on('error', () => { closed = true; });
     sock.on('connect', () => sock.write(bytes));
