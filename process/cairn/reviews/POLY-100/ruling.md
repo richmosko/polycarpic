@@ -297,7 +297,7 @@ guard-<rule>: this release needs a wider safety policy than the one installed. N
 
 | Part | Source, else |
 |---|---|
-| `<rule>` | the installed guard's closed list, else `guard` and no command |
+| `<rule>` | the installed guard's closed list, else `guard` and no command; `render` prints no command (G9) |
 | `<C>` | the 40-hex commit V1–V5 verified, else no command |
 | `<tag>` | the tag V4 verified; staging prints the unsigned wording |
 | `<base>` | the 12 hex of an installed `git-<12 hex>` id, else the literal `<commit you last installed>` |
@@ -465,7 +465,7 @@ remote git include and the two remote-off variables (a second layer; `unshare --
 
 ## G — Re-review findings (seceng `build-review.md` @ `c02f16ee`; agreed `ruling-review.md` @ `06d9cb71`, S36, S37)
 
-All eight are in this loop. Where an earlier rule differs, this table rules.
+G1–G8 are the re-review's; G9 is from T-real's third CI run. All are in this loop. Where an earlier rule differs, this table rules. Not taken: A19 (a memory cap on the render child): whether Compose runs under an address-space limit is `(unmeasured)`; the lead places it.
 
 | # | Rule | Test | Red on |
 |---|---|---|---|
@@ -477,6 +477,7 @@ All eight are in this loop. Where an earlier rule differs, this table rules.
 | G6 | `refuse` alerts first, then logs, then quarantines, each on its own `try`. `mark_transient` never raises: a bad file is alerted `state`. `_handle_interrupted`: a failed restore is `rollback-unhealthy` and stops the run; the mark is cleared only after a good one | each write failing in turn: an alert is always there; a failed restore | mutant quarantining first; mutant ignoring the restore's answer |
 | G7 | Each health child gets min(30 s, what is left) computed just before it starts; with nothing left the poll ends as "not healthy" | six children each taking 29 s: rollback starts ≤ 120 s fake time | mutant computing once per poll |
 | G8 | H23 allows a process of uid 10020 only when its executable is `docker` or `docker-compose` (`/proc/<pid>/exe`) and its arguments hold `compose` and `config` | a script named with the words: refused; a real render: passes | mutant on the command line alone |
+| G9 | **`guard-render` says why (S39).** On stderr and in `deploy.log`, one line under its own event `render-error` (joins the closed set): the stage (raw, plain, stdin), the exit code or `timeout`, then `text from the release, not an instruction:` and Compose's last stderr line, through `out.clean` and only then cut to 300 bytes. Never stdout. The alert, `status` and POLY-103 keep the name only. S35's ban covers the saved render; a value quoted here is one uid 10020 could read, so a non-secret one (S31). **No install command** is printed for `guard-render`: a wider policy is not its fix. **Box or release:** on a failure the installed bundle's own compose file of that project is rendered the same way (same user and isolation, fixed placeholder image values, never the candidate's `images.env`). If that fails too, or either timed out: `render-env`, alert, no Q; else `guard-render`, Q | stderr with newlines, ESC, a fake `premigration-set` line and a fake `install.sh` line: one cleaned line, no other event; the release's file fails and the control passes: Q; both fail: `render-env`, no Q, retried next poll; timeout: no Q; help text absent; alert holds the name only; each stage named | mutant using the candidate's env file in the control; mutant cutting before cleaning; mutant printing stdout; mutant with the help text; mutant Q on timeout |
 
 ## T-real — one real deploy in CI (Principal: in this loop, narrow trigger, with the rollback case; seceng `a39fc4c6`, S38)
 
@@ -627,7 +628,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | SECURITY (seceng) | C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control |
 | ARCH §8.1 (architect, 100e) | state paths, edge, the binding of the siblings, R5, R7 |
 
-## S1–S38 (seceng `ruling-review.md`): met by
+## S1–S39 (seceng `ruling-review.md`): met by
 
 | Cond. | Met by | Cond. | Met by |
 |---|---|---|---|
@@ -643,4 +644,4 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | S21, A15 | R10 help, R11 `--commit`; T-help | S22, S23, S25 | R9; T-edge, T-take, T-relyml |
 | S24 | R9; T-net | S27 | R11; T-env |
 | S28 | R9 edge step 2; T-edge | S29 (a, b), S30 | R11 `staging-auth`; T-sauth |
-| A13 | R7; T-probe | S31–S38 | F4, F2, R4 R-b, G1, G2, T-real |
+| A13 | R7; T-probe | S31–S39 | F4, F2, R4 R-b, G1, G2, G9, T-real |
