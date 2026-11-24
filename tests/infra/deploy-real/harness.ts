@@ -192,7 +192,7 @@ function push(local: string, name: string): string {
 
 function derived(tag: string, base: string, commit: string, extra = '', files: Record<string, string> = {}): void {
   const ctx = mkdtempSync(join(tmpdir(), 'poly-real-img-'));
-  for (const [n, c] of Object.entries(files)) writeFileSync(join(ctx, n), c);
+  for (const [n, c] of Object.entries(files)) writeFileSync(join(ctx, n), c, { mode: 0o644 });
   writeFileSync(join(ctx, 'Dockerfile'), `FROM ${base}\nLABEL org.opencontainers.image.revision=${commit}\n${extra}\n`);
   must(dockerRoot(['build', '-q', '-t', tag, ctx], { timeout: 900_000 }), `build ${tag}`);
 }
@@ -209,10 +209,10 @@ export function release(commit: string, badWeb = false): Release {
   }
   const env = ['postgres', 'tools', 'caddy'].map((n) => `POLY_${n.toUpperCase()}_IMAGE=${REG}/polycarpic-${n}@${siblings[n]}`).join('\n') + '\n';
   const files: Record<string, string> = { 'images.env': env };
-  let extra = 'COPY --chown=root:root --chmod=0644 images.env /release/infra/release/images.env';
+  let extra = 'COPY --chown=root:root images.env /release/infra/release/images.env';
   if (badWeb) {
     files['web-main.ts'] = readFileSync(join(ROOT, 'tests/infra/deploy-real/fixtures/web-main-stub.ts'), 'utf8');
-    extra += '\nCOPY --chown=root:root --chmod=0644 web-main.ts /app/apps/web/src/main.ts';
+    extra += '\nCOPY --chown=root:root web-main.ts /app/apps/web/src/main.ts';
   }
   derived(`polycarpic-deploy-real-app:${commit.slice(0, 12)}${badWeb ? '-bad' : ''}`, APP_IMAGE, commit, extra, files);
   const app = push(`polycarpic-deploy-real-app:${commit.slice(0, 12)}${badWeb ? '-bad' : ''}`, 'polycarpic');

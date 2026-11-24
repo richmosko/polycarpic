@@ -156,6 +156,7 @@ class World(object):
         self.run_hang, self.run_names, self.stuck_oneoff, self.run_started = set(), [], set(), set()
         self.inspect_fail, self.inspect_calls = {}, []
         self.config_rules = []
+        self.inspect_missing_msg = "No such object\n"  # what `docker inspect` of an unknown name says (Docker 29.1.3: `error: no such object: <name>`)
         self.child_secs = None  # G7: each health child (compose ps, exec; docker inspect) after the run's first `up` takes this long on the fake clock, or its timeout if shorter (and then times out)
         self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
         self.config_wrapped = []
@@ -370,7 +371,7 @@ class World(object):
         if sub == "inspect":
             c = self.by_name.get(argv[2])
             if c is None:
-                return 1, "[]", "No such object\n"
+                return 1, "[]", self.inspect_missing_msg
             return 0, json.dumps([{"Id": "x", "Created": utc(), "Image": "sha256:" + "cd" * 32, "Config": {"Image": c["image"]}, "State": {"StartedAt": utc()}}]), ""
         self.unhandled.append(list(argv))
         return 1, "", "FAKE docker: unhandled %r\n" % (argv,)
