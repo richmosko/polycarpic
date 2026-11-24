@@ -25,18 +25,19 @@ docker images --format '{{.Repository}}:{{.Tag}}' 2> /dev/null | grep -E '^(ghcr
   docker rmi -f "$img" > /dev/null 2>&1 || true
 done
 
-# the runner's /opt, if the harness changed it for the tool's trust check: back to the `<mode> <uid>:<gid>` it recorded first
-if [ -r /run/poly-deploy-real/opt.orig ]; then
-  read -r orig_mode orig_owner < /run/poly-deploy-real/opt.orig || true
-  if [[ "${orig_mode:-}" =~ ^[0-7]{3,4}$ && "${orig_owner:-}" =~ ^[0-9]+:[0-9]+$ ]]; then
-    as_root chown "$orig_owner" /opt || true
-    as_root chmod "$orig_mode" /opt || true
-  fi
-fi
+# what the harness recorded about the runner's /opt (`<mode> <uid>:<gid>`), read now: the file goes with /run/poly-deploy-real below
+opt_orig=$(as_root cat /run/poly-deploy-real/opt.orig 2> /dev/null || true)
 
 # the data mount, then the trees
 if mountpoint -q /srv/polycarpic 2> /dev/null; then as_root umount /srv/polycarpic || true; fi
 as_root rm -rf /srv/polycarpic /opt/polycarpic /etc/polycarpic /var/lib/polycarpic /run/polycarpic /run/poly-deploy-real /etc/docker/certs.d/ghcr.io || true
+
+# the runner's /opt back to exactly the recorded value, after /opt/polycarpic is gone; nothing when nothing was recorded or it is malformed
+read -r orig_mode orig_owner <<< "$opt_orig" || true
+if [[ "${orig_mode:-}" =~ ^[0-7]{3,4}$ && "${orig_owner:-}" =~ ^[0-9]+:[0-9]+$ ]]; then
+  as_root chown "$orig_owner" /opt || true
+  as_root chmod "$orig_mode" /opt || true
+fi
 
 # the fake gh and the installed dispatcher sit beside, never over, the real tools
 as_root rm -f /usr/local/sbin/gh /usr/local/sbin/polycarpic-ops || true
