@@ -1,16 +1,17 @@
 ---
 id: POLY-162
 title: Deploy test passing end to end
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
 assignee: devops-engineer
+paths: [process/cairn/issues/POLY-162.md, process/cairn/reviews/POLY-162/**, infra/**, .github/workflows/**, Dockerfile, apps/web/**, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, packages/*/package.json, layers.json, eslint.config.js, process/STATE.md, process/DECISIONS.md]
 labels: [ops, deploy]
 priority: null
 pr: null
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 POLY-100 merged the pull-based deploy without a completed real deploy: its end-to-end test (T-real, `tests/infra/deploy-real/`) is on `main` with its CI step switched off. This issue makes a real first deploy work and switches the step on. Cut out of POLY-100 by the Principal's decision of 2026-11-24 (`process/DECISIONS.md`): no more scope there. Rulings already written and security-reviewed are in `process/cairn/reviews/POLY-100/ruling.md` (G13, G14, G15, T-real, S38, S41, S42); devops-engineer's commits for G13/G14 and its half of G15 are kept on branch `feature/poly-162-deploy-test-passing`. Must be done before the first staging deploy (POLY-104).
@@ -42,3 +43,7 @@ Still open for this issue (each stops a first deploy from going healthy on a rea
 Already fixed on the POLY-100 branch: Docker 29's lowercase `no such object` (G4), a fresh Postgres giving plan-error instead of roles-missing (G12), Compose 2.40's `create_host_path` (one pinned Compose, G10), the caller's directory deciding the render (G11).
 
 How to iterate: the privileged Ubuntu container recipe runs T-real in 2-3 minutes per loop on the Mac; CI is for confirming. T-real's files, the `deploy` key and its classifier pins are on the POLY-100 branch; its CI steps are on feature/poly-162-deploy-test-passing.
+
+### @team-lead — 2026-11-24
+
+Feature started. Branch: `feature/poly-162-deploy-test-passing` (the three kept devops commits, with `main` merged in at d54aedc6). No new ruling stage: G13, G14, G15, T-real and S38/S41/S42 are already ruled and security-reviewed in `process/cairn/reviews/POLY-100/ruling.md`. Sub-issues: a (qa, tests), b (devops, ops build), c (backend, health listener), d (seceng, build review), e (architect, verdict).

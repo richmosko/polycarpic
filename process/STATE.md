@@ -15,7 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-100 (Pull-based deploy + timers) merged 2026-11-24 via PR [#152](https://github.com/richmosko/polycarpic/pull/152) — ARCH 1.28.0, SECURITY 1.20.1, INFRA 1.3.27. `polycarpic-ops deploy`, `first-deploy`, `rollback`, `edge-deploy` and the timers exist and are tested against stand-ins and real Compose rendering; **no real deploy has completed** and the end-to-end test runs in no CI step. Nothing is deployed and no `v1.*` or `edge-*` tag is cut until POLY-160 (follow-ups, with the interrupted-deploy finding H1 as a gate), POLY-161 (web server in the release image) and POLY-162 (the deploy test passing end to end) are done._
+- **Feature:** Deploy test passing end to end
+- **Issue:** `POLY-162` (cairn)
+- **Milestone:** `POLY-M1`
+- **Branch:** `feature/poly-162-deploy-test-passing`
+- **Started:** 2026-11-24
+- **Goal:** a real first deploy completes on real Linux, Docker and Compose, and the end-to-end deploy test (T-real) runs and passes in CI.
+- **Status:** In Progress
+
+_Standing context. POLY-100 (Pull-based deploy + timers) merged 2026-11-24 via PR [#152](https://github.com/richmosko/polycarpic/pull/152) — ARCH 1.28.0, SECURITY 1.20.1, INFRA 1.3.27. `polycarpic-ops deploy`, `first-deploy`, `rollback`, `edge-deploy` and the timers exist and are tested against stand-ins and real Compose rendering; **no real deploy has completed** and the end-to-end test runs in no CI step. Nothing is deployed and no `v1.*` or `edge-*` tag is cut until POLY-160 (follow-ups, with the interrupted-deploy finding H1 as a gate), POLY-161 (web server in the release image) and POLY-162 (the deploy test passing end to end) are done._
 
 _Standing context. POLY-99 (Backup, uploader, restore, drill) merged 2026-11-23 via PR [#150](https://github.com/richmosko/polycarpic/pull/150) — ARCH 1.27.1, SECURITY 1.18.0, INFRA 1.3.23. `infra/backup/backup.sh` (nightly and premigration), `infra/postgres/archive-wal.sh`, the put-only uploader (`infra/backup/upload.sh` and its tools image), `polycarpic-ops backup` and `upload`, `infra/restore.sh` and `infra/drill.sh` exist. Backups are compressed, then encrypted with age before they touch the disk; decryption happens only on the operator's laptop, into a throwaway scratch Postgres with no network. The deploy calls `polycarpic-ops backup premigration` (ruling R6, `process/cairn/reviews/POLY-99/ruling.md`). It is proven against a fake bucket, the test box image and a real Postgres only: no real Backblaze call, real key or real backup has been made (`process/cairn/reviews/POLY-99/verdict.md` §8); the real-box items are on POLY-100, POLY-103, POLY-104, POLY-105 and POLY-116. Decided by the Principal on 2026-11-23 (`process/DECISIONS.md`): the from-box bucket cross-check stays optional on the laptop; decrypted premigration data may be streamed into a temporary scratch cluster on the box, with the cross-check always required there (the route back into prod, POLY-158, not built); a daily off-box list-only bucket check gates the first real household data (POLY-159, not built). The drill report is redacted because this repository is public._
 
