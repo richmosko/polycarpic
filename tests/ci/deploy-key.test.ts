@@ -27,6 +27,7 @@ const ROWS: [string, string][] = [
   ['infra/provision-check.sh', 'H23, H24'],
   ['infra/ci/image.sh', 'the images'],
   ['infra/ci/images-env.sh', 'images.env'],
+  ['infra/ci/install-compose.sh', 'the one pinned Compose the job installs'],
   ['infra/ci/deploy-real-undo.sh', 'the undo the step leaves behind'],
   ['infra/ci/deploy-real-sweep.mjs', 'B9: the sweep that gates the kept log'],
   ['packages/config/src/check.ts', 'PLAID_ENV, MAIL_FROM: the settings contract'],
@@ -105,7 +106,8 @@ type Step = { name?: string; if?: string; run?: string; uses?: string; env?: Rec
 describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; POLY-162)', () => {
   // POLY_CI_YML: a copy of ci.yml to read instead (how a mutant is shown red without editing the workflow; unset in CI)
   const doc = parse(readFileSync(process.env.POLY_CI_YML ?? join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')) as { permissions?: Record<string, string>; jobs: Record<string, { permissions?: Record<string, string>; steps: Step[] }> };
-  const steps = doc.jobs.image!.steps;
+  const J = doc.jobs['deploy-real']!;
+  const steps = J.steps;
   const iReal = steps.findIndex((s) => (s.run ?? '').includes('vitest.deploy-real.config.ts'));
   const real = steps[iReal];
   const DEPLOY_ON = "needs.changes.outputs.deploy == 'true'";
@@ -113,7 +115,7 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
   it('exactly one step of the image job runs the deploy-real config, and nothing else in any workflow does  [red if: the step is absent or duplicated]', () => {
     expect(steps.filter((s) => (s.run ?? '').includes('vitest.deploy-real.config.ts')).length).toBe(1);
     for (const f of ['build.yml', 'release.yml', 'renovate-check.yml']) expect(readFileSync(join(ROOT, '.github', 'workflows', f), 'utf8'), f).not.toContain('deploy-real');
-    for (const [id, j] of Object.entries(doc.jobs)) if (id !== 'image') expect(JSON.stringify(j.steps), `job ${id}`).not.toContain('vitest.deploy-real.config.ts');
+    for (const [id, j] of Object.entries(doc.jobs)) if (id !== 'deploy-real') expect(JSON.stringify(j.steps), `job ${id}`).not.toContain('vitest.deploy-real.config.ts');
   });
 
   it(`the step's condition is exactly \`${DEPLOY_ON}\`: no constant, no always(), no other key  [red if: it is forced on or off, or widened]`, () => {
@@ -121,10 +123,19 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
     expect(real?.['continue-on-error'], 'a red real deploy must fail the job').toBeUndefined();
   });
 
-  it('it comes after the backup suite and is the last step that is not an always() step  [red if: another real step follows it]', () => {
-    const iBackup = steps.findIndex((s) => (s.run ?? '').includes('vitest.backup.config.ts'));
-    expect(iBackup).toBeGreaterThanOrEqual(0);
-    expect(iReal).toBeGreaterThan(iBackup);
+  it('it is its own job: the job runs on the deploy key alone, within 15 minutes, builds its images before the test, and the image job no longer carries it or the key  [red if: it is back in image, or the job is unbounded]', () => {
+    expect((J as { if?: string }).if).toBe(DEPLOY_ON);
+    expect((J as { 'timeout-minutes'?: number })['timeout-minutes']).toBeLessThanOrEqual(15);
+    const iBuild = steps.findIndex((s) => /infra\/ci\/image\.sh build/.test(s.run ?? ''));
+    expect(iBuild, 'the job builds its own app image').toBeGreaterThanOrEqual(0);
+    expect(iReal).toBeGreaterThan(iBuild);
+    expect(steps.some((s) => /docker build -t polycarpic-postgres:ci/.test(s.run ?? '')), 'and the Postgres derivative').toBe(true);
+    expect(steps.some((s) => /docker build -t polycarpic-caddy:ci/.test(s.run ?? '')), 'and the Caddy derivative').toBe(true);
+    expect((doc.jobs.image as { if?: string }).if ?? '', 'the image job is not triggered by the deploy key').not.toContain('outputs.deploy');
+    expect(JSON.stringify(doc.jobs.image!.steps), 'the image job holds no deploy step').not.toMatch(/deploy-real|outputs\.deploy/);
+  });
+
+  it('it is the last step that is not an always() step  [red if: another real step follows it]', () => {
     const after = steps.slice(iReal + 1);
     expect(after.length).toBeGreaterThan(0);
     for (const s of after) expect(s.if ?? '', `step "${s.name}" after the real deploy is not an always() step`).toMatch(/^always\(\)/);
@@ -134,12 +145,12 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
     expect(JSON.stringify(real?.env ?? {})).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
     // B8: a workflow-level or job-level env reaches every step of the job too
     expect(JSON.stringify((doc as { env?: unknown }).env ?? {}), 'workflow env').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
-    expect(JSON.stringify((doc.jobs.image as { env?: unknown }).env ?? {}), 'image job env').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
+    expect(JSON.stringify((J as { env?: unknown }).env ?? {}), 'deploy-real job env').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
     expect(real?.run ?? '').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|\bgh\s|secrets\./);
-    expect(doc.jobs.image!.permissions).toEqual({ contents: 'read' });
+    expect(J.permissions).toEqual({ contents: 'read' });
     const checkout = steps.find((s) => (s.uses ?? '').startsWith('actions/checkout'));
     expect(checkout?.with?.['persist-credentials']).toBe(false);
-    expect(steps.some((s) => /(GH_TOKEN|GITHUB_TOKEN)/.test(JSON.stringify(s.env ?? {}))), 'a step of the image job carries a token').toBe(false);
+    expect(steps.some((s) => /(GH_TOKEN|GITHUB_TOKEN)/.test(JSON.stringify(s.env ?? {}))), 'a step of the deploy-real job carries a token').toBe(false);
   });
 
   it('the undo runs always, only when the key is on, executes infra/ci/deploy-real-undo.sh, and sits after the real deploy  [red if: the undo is missing, conditional on success, or before it]', () => {
@@ -193,7 +204,8 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
     expect(up.if).not.toMatch(/!= 'failure'|failure\(\)|success\(\)/);
     const out = /--out\s+(\S+)/.exec(sweepStep.run ?? '')?.[1];
     expect(out, 'the sweep writes one named output').toBeTruthy();
-    expect(String(up.with?.path), 'the upload is exactly the sweep\'s output').toBe(out);
+    const norm = (x: string) => x.replace(/"/g, '').replace('${{ runner.temp }}', '$RUNNER_TEMP');
+    expect(norm(String(up.with?.path)), 'the upload is exactly the sweep\'s output').toBe(norm(out!));
     for (const s of steps) if (s !== real) expect(s.run ?? '', s.name).not.toMatch(/tee\s+(-a\s+)?\S*deploy-real\/(log|harness)/);
   });
 

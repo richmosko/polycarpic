@@ -31,7 +31,7 @@ const runs = () => steps(w.jobs.unit!).map((s) => `${s.run ?? ''}`).join('\n');
 
 describe('ci.yml: web e2e in the unit job (POLY-128 R9)', () => {
   it('job set is unchanged  [red if: an e2e/playwright job is added at top level]', () => {
-    expect(Object.keys(w.jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'guard', 'image', 'lint', 'provision', 'unit']);
+    expect(Object.keys(w.jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'deploy-real', 'guard', 'image', 'lint', 'provision', 'unit']);
   });
   it('unit runs `turbo run e2e` with --affected  [red if: the e2e step is missing or runs unaffected]', () => {
     expect(runs()).toMatch(/turbo run e2e[^\n]*--affected/);

@@ -20,15 +20,18 @@ const SWEEP = join(ROOT, 'infra', 'ci', 'deploy-real-sweep.mjs');
 const made: string[] = [];
 afterAll(() => { for (const d of made) rmSync(d, { recursive: true, force: true }); });
 
+const NAMES = ['postgres/db_superuser_password', 'web/db_password_app', 'web/plaid_secret', 'auth/db_password_auth', 'auth/auth_secret', 'auth/resend_api_key',
+  'worker/db_password_worker', 'worker/credential_keyring', 'worker/resend_api_key', 'migrate/db_password_migrator', 'operator/db_password_operator'];
+const BASE = 'AbCdEfGhJkLmNpQrStUvWxYz0123456789+/QqWwEeRrTtYyUuIiOoPp';
+// eleven distinct 44-character base64-alphabet values (no two share a 16-character window) and the token
 const SECRETS: Record<string, string> = {
-  db_password_app: 'q7Zk+L2mP9/xW4nR8vT1yB6cD3fH5jA0sGeUoIiK=',
-  db_password_auth: 'Zm9vYmFyX2F1dGhfc2VjcmV0X3ZhbHVlXzEyMzQ1Ng==',
-  auth_secret: 'Xk3/Pq9+Lm2Rt7Vw1Yz5Bc8Df4Gh6Jn0SaEuOiK+7Ab=',
-  credential_keyring: 'Kd8+Wq1/Zx4Cv7Bn2Mt5Ry9Uh3Jf6Gs0LpOaEiYw/Qe=',
-  plaid_secret: 'Tn5/Hy2+Gb8Vf1Dc4Xs7Zq0Wm3Lk6Jp9ReUoAiNt+Yc=',
-  resend_api_key: 'Re9+Lp3/Km6Jn2Hb5Gv8Fc1Dx4Zs7Aq0WeTuYiOr/Ba=',
+  ...Object.fromEntries(NAMES.map((n, i) => [n, Array.from({ length: 44 }, (_, k) => BASE[(k * (i + 3) + i * 7 + (k % 5) * i) % BASE.length]).join('') + '=' ])),
   github_read_token: 'github_pat_' + 'Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz',
 };
+const APP = 'web/db_password_app';
+// A value whose standard base64 carries `+` or `/` in every 16-character window, so the url-safe form (which swaps them) cannot stand in for it: without this a sweep that drops the standard form passes.
+SECRETS[APP] = '>>>abc???def>>>ghi???jkl>>>mno???pqr>>>stu???vwx';
+const KEYRING = 'worker/credential_keyring';
 type In = { step?: string | null; harness?: string | null; deploy?: string | null };
 type Run = { code: number; err: string; out: string | null; dir: string };
 
@@ -86,14 +89,14 @@ describe('deploy-real sweep (B9): a hit in any input is refused, by name, with n
   for (const where of inputs) {
     for (const [what, make] of forms) {
       it(`${what} in the ${where} input  [red if: that input or that encoding is not swept]`, () => {
-        const r = sweep({ [where]: text(make(SECRETS.db_password_app!)) });
+        const r = sweep({ [where]: text(make(SECRETS[APP]!)) });
         refused(r);
-        noValues(r, 'db_password_app');
+        noValues(r, APP);
       });
     }
   }
   it('a 15-character piece is not a hit (the rule is 16)  [red if: the window is shorter]', () => {
-    const r = sweep({ step: text(SECRETS.db_password_app!.slice(11, 26)) });
+    const r = sweep({ step: text(SECRETS[APP]!.slice(11, 26)) });
     expect(r.code, r.err).toBe(0);
   });
   it('the token is found like any secret  [red if: github_read_token is exempt]', () => {
@@ -128,13 +131,13 @@ describe('deploy-real sweep (B9): fail closed', () => {
   it('no secrets list file content  [red if: an empty look publishes]', () => { refused(sweep({}, undefined, { raw: '' })); });
   it('an unparsable list  [red if: it publishes]', () => { refused(sweep({}, undefined, { raw: '{not json' })); });
   it('a short list (fewer than 6 entries)  [red if: a short look publishes]', () => {
-    refused(sweep({}, { github_read_token: SECRETS.github_read_token, a: SECRETS.auth_secret }));
+    refused(sweep({}, { github_read_token: SECRETS.github_read_token, a: SECRETS['auth/auth_secret'] }));
   });
   it('a list without github_read_token  [red if: the token is not required]', () => {
     const { github_read_token: _t, ...rest } = SECRETS;
     refused(sweep({}, { ...rest, extra: 'Qw1/Er2+Ty3Ui4Op5As6Df7Gh8Jk9Lz0Xc=' }));
   });
-  it('a list whose values are not strings  [red if: it is trusted]', () => { refused(sweep({}, { ...SECRETS, db_password_app: 5 })); });
+  it('a list whose values are not strings  [red if: it is trusted]', () => { refused(sweep({}, { ...SECRETS, [APP]: 5 })); });
   for (const which of ['step', 'harness', 'deploy'] as const) {
     it(`an unreadable ${which} input (exists, mode 000)  [red if: it is skipped]`, () => {
       if (process.getuid?.() === 0) return; // root reads anything; CI's step runs the sweep as the runner user
@@ -144,9 +147,28 @@ describe('deploy-real sweep (B9): fail closed', () => {
   it('an absent step log is a failure  [red if: it is skipped]', () => { refused(sweep({ step: null })); });
   it('an absent harness log is a failure  [red if: it is skipped]', () => { refused(sweep({ harness: null })); });
   it('the refusal names the secret and never the value, for a hit in a different secret too  [red if: a value or a line is printed]', () => {
-    const r = sweep({ deploy: 'x ' + SECRETS.credential_keyring + ' y' });
+    const r = sweep({ deploy: 'x ' + SECRETS[KEYRING] + ' y' });
     refused(r);
-    noValues(r, 'credential_keyring');
-    expect(r.err, 'the line is not echoed').not.toContain('x ' + SECRETS.credential_keyring);
+    noValues(r, KEYRING);
+    expect(r.err, 'the line is not echoed').not.toContain('x ' + SECRETS[KEYRING]);
+  });
+});
+
+describe('deploy-real sweep (B9, architect item 1): the list must carry every name the harness registers', () => {
+  for (const name of [...NAMES, 'github_read_token']) {
+    it(`a list without ${name} is refused  [red if: that name is not required]`, () => {
+      const { [name]: _gone, ...rest } = SECRETS;
+      refused(sweep({}, rest));
+    });
+  }
+  it('the sweep\'s required names equal the ones the harness registers (read from both sources)  [red if: the two lists drift]', () => {
+    const harness = readFileSync(join(ROOT, 'tests', 'infra', 'deploy-real', 'harness.ts'), 'utf8');
+    const block = /const SECRETS: Record<string, \{ gid: number; files: string\[\] \}> = \{([\s\S]*?)\n\};/.exec(harness)?.[1] ?? '';
+    const fromHarness = [...block.matchAll(/^\s*(\w+): \{ gid: \d+, files: \[([^\]]*)\] \}/gm)].flatMap((m) => [...m[2]!.matchAll(/'([^']+)'/g)].map((f) => `${m[1]}/${f[1]}`));
+    expect(fromHarness.length, 'the harness list was read').toBeGreaterThan(5);
+    const sweepSrc = readFileSync(SWEEP, 'utf8');
+    const fromSweep = [...(/const REQUIRED_NAMES = \[([\s\S]*?)\];/.exec(sweepSrc)?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]!);
+    expect([...fromSweep].sort()).toEqual([...fromHarness, 'github_read_token'].sort());
+    expect([...NAMES].sort(), 'this file\'s fixture carries the same names').toEqual([...fromHarness].sort());
   });
 });
