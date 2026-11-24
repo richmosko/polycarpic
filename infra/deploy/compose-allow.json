@@ -530,6 +530,16 @@
       ]
      },
      "pins": {
+      "healthcheck": {
+       "interval": "30s",
+       "test": [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+       ],
+       "timeout": "5s"
+      },
       "mem_limit": "805306368",
       "tmpfs": [
        "/tmp"
@@ -876,6 +886,16 @@
       ]
      },
      "pins": {
+      "healthcheck": {
+       "interval": "30s",
+       "test": [
+        "CMD",
+        "node",
+        "-e",
+        "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+       ],
+       "timeout": "5s"
+      },
       "mem_limit": "402653184",
       "tmpfs": [
        "/tmp"

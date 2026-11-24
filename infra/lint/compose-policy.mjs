@@ -136,6 +136,9 @@ for (const [kind, path] of Object.entries(files)) {
       if (s.command !== undefined || s.entrypoint !== undefined) v('caddy-env', rel, 'caddy must have no command or entrypoint');
     }
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
+    // G15: web's health check asks /api/v1/health and requires exactly 200 (a 404 must not pass)
+    if (sn === 'web' && JSON.stringify(s.healthcheck?.test ?? null) !== JSON.stringify(['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]))
+      v('web-health', rel, 'web healthcheck must fetch /api/v1/health and require 200');
     // G14: every service's `command` and `entrypoint` is the exact value below or absent (the image's own default is `web`, so each app service names its own)
     {
       const want = SERVICE_EXEC[sn] ?? {};

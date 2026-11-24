@@ -83,7 +83,7 @@ export const TABLE = {
     /^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)/,
     /^packages\/db\/(migrations|sql)\//, /^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$/,
     /^apps\/migrate\/src\/(cli|run|index)\.ts$/, /^apps\/(web|worker)\/src\/(main|startup)\.ts$/, /^apps\/auth\/src\/(main|bind|http)\.ts$/,
-    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe)\.ts$/,
+    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe|public-health)\.ts$/,
     /^tests\/infra\/deploy-real\//, /^tests\/infra\/vitest\.deploy-real\.config\.ts$/, /^infra\/ci\/changes\.mjs$/, /^\.github\/workflows\/ci\.yml$/,
   ],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):

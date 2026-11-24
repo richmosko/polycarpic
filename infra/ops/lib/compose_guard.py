@@ -423,6 +423,8 @@ def _service(sp, name, svc, raw_svc, plain, images, rdir, bind_addr):
             fail("pinned")
     if sp.get("no_command") and any(svc.get(k) or raw_svc.get(k) for k in ("command", "entrypoint")):
         fail("pinned")
+    if "healthcheck" in sp.get("pins", {}) and svc.get("healthcheck") != sp["pins"]["healthcheck"]:  # G15: web's health check is /api/v1/health and requires 200
+        fail("pinned")
     for k in ("command", "entrypoint"):  # G14: exact value or absent for every service (Compose's JSON prints null for an absent one)
         if svc.get(k) != sp.get(k):
             fail("pinned")
