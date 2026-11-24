@@ -241,10 +241,33 @@ export function install(): Res {
   return res;
 }
 
+/** The product keeps the render's stderr to itself (`guard-render` says only that it failed). On that refusal the harness re-runs the same render by hand, isolated as the tool does and once as plain root, and logs both
+ * answers (the output holds a compose file, never a secret value: secrets are file mounts) so the failure names its own cause. Nothing here changes the product's check. */
+export function diagnoseRender(): string {
+  const rd = root(['sh', '-c', 'ls -dt /opt/polycarpic/releases/sha256-* 2>/dev/null | head -1']).out.trim();
+  if (!rd) return 'diagnose: no release directory under /opt/polycarpic/releases';
+  const cdir = `${rd}/infra/compose`;
+  const home = '/var/lib/polycarpic/state/deploy/render-home';
+  const env = ['HOME=' + home, 'XDG_CACHE_HOME=' + home, 'COMPOSE_EXPERIMENTAL_GIT_REMOTE=0', 'COMPOSE_EXPERIMENTAL_OCI_REMOTE=0'];
+  const base = ['docker', 'compose', '-p', 'polycarpic-staging', '--project-directory', cdir, '-f', `${cdir}/staging.yml`, '--env-file', `${ETC}/staging-host.env`, '--env-file', `${ETC}/staging-mail.env`, '--profile', '*', 'config', '--format', 'json'];
+  const iso = ['unshare', '--net', '--', 'setpriv', '--reuid', '10020', '--regid', '10020', '--clear-groups', '--no-new-privs', '--'];
+  const out: string[] = [`diagnose: release ${rd}`, `ls -ld parents: ${root(['sh', '-c', `ls -ld / /opt /opt/polycarpic /opt/polycarpic/releases ${rd} ${cdir} ${cdir}/staging.yml ${rd}/images.env ${ETC} ${ETC}/staging-host.env ${ETC}/staging-mail.env ${home} 2>&1`]).out.trim()}`];
+  const a = root(['env', ...env, ...iso, ...base]);
+  out.push(`isolated (uid 10020, no network): exit ${a.code}`, a.err.trim().split('\n').slice(0, 12).join('\n'));
+  const b = root(['env', ...env, ...base]);
+  out.push(`as plain root: exit ${b.code}`, b.err.trim().split('\n').slice(0, 12).join('\n'));
+  return out.join('\n');
+}
+
 /** The installed dispatcher as root under the umask 077 it sets itself. */
 export function ops(args: string[], label: string, timeout = 1_200_000): Res {
   const r = root(['sh', '-c', 'umask 077; exec "$@"', 'sh', TOOL, ...args], { timeout });
   logRun(label, r);
+  if (/refused guard-render/.test(r.err)) {
+    const why = diagnoseRender();
+    log(why);
+    r.err += '\n' + why; // the assertion that fails on this refusal prints the render's own answer
+  }
   return r;
 }
 
