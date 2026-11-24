@@ -1,9 +1,9 @@
 // POLY-100 T-real, part 1 (ruling.md 3765f358): one REAL `first-deploy staging` on the runner. Real root, install_box.py, the installed dispatcher under its own umask 077, Docker, Compose, the job's
 // own images served by a registry answering as ghcr.io, real Postgres and the real roles. Fake: GitHub's API (`gh`). One real anonymous `git fetch` of two public commits of main (the second descends from the
-// first) is made by the tool and by `commits()`: said here, on purpose. It would have caught F1 (the real tar), F16 (`run`'s options), G1 (umask 077, uid 10020) and the PLAID_ENV, MAIL_FROM and edge-network faults.
+// first) is made by the tool and by `commits()`: said here, on purpose. The tools image is NOT exercised here (staging never runs it; it is the Caddy image relabelled): the backup suite proves it. It would have caught F1 (the real tar), F16 (`run`'s options), G1 (umask 077, uid 10020) and the PLAID_ENV, MAIL_FROM and edge-network faults.
 // Shown red on the product code at 2825b6f7, where G1 was found: the harness never creates /opt/polycarpic, releases, state/deploy or the render home.
 import { describe, expect, it } from 'vitest';
-import { IN_CI, STATE, containerImages, commits, containers, install, missing, modeOf, offer, ops, prepare, release, root, run, stateFile, step, log, type Release } from './harness.ts';
+import { IN_CI, STATE, containerImages, commits, containers, install, missing, modeOf, offer, ops, prepare, release, root, run, settleTimer, stateFile, step, log, type Release } from './harness.ts';
 
 const gap = missing();
 if (gap.length && IN_CI) throw new Error(`deploy-real: ${gap.join(', ')} missing in CI: T-real must run, not skip`);
@@ -40,10 +40,11 @@ suite('T-real part 1: first-deploy staging, for real', () => {
     expect(r.code, r.err).toBe(0);
   });
 
-  it('first-deploy staging again: healthy, the containers run the digests of the release, the timer is the only thing allowed to fail', () => {
+  it('first-deploy staging again: exit 0, healthy, the containers run the digests of the release, the real timer is enabled (then stopped, and its service waited out)', () => {
     const r = step('first-deploy (healthy)', () => ops(['first-deploy', 'staging'], 'first-deploy staging #2'));
-    // systemd timers are not covered (ruling): on a runner without the unit the tool says so after a healthy deploy; anything else is a fault
-    if (r.code !== 0) expect(r.err, 'only the timer enable may fail after a healthy deploy').toMatch(/first-deploy: could not enable polycarpic-deploy@staging\.timer/);
+    expect(r.code, r.err).toBe(0); // exact (ruling 1ccc4fb9): the two real deploy units are installed by prepare()
+    const t = settleTimer();
+    expect(t.enabled, 'first-deploy enabled the deploy timer').toBe('enabled');
     const cur = (stateFile('current') ?? '').split(' ');
     expect(cur[0], 'current is the offered digest').toBe(rel1.app);
     const imgs = containerImages();

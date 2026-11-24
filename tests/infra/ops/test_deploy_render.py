@@ -257,7 +257,7 @@ class Tamper(Render):
     test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
 
     def test_the_saved_file_changed_between_the_judging_and_the_up_is_refused(self):
-        self.candidate()
+        x = self.candidate()
         seen = {"config": 0}
 
         def tamper(cmd, argv):
@@ -265,7 +265,7 @@ class Tamper(Render):
                 seen["config"] += 1
                 return
             if cmd in ("run", "up") and not seen.get("done"):
-                names = [n for n in os.listdir(str(self.host.p("%s/staging" % STATE))) if n.startswith("render-")] if os.path.isdir(str(self.host.p("%s/staging" % STATE))) else []
+                names = [n for n in os.listdir(str(self.host.p("%s/staging" % STATE))) if n == "render-%s.json" % x.split(":")[1][:12]] if os.path.isdir(str(self.host.p("%s/staging" % STATE))) else []  # the candidate's own .json (not a sidecar, not current's), whatever order listdir gives
                 if names:
                     seen["done"] = True
                     with open(str(self.host.p("%s/staging/%s" % (STATE, names[0]))), "ab") as fh:

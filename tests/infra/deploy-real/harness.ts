@@ -69,7 +69,8 @@ export function step<T>(name: string, fn: () => T): T {
 
 // ---- files as root ----
 export function putRoot(path: string, content: string, mode = '0644', owner = 'root', group = 'root'): void {
-  const r = root(['install', '-D', '-m', mode, '-o', owner, '-g', group, '/dev/stdin', path], { input: content });
+  // `install /dev/stdin` fails through sudo on a pipe ("No such device or address"): write with a shell, then set the mode and owner
+  const r = root(['sh', '-c', 'umask 077; mkdir -p "$(dirname "$1")" && cat > "$1" && chmod "$2" "$1" && chown "$3:$4" "$1"', 'sh', path, mode, owner, group], { input: content });
   if (r.code !== 0) throw new Error(`put ${path}: ${r.err}`);
 }
 export function readRoot(path: string): string | null {
@@ -127,6 +128,9 @@ export function prepare(): void {
   const fake = '/usr/local/sbin/gh';
   if (root(['test', '-e', fake]).code === 0) throw new Error('a gh already sits at /usr/local/sbin/gh: the fake is never written over a real one');
   must(root(['install', '-m', '0755', '-o', 'root', '-g', 'root', join(ROOT, 'tests/infra/deploy-real/fixtures/gh'), fake]), 'fake gh');
+  // the two real deploy units (ruling 1ccc4fb9): `first-deploy` enables the timer for real; the undo stops both, removes both and reloads
+  for (const u of ['polycarpic-deploy@.service', 'polycarpic-deploy@.timer']) must(root(['install', '-m', '0644', '-o', 'root', '-g', 'root', join(ROOT, 'infra/deploy/systemd', u), `/etc/systemd/system/${u}`]), `unit ${u}`);
+  must(root(['systemctl', 'daemon-reload']), 'daemon-reload');
   must(sh(`install -m 0600 /dev/null ${RUN}/gh-calls.log && touch ${RUN}/prepared`), 'prepared marker');
 }
 
@@ -243,3 +247,14 @@ export const containerImages = (): Record<string, string> => {
   }
   return out;
 };
+
+/** After `first-deploy` enabled the timer: assert it is enabled, then stop it and wait for the service to be inactive, so no timer poll races the steps that follow (ruling 1ccc4fb9). */
+export function settleTimer(): { enabled: string } {
+  const enabled = root(['systemctl', 'is-enabled', 'polycarpic-deploy@staging.timer']).out.trim();
+  root(['systemctl', 'stop', 'polycarpic-deploy@staging.timer']);
+  for (let i = 0; i < 60; i++) {
+    if (root(['systemctl', 'is-active', 'polycarpic-deploy@staging.service']).out.trim() !== 'active') return { enabled };
+    run(['sleep', '2']);
+  }
+  throw new Error('timer-service-still-active: polycarpic-deploy@staging.service did not become inactive in 120 s');
+}
