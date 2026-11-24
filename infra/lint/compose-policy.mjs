@@ -131,6 +131,12 @@ for (const [kind, path] of Object.entries(files)) {
       if (s.command !== undefined || s.entrypoint !== undefined) v('caddy-env', rel, 'caddy must have no command or entrypoint');
     }
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
+    // G14: every app service names its command (the image's own default is `web`), and has no entrypoint of its own
+    if (['web', 'auth', 'worker', 'migrate'].includes(sn)) {
+      const cmd = Array.isArray(s.command) ? s.command : null;
+      if (!cmd || cmd.length !== 1 || cmd[0] !== sn) v('app-command', rel, `${sn}: command must be exactly ["${sn}"]`);
+      if (s.entrypoint !== undefined) v('app-command', rel, `${sn}: must not set an entrypoint`);
+    }
     for (const key of ['networks', 'secrets', 'volumes', 'user', 'cap_drop', 'cap_add', 'security_opt', 'healthcheck', 'command', 'tmpfs'])
       if (hasVar(s[key])) v('raw-interpolation', rel, `${sn}: \${…} in ${key}`);
     for (const p of list(s.ports)) {

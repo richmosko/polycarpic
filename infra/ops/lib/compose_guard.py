@@ -423,6 +423,9 @@ def _service(sp, name, svc, raw_svc, plain, images, rdir, bind_addr):
             fail("pinned")
     if sp.get("no_command") and any(svc.get(k) or raw_svc.get(k) for k in ("command", "entrypoint")):
         fail("pinned")
+    if sp.get("command") is not None:  # G14: web, auth, worker and migrate name their command, and have no entrypoint of their own
+        if svc.get("command") != sp["command"] or "entrypoint" in svc or "entrypoint" in raw_svc:
+            fail("pinned")
     _mounts(sp, svc, rdir)
     _files(sp, svc, plain)
     _env(sp, raw_svc)

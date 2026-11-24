@@ -126,6 +126,9 @@
    },
    "services": {
     "auth": {
+     "command": [
+      "auth"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -240,6 +243,9 @@
      "user": "10004:10004"
     },
     "migrate": {
+     "command": [
+      "migrate"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -472,6 +478,9 @@
      "user": "10005:10005"
     },
     "web": {
+     "command": [
+      "web"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -520,6 +529,9 @@
      "user": "10001:10001"
     },
     "worker": {
+     "command": [
+      "worker"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -588,6 +600,9 @@
    },
    "services": {
     "auth": {
+     "command": [
+      "auth"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"
@@ -638,6 +653,9 @@
      "user": "10107:10107"
     },
     "migrate": {
+     "command": [
+      "migrate"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -791,6 +809,9 @@
      "user": "999:999"
     },
     "web": {
+     "command": [
+      "web"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -839,6 +860,9 @@
      "user": "10101:10101"
     },
     "worker": {
+     "command": [
+      "worker"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"
