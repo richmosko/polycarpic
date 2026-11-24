@@ -77,3 +77,13 @@ class Sidecar(ProdBase):
             r = self.host.go(*args, runner=self.runner(), ctx_extra={"owner_of": self.world.owner_of})
             self.assertNotEqual(r.rc, 0, "%s: %s" % (args, r.out))
             self.assertEqual([c for c in r.runner.calls if "compose" in c["argv"][:3] and "-f" in c["argv"]], [], "%s called compose without a hash" % (args,))
+
+    def test_each_reader_refuses_a_render_whose_sidecar_alone_was_changed(self):
+        self.first_prod()
+        d, js = self.pair()
+        side = d / (js[0][:-5] + ".sha256")
+        side.write_text("0" * 64 + "\n")
+        for args in (("backup", "nightly"), ("upload",), ("cli", "user", "invite", "ops@example.com")):
+            r = self.host.go(*args, runner=self.runner(), ctx_extra={"owner_of": self.world.owner_of})
+            self.assertNotEqual(r.rc, 0, "%s used a render whose hash was changed: %s" % (args, r.out))
+            self.assertEqual([c for c in r.runner.calls if "compose" in c["argv"][:3] and "-f" in c["argv"]], [], "%s called compose" % (args,))

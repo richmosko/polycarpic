@@ -148,3 +148,13 @@ class RestoreNeedsNoWrite(u.Helpers):
         self.full_disk_for_saves()
         r = self.deploy("staging")
         self.assertEqual(last(r), "deploy: rollback-unhealthy", r.err)
+
+    def test_a_restore_that_must_save_and_cannot_with_a_saved_pair_whose_sidecar_differs_is_rollback_unhealthy(self):
+        """seceng-100 on G5/S36: in a restore the saved pair is not reused when the sidecar differs from the file's hash."""
+        x1, x2 = self.unhealthy_second_deploy()
+        d = self.host.p("%s/staging" % SDIR)
+        (d / ("render-%s.sha256" % x1.split(":")[1][:12])).write_text("0" * 64 + "\n")
+        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].setdefault("environment", {}).update(S36_NEW="1") or doc
+        self.full_disk_for_saves()
+        r = self.deploy("staging")
+        self.assertEqual(last(r), "deploy: rollback-unhealthy", r.err)

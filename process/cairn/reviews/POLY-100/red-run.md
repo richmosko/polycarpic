@@ -306,3 +306,6 @@ Still to do: G8 (one container run), G6's `_handle_interrupted` ignoring the res
 | Fixture faults found (mine): the snapshot tar did not keep /opt/polycarpic (H24 failed on every box test); root in the container cannot read another user's /proc/<pid>/exe (added CAP_SYS_PTRACE: a real box's root can) | tests/infra/provision/box.ts | provision config 194/194 |
 | Product edge, told to devops-100: H23's glob ` compose `…` config ` cannot match `compose config` written adjacent (no flag between); a real render has `-p` and the files between, so nothing breaks today |
 T-real (tests/infra/deploy-real, tests/ci/deploy-key.test.ts): written, not run here; first CI run is its red/green record, and it must be red on 2825b6f7 (G1).
+| G5 (seceng-100): `pair_ok` checks existence only | test_deploy_sidecar.py: sidecar changed alone: each reader refuses `state` | red ×3 |
+| G5 (seceng-100): the same mutant | test_deploy_unwind_more.py: a restore with a saved pair whose sidecar differs is `rollback-unhealthy` | GREEN, LAYERED: `_saved_pair` also compares the stored hash itself; the case still pins the behaviour |
+| G5 (seceng-100): a changed sidecar alone does not stop `up` | test_deploy_render.py `SidecarTamper` | passes on the build as ruled (`up` re-hashes the .json against the Judged record) |

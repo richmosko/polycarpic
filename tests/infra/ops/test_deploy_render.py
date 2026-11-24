@@ -247,6 +247,31 @@ class RenderUser(Render):
         self.assertNotEqual(last(r), "deploy: refused render-user", "the right user passes: " + r.err)
 
 
+class SidecarTamper(Render):
+    test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off = None
+    test_a_remote_include_is_refused_as_guard_render_and_never_fetched = None
+    test_the_judged_render_is_saved_root_0600_with_core_written_back_as_zero = None
+    test_a_second_render_that_differs_from_the_judged_one_is_guard_render = None
+    test_the_second_render_reads_the_saved_file_on_stdin = None
+    test_every_other_compose_call_names_only_the_saved_file_with_f = None
+    test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
+
+    def test_a_changed_sidecar_alone_does_not_stop_up_it_starts_the_judged_bytes(self):
+        """seceng-100 on G5: `up` and `run` check the .json against the Judged record; the sidecar is what the READERS (backup, upload, cli) and a restore compare."""
+        x = self.candidate()
+        done = {}
+
+        def tamper(cmd, argv):
+            if cmd == "up" and not done:
+                done["x"] = 1
+                with open(str(self.host.p("%s/staging/render-%s.sha256" % (STATE, x.split(":")[1][:12]))), "a") as fh:
+                    fh.write("0")
+        self.world.on_compose = tamper
+        r = self.deploy("staging")
+        self.assertTrue(done, "the sidecar was reached")
+        self.assertEqual(r.rc, 0, r.err)
+
+
 class Tamper(Render):
     test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off = None
     test_a_remote_include_is_refused_as_guard_render_and_never_fetched = None

@@ -9,6 +9,7 @@ export default defineConfig({
     sequence: { concurrent: false, shuffle: false },
     testTimeout: 15 * 60_000,
     hookTimeout: 15 * 60_000,
+    bail: 1, // the first failure stops the run: a setup fault is one red with its own message, not fourteen product failures
     retry: 0, // a product assertion is never retried (ruling, Flakes)
     reporters: ['default'],
   },

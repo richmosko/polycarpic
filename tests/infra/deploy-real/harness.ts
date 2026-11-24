@@ -106,6 +106,14 @@ function must(r: Res, what: string): Res {
 }
 
 export function prepare(): void {
+  try {
+    prepareBox();
+  } catch (e) {
+    throw new Error(`T-real SETUP failed (the box was not prepared; nothing of the product ran): ${(e as Error).message}`);
+  }
+}
+
+function prepareBox(): void {
   if (existsSync('/run/poly-deploy-real/prepared') || readRoot(`${RUN}/prepared`) !== null) return;
   must(sh(`install -d -m 0700 ${RUN}`), 'run dir');
   for (const [name, id] of USERS) {
