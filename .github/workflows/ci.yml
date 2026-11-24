@@ -794,7 +794,6 @@ jobs:
         if: always() && needs.changes.outputs.deploy == 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/deploy-real"
-          touch "$RUNNER_TEMP/deploy-real/step.log" "$RUNNER_TEMP/deploy-real/harness.log"
           sudo env "PATH=$PATH" node infra/ci/deploy-real-sweep.mjs --secrets /run/poly-deploy-real/secrets.json --step-log "$RUNNER_TEMP/deploy-real/step.log" --harness-log "$RUNNER_TEMP/deploy-real/harness.log" --deploy-log /var/lib/polycarpic/state/deploy/staging/deploy.log --out "$RUNNER_TEMP/deploy-real/kept.log"
           sudo chmod 0644 "$RUNNER_TEMP/deploy-real/kept.log"
 
