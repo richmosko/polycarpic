@@ -168,7 +168,7 @@ def _deploy(project, ctx, work, first, existing_data):
     try:
         try:
             return _deploy_checked(project, ctx, work, first, existing_data, seen, run)
-        except (rel.Transient, Refusal):
+        except (rel.Transient, Refusal, _Stop):
             raise
         except Exception as err:
             return _internal(project, ctx, err, seen["digest"], run)
