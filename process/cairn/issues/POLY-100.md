@@ -1,7 +1,7 @@
 ---
 id: POLY-100
 title: Pull-based deploy + timers
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: https://github.com/richmosko/polycarpic/pull/152
 created: 2026-11-08
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -91,3 +91,7 @@ Criterion 5 reworded with the Principal's agreement (2026-11-23), at the archite
 ### @team-lead — 2026-11-23
 
 PR opened: https://github.com/richmosko/polycarpic/pull/152. Gate signed at a9d35481, seceng PASS WITH FOLLOW-UPS (H1 accepted into POLY-160 by the Principal), architect verdict at 82b8b1c2. Awaiting the Principal's merge.
+
+### @team-lead — 2026-11-24
+
+Validate passed; merging via PR #152. Closing. No real deploy has completed: POLY-160, POLY-161 and POLY-162 carry the rest.
