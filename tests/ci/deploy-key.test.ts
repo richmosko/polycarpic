@@ -100,7 +100,7 @@ describe('T-real is switched off until POLY-162 (Principal, scope closed; action
 
   it('no step runs the deploy-real config, and a comment names POLY-162  [red if: the real-deploy step is back before POLY-162 gets it to pass]', () => {
     expect(ci, 'a step runs vitest.deploy-real.config.ts').not.toContain('vitest.deploy-real.config.ts');
-    expect(ci, 'a step runs infra/ci/deploy-real-undo.sh').not.toMatch(/deploy-real-undo\.sh/);
+    expect(ci, 'a step executes infra/ci/deploy-real-undo.sh (naming it for shellcheck is fine)').not.toMatch(/(bash|sh|sudo)\s+(\.\/)?infra\/ci\/deploy-real-undo\.sh/);
     expect(ci, 'a comment names POLY-162 where the steps were').toMatch(/#[^\n]*POLY-162/);
     expect(ci).not.toMatch(/^\s+if: false\b/m); // the form actionlint rejects
   });
