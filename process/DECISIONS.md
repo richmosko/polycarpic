@@ -1007,3 +1007,11 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Fix H1 in POLY-100 (recovery first, the mark kept), about an hour and one more CI run.
 **Approved by:** Mosko
+
+### 2026-11-24 — POLY-162: the end-to-end deploy test runs in its own CI job; loop decisions taken by the lead
+**Decision:** The end-to-end deploy test (T-real) runs in a CI job of its own, `deploy-real` (15-minute limit, builds its own images, the conditions of POLY-100's ruling unchanged: read-only permissions, no token, an undo that always runs). Its kept log is uploaded only after a sweep step that always runs and succeeds; a hit fails the run and publishes nothing (seceng's ruling B9, `process/cairn/reviews/POLY-162/build-review.md`). The Principal delegated the loop's decisions to the lead for this feature and asked for them in the closing summary; the others taken were: no new ruling stage (the design was ruled and security-reviewed in POLY-100); the architect's ten checklist items and seceng's five fixes were fixed in the loop except the weak assertions on the stand-in health listener, which go to POLY-161 with the file; five secret-scanner fingerprints for test fixtures were reviewed by seceng and added to `.gitleaksignore`; the environment-variable gap in the compose guard (seceng U1) goes to POLY-160 as a gate before the first prod deploy.
+**Why:** With the test as the last step of `image`, the slowest `image` job measured (737 s) plus the test's step (295 s on CI) is 1,032 s, over the 1,020 s cap ruled in POLY-100, and most of the test is fixed waiting time. Measured after the move: `deploy-real` 419 s and 436 s of 900, `image` 602 s and 585 s of 1,200 (runs 45507656076, 45509710782). A change to the workflow, the trigger list or the ops tooling alone now starts `deploy-real` and no longer starts `image`.
+**Alternatives considered:**
+- Keep the test in `image` and wait for more CI timings before moving it.
+- Defer the checklist items to POLY-160 and merge on the first green run.
+**Approved by:** team-lead, under the Principal's delegation of 2026-11-24 ("If there are decisions to be made, I trust your judgement"); open to reversal.

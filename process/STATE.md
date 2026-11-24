@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-162-deploy-test-passing`
 - **Started:** 2026-11-24
 - **Goal:** a real first deploy completes on real Linux, Docker and Compose, and the end-to-end deploy test (T-real) runs and passes in CI.
-- **Status:** In Progress
+- **Status:** In Review. Gate `process/cairn/reviews/POLY-162/gate.md`; seceng PASS, 0 BLOCKS; architect PASS WITH FOLLOW-UPS at `08a3f3a5`; CI green (run 45509710782)
 
 _Standing context. POLY-100 (Pull-based deploy + timers) merged 2026-11-24 via PR [#152](https://github.com/richmosko/polycarpic/pull/152) — ARCH 1.28.0, SECURITY 1.20.1, INFRA 1.3.27. `polycarpic-ops deploy`, `first-deploy`, `rollback`, `edge-deploy` and the timers exist and are tested against stand-ins and real Compose rendering; **no real deploy has completed** and the end-to-end test runs in no CI step. Nothing is deployed and no `v1.*` or `edge-*` tag is cut until POLY-160 (follow-ups, with the interrupted-deploy finding H1 as a gate), POLY-161 (web server in the release image) and POLY-162 (the deploy test passing end to end) are done._
 
