@@ -534,6 +534,8 @@ class World(object):
             return self.run_codes.get((svc, tail[0] if tail else ""), 0), "", ""
         if subcmd == "exec" and "psql" in argv and stdin and "pg_roles" in stdin:  # G12
             self.role_queries.append(list(argv))
+            if self.roles_answer == "timeout":
+                raise TimeoutError("roles query")
             return self.roles_answer
         if subcmd == "exec" and "psql" in argv:
             return self.psql_result  # S19's table read: (code, out, err); stdout's last line is the user-table count
