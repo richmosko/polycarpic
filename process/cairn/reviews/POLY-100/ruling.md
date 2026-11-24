@@ -487,7 +487,10 @@ It would have caught F1 (the real tar), F16 (`run`'s options), G1 (umask and uid
 - **Prepared, not provisioned:** a tmpfs mounted at `/srv/polycarpic`, users (10020 included), networks, env files, secrets. `provision.sh` stays with the box fixture. The harness never creates `/opt/polycarpic`, `releases`, `state/deploy` or the render home: only `install_box.py` and the tool make them, or G1 would pass unseen. Shown red on the code G1 was found in (`2825b6f7`).
 - **Steps:** `first-deploy staging` → exit 4 `roles-missing`; `provision --stage database`; again → healthy, containers on the digests, modes as G1; a second poll changes nothing; then a second release whose web never answers → rolled back within the window, quarantined,
   the first release healthy again; the next poll skips it. No argv names edge.
-- **Not covered:** systemd timers, real GitHub, a prod deploy (premigration backup, edge): POLY-104 and the first prod deploy.
+- **Exits are exact.** `roles-missing` is 4, the rolled-back release is 1, everything else 0; no other non-zero exit is tolerated. The harness installs the two real deploy units on the runner (real systemd), so `first-deploy` ends 0 and the timer is enabled; it then
+  stops the timer and waits until the service is inactive before the next step. The undo step, on failure too, stops timer and service, removes both units and reloads before the fake `gh` goes, so nothing polls after it.
+- **The tools sibling is the Caddy image relabelled:** staging starts no tools container, and pull, label, attestation and guard see only digest and label. The test says that the tools image itself is not exercised here; the backup suite proves it.
+- **Not covered:** a timer firing on schedule, real GitHub, a prod deploy (premigration backup, edge): POLY-104 and the first prod deploy.
 
 **New `deploy` key in `changes.mjs`** gating that one step; the `image` job's `if` gains it, and the builds it needs run on it too.
 
