@@ -12,7 +12,7 @@ Tip `a975ba56` (tests, wiring), on a machine the lead declared quiet (nobody els
 | Compose-policy lint, with CI's env | rc 0 | 23:16:48 | `lint.txt` (the `rc=1` at the top of `infra.txt` is my run without `POLY_POSTGRES_IMAGE` and `POLY_BIND_ADDR`, which CI sets; not a finding) |
 | `node scripts/layers/check.mjs`, `vitest run tests/layers` | rc 0; 9 files, **556/556** | 23:16:48 to 23:17:06 | `lint.txt` |
 | `turbo run test typecheck` (web unit and every package), `eslint packages apps scripts/layers`, `check-migrations` | 39/39 tasks, 0 errors, eslint rc 0 | 23:17:06 to 23:17:19 | `node.txt` |
-| `python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops` | **not run by me**: the pre-tool hook refuses an un-tiered full run; the command is the lead's to run or to tier. I ran its guard file alone (`test_deploy_guard`, all cases incl. G14/G15, OK) | | |
+| `python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops` | run by the lead in `poly97-box:test` on the tree at 78888010: **555 tests, OK, 1 skipped** (the hook refused my own un-tiered run; I ran `test_deploy_guard` alone, OK) | | |
 
 `tests/infra` failures: **none** on a quiet machine. devops-162's 163 failures under load are therefore load, not real (nothing to list).
 
@@ -41,4 +41,7 @@ Open, said plainly:
 |---|---|---|
 | 45500690283 (aac58b1d) | T-real as the last `image` step | step 295 s; `image` job 963 s (668 s without T-real); over the architect's rule (737 + 295 = 1032 s) |
 | 45504649884 (bb8ce326) | `deploy-real` as its own job | T-real passed 17/17; job 7.5 min, tests 294 s (lead's reading) |
-| at `a975ba56` | CI run not yet read | to fill when devops's run id reports |
+| 45507656076 (a975ba56), whole run green | `deploy-real` job: T-real step 290 s (23:12:52 to 23:17:42), 3 files, 17 passed in the log, 0 skipped; job 419 s (23:10:50 to 23:17:49) of its 15 min | measured |
+| same run | `image` job without T-real: 602 s (23:10:50 to 23:20:52), well under 17 min (1020 s) and under the 626 to 737 s of earlier runs | measured |
+
+Reading: T-real's own job is 7.0 min and `image` is back to 10.0 min; both far inside their limits, and they run side by side, so the longest job of the run is `image` (the run took 10.2 min, 23:10:34 to 23:21:00).
