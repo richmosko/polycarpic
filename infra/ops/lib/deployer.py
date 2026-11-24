@@ -390,7 +390,7 @@ def _compose(ctx, argv, timeout=600):
         return 124, "", "timeout"
 
 
-GONE = ("No such object", "No such container")
+GONE = ("no such object", "no such container")  # matched case-insensitively: Docker 29 says `error: no such object: <name>`
 
 
 def _gone(ctx, name):
@@ -399,7 +399,7 @@ def _gone(ctx, name):
     for i in range(13):
         try:
             code, _, err = ctx.run(["docker", "inspect", name], timeout=30)
-            if code != 0 and any(m in err for m in GONE):
+            if code != 0 and any(m in err.lower() for m in GONE):
                 return True
         except (TimeoutError, OSError):
             pass
