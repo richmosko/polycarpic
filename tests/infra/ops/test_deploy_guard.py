@@ -106,6 +106,22 @@ CASES = [
     ("an extra tmpfs on web", both(svc("web", tmpfs=["/tmp", "/var/lib/x"])), "pinned"),
     # A18 (ruling 13e43e26): a bind's mount propagation is pinned; rshared would let a mount made inside the container appear on the host
     ("a bind with propagation rshared on postgres", plain_only(lambda d: d["services"]["postgres"]["volumes"][0].setdefault("bind", {}).update(propagation="rshared") or d), ("mount", "key")),
+    # G14 (ruling.md, section G): every service's command and entrypoint is the exact value or absent; the image's own default is `web`, which the worker must never run
+    ("worker with no command (the image default, web)", both(delkey("worker", "command")), "pinned"),
+    ("worker command web", both(svc("worker", command=["web"])), "pinned"),
+    ("worker command with an extra argument", both(svc("worker", command=["worker", "--x"])), "pinned"),
+    ("auth command replaced", both(svc("auth", command=["web"])), "pinned"),
+    ("migrate with no command", both(delkey("migrate", "command")), "pinned"),
+    ("web with an entrypoint", both(svc("web", entrypoint=["/bin/sh"])), "pinned"),
+    ("web with a command that is not web", both(svc("web", command=["worker"])), "pinned"),
+    ("operator with no entrypoint", both(delkey("operator", "entrypoint")), "pinned"),
+    ("operator with a command", both(svc("operator", command=["x"])), "pinned"),
+    ("postgres without its config_file command", both(delkey("postgres", "command")), "pinned"),
+    ("postgres with an entrypoint", both(svc("postgres", entrypoint=["/bin/sh"])), "pinned"),
+    # G15: web's health check is /api/v1/health and requires exactly 200; the old one (/ and any status below 500) passes a 404
+    ("web healthcheck on / accepting anything below 500", both(svc("web", healthcheck={"interval": "30s", "timeout": "5s", "test": ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]})), "pinned"),
+    ("web healthcheck on the health path accepting anything below 500", both(svc("web", healthcheck={"interval": "30s", "timeout": "5s", "test": ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]})), "pinned"),
+    ("web with no healthcheck", both(delkey("web", "healthcheck")), "pinned"),
     # S27 (ruling-review.md @ d6cb5d6b): the env_file list of each service is exact and ordered; only the raw render keeps it
     ("mail.env on web", raw_only(svc("web", env_file=[S_HOST, S_MAIL])), "env"),
     ("auth missing its mail.env (a subset)", raw_only(svc("auth", env_file=[S_HOST])), "env"),
