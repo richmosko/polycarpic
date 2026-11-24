@@ -132,8 +132,8 @@ function prepareBox(): void {
     must(sh(`install -d -m 0750 -o root -g ${gid} ${ETC}/staging-secrets/${svc}`), `secrets dir ${svc}`);
     for (const f of files) putRoot(`${ETC}/staging-secrets/${svc}/${f}`, secret(`${svc}/${f}`) + '\n', '0440', 'root', String(gid));
   }
-  putRoot(`${ETC}/staging-host.env`, 'TLS_MODE=real-domain\nPUBLIC_ORIGIN=https://staging.example.test\nPOLY_INSTANCE=polycarpic-staging\n');
-  putRoot(`${ETC}/staging-mail.env`, 'MAIL_FROM="ops@example.test"\n');
+  putRoot(`${ETC}/staging-host.env`, 'TLS_MODE=real-domain\nPUBLIC_ORIGIN=https://staging.example.com\nPOLY_INSTANCE=polycarpic-staging\n');
+  putRoot(`${ETC}/staging-mail.env`, 'MAIL_FROM="ops@example.com"\n');
   putRoot(`${ETC}/secrets/host/github_read_token`, 'github_pat_' + randomBytes(62).toString('base64url').slice(0, 82) + '\n', '0400');
   const cur = JSON.parse(readRoot(`${RUN}/secrets.json`) ?? '{}'); // the sweep looks for the token's own text too
   cur.github_read_token = readRoot(`${ETC}/secrets/host/github_read_token`)!.trim();
