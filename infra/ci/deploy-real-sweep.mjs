@@ -7,6 +7,17 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const WINDOW = 16;
 const MIN_ENTRIES = 6;
+// Every name the harness registers in secrets.json (`<service>/<file>` for each secret file of tests/infra/deploy-real/harness.ts, and the token). A list missing any of
+// them is a partial look and publishes nothing; tests/ci holds this list equal to the harness's.
+const REQUIRED_NAMES = [
+  'postgres/db_superuser_password',
+  'web/db_password_app', 'web/plaid_secret',
+  'auth/db_password_auth', 'auth/auth_secret', 'auth/resend_api_key',
+  'worker/db_password_worker', 'worker/credential_keyring', 'worker/resend_api_key',
+  'migrate/db_password_migrator',
+  'operator/db_password_operator',
+  'github_read_token',
+];
 
 function fail(lines) {
   for (const l of lines) process.stderr.write(`deploy-real-sweep: ${l}\n`);
@@ -30,6 +41,8 @@ if (secrets === null || typeof secrets !== 'object' || Array.isArray(secrets)) f
 const entries = Object.entries(secrets);
 if (entries.some(([, v]) => typeof v !== 'string' || v.length === 0)) fail(['the secret list holds a value that is not a non-empty string']);
 if (!Object.prototype.hasOwnProperty.call(secrets, 'github_read_token')) fail(['the secret list lacks github_read_token']);
+const absent = REQUIRED_NAMES.filter((n) => !Object.prototype.hasOwnProperty.call(secrets, n));
+if (absent.length) fail(absent.map((n) => `the secret list lacks ${n}`));
 if (entries.length < MIN_ENTRIES) fail([`the secret list has ${entries.length} entries, fewer than ${MIN_ENTRIES}`]);
 
 // each input: [label, path, may be absent]
