@@ -4,6 +4,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import { TABLE, classify } from '../../infra/ci/changes.mjs';
 import { ROOT } from './helpers.ts';
 
@@ -26,6 +27,7 @@ const ROWS: [string, string][] = [
   ['infra/provision-check.sh', 'H23, H24'],
   ['infra/ci/image.sh', 'the images'],
   ['infra/ci/images-env.sh', 'images.env'],
+  ['infra/ci/deploy-real-undo.sh', 'the undo the step leaves behind'],
   ['packages/config/src/check.ts', 'PLAID_ENV, MAIL_FROM: the settings contract'],
   ['packages/config/package.json', 'the settings contract'],
   ['packages/db/migrations/0001_init.sql', 'migrations'],
@@ -95,14 +97,67 @@ const walk = (d: string): string[] => (existsSync(d) ? readdirSync(d).flatMap((n
 const spec = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g;
 const withExt = (p: string): string | null => [p, `${p}.ts`, join(p, 'index.ts')].find((c) => existsSync(c) && statSync(c).isFile()) ?? null;
 
-describe('T-real is switched off until POLY-162 (Principal, scope closed; actionlint rejects a literal `if: false`)', () => {
-  const ci = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+// POLY-162: the step is ON, by the `deploy` key and by nothing else. The step is the last of `image` before the always() steps; the undo runs always and only then; no token reaches it; nothing pulls after it (ruling.md "Job", S38).
+type Step = { name?: string; if?: string; run?: string; uses?: string; env?: Record<string, string>; with?: Record<string, string>; 'continue-on-error'?: unknown };
+describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; POLY-162)', () => {
+  // POLY_CI_YML: a copy of ci.yml to read instead (how a mutant is shown red without editing the workflow; unset in CI)
+  const doc = parse(readFileSync(process.env.POLY_CI_YML ?? join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')) as { permissions?: Record<string, string>; jobs: Record<string, { permissions?: Record<string, string>; steps: Step[] }> };
+  const steps = doc.jobs.image!.steps;
+  const iReal = steps.findIndex((s) => (s.run ?? '').includes('vitest.deploy-real.config.ts'));
+  const real = steps[iReal];
+  const DEPLOY_ON = "needs.changes.outputs.deploy == 'true'";
 
-  it('no step runs the deploy-real config, and a comment names POLY-162  [red if: the real-deploy step is back before POLY-162 gets it to pass]', () => {
-    expect(ci, 'a step runs vitest.deploy-real.config.ts').not.toContain('vitest.deploy-real.config.ts');
-    expect(ci, 'a step executes infra/ci/deploy-real-undo.sh (naming it for shellcheck is fine)').not.toMatch(/(bash|sh|sudo)\s+(\.\/)?infra\/ci\/deploy-real-undo\.sh/);
-    expect(ci, 'a comment names POLY-162 where the steps were').toMatch(/#[^\n]*POLY-162/);
-    expect(ci).not.toMatch(/^\s+if: false\b/m); // the form actionlint rejects
+  it('exactly one step of the image job runs the deploy-real config, and nothing else in any workflow does  [red if: the step is absent or duplicated]', () => {
+    expect(steps.filter((s) => (s.run ?? '').includes('vitest.deploy-real.config.ts')).length).toBe(1);
+    for (const f of ['build.yml', 'release.yml', 'renovate-check.yml']) expect(readFileSync(join(ROOT, '.github', 'workflows', f), 'utf8'), f).not.toContain('deploy-real');
+    for (const [id, j] of Object.entries(doc.jobs)) if (id !== 'image') expect(JSON.stringify(j.steps), `job ${id}`).not.toContain('vitest.deploy-real.config.ts');
+  });
+
+  it(`the step's condition is exactly \`${DEPLOY_ON}\`: no constant, no always(), no other key  [red if: it is forced on or off, or widened]`, () => {
+    expect(real?.if).toBe(DEPLOY_ON);
+    expect(real?.['continue-on-error'], 'a red real deploy must fail the job').toBeUndefined();
+  });
+
+  it('it comes after the backup suite and is the last step that is not an always() step  [red if: another real step follows it]', () => {
+    const iBackup = steps.findIndex((s) => (s.run ?? '').includes('vitest.backup.config.ts'));
+    expect(iBackup).toBeGreaterThanOrEqual(0);
+    expect(iReal).toBeGreaterThan(iBackup);
+    const after = steps.slice(iReal + 1);
+    expect(after.length).toBeGreaterThan(0);
+    for (const s of after) expect(s.if ?? '', `step "${s.name}" after the real deploy is not an always() step`).toMatch(/^always\(\)/);
+  });
+
+  it('no token reaches it (S38 e): the checkout persists no credentials, the step and the job set no GH_TOKEN or GITHUB_TOKEN, permissions are contents: read and nothing more  [red if: a token is added]', () => {
+    expect(JSON.stringify(real?.env ?? {})).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
+    expect(real?.run ?? '').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|\bgh\s|secrets\./);
+    expect(doc.jobs.image!.permissions).toEqual({ contents: 'read' });
+    const checkout = steps.find((s) => (s.uses ?? '').startsWith('actions/checkout'));
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
+    expect(steps.some((s) => /(GH_TOKEN|GITHUB_TOKEN)/.test(JSON.stringify(s.env ?? {}))), 'a step of the image job carries a token').toBe(false);
+  });
+
+  it('the undo runs always, only when the key is on, executes infra/ci/deploy-real-undo.sh, and sits after the real deploy  [red if: the undo is missing, conditional on success, or before it]', () => {
+    const iUndo = steps.findIndex((s) => /(bash|sh|sudo)\s+(\.\/)?infra\/ci\/deploy-real-undo\.sh/.test(s.run ?? ''));
+    expect(iUndo, 'no step runs the undo').toBeGreaterThan(iReal);
+    expect(steps[iUndo]!.if).toBe(`always() && ${DEPLOY_ON}`);
+  });
+
+  it('nothing after the real deploy pulls, logs in or checks out; the kept log is the step\'s own output alone, never /etc/polycarpic, state or a saved render (S38 b, c)  [red if: a later pull, or a wider artifact path]', () => {
+    for (const s of steps.slice(iReal + 1)) {
+      expect(s.uses ?? '', s.name).not.toMatch(/^actions\/checkout|docker\/login|setup-/);
+      expect(s.run ?? '', s.name).not.toMatch(/docker (pull|login)|\bgh\s|\bcurl\b|apt-get install/);
+    }
+    const up = steps.slice(iReal + 1).filter((s) => (s.uses ?? '').startsWith('actions/upload-artifact') && s.with?.name === 'deploy-real-log');
+    expect(up.length, 'the real deploy\'s log is not kept').toBe(1);
+    expect(up[0]!.if).toBe(`always() && ${DEPLOY_ON}`);
+    const p = String(up[0]!.with?.path);
+    expect(p).toContain('deploy-real');
+    expect(p).not.toMatch(/etc\/polycarpic|\/var\/lib|state|\*|render|\/opt/);
+    expect(p.replace(/\$\{\{[^}]*\}\}/g, 'X').trim().split(/\s+/).length, 'one path').toBe(1);
+  });
+
+  it('the step keeps its failure: it pipes through tee under pipefail, so the vitest exit code is the step\'s  [red if: the pipe hides the exit code]', () => {
+    expect(real?.run ?? '').toMatch(/set -o pipefail/);
   });
 });
 
