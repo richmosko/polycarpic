@@ -1,7 +1,7 @@
 ---
 id: POLY-100b
 title: Deploy security review
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-100
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, pro
 stage: plan
 estimate.cost_usd: "25.00"
 estimate.gate_cycles: 4
-labels: []
+actual.cost_usd: "69.4363"
+actual.tokens: 159740272
+actual.gate_cycles: 22
+actual.wall_clock: 1950
+ratio: "2.78"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-23

@@ -1,7 +1,7 @@
 ---
 id: POLY-100d
 title: Deploy build
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-100
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, pro
 stage: execute
 estimate.cost_usd: "50.00"
 estimate.gate_cycles: 4
-labels: []
+actual.cost_usd: "62.2199"
+actual.tokens: 428910704
+actual.gate_cycles: 52
+actual.wall_clock: 1912
+ratio: "1.24"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-23
