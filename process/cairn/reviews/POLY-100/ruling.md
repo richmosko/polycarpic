@@ -35,7 +35,8 @@ IN: R1–R13. OUT:
 | Outbound alert route; token-expiry alert; Rekor watch (seceng A-b) | POLY-103 | Monitoring. This loop writes the files it reads (R10). |
 | Live first deploy; the guard over the real bundle under the box's own compose version, plus one refused case (SM6); real `check-config` in the rendered env; units under real systemd; the real token (§D1) | POLY-104 | First staging deploy. |
 | Home-box DNS-plugin Caddy build; home egress allowlist (`tuf-repo-cdn.sigstore.dev`, `ghcr.io`, `api.github.com`, `github.com`) | POLY-120 | Home box is post-GA. |
-| `polycarpic-ops self-update` (INFRA §8.7) | **§L2** (unhomed) | The ops tool keeps updating by `install.sh` (§D3). |
+| `polycarpic-ops self-update` (INFRA §8.7); A19 (a memory cap on the render child) | POLY-160 | The ops tool keeps updating by `install.sh` (§D3); A19 is `(unmeasured)`. |
+| Findings of the third build review and the verdict outside four classes (an unverified release runs; the guard is bypassed; data is lost or exposed; a bad release stays running) | POLY-160, which blocks POLY-104 | Principal, 2026-11-23 (`process/DECISIONS.md` @ `34f6ad92`). Left unmeasured: live staging, a timer firing on schedule, the real token, Caddy without an `app.` record → POLY-104; the real bucket → POLY-105; the first prod deploy (premigration from a release, edge takeover) and the 60 minutes → POLY-116. |
 | `migrate --plan` under a read-only credential (seceng A-a) | not taken | R6 takes the prod backup before any candidate container holds a credential, which closes the same window. |
 
 ## R1 — Entry points, units, lock
@@ -465,7 +466,7 @@ remote git include and the two remote-off variables (a second layer; `unshare --
 
 ## G — Re-review findings (seceng `build-review.md` @ `c02f16ee`; agreed `ruling-review.md` @ `06d9cb71`, S36, S37)
 
-G1–G8 are the re-review's; G9 is from T-real's third CI run. All are in this loop. Where an earlier rule differs, this table rules. Not taken: A19 (a memory cap on the render child): whether Compose runs under an address-space limit is `(unmeasured)`; the lead places it.
+G1–G8 are the re-review's; G9 is from T-real's third CI run. All are in this loop. Where an earlier rule differs, this table rules. Not taken: A19 (a memory cap on the render child), POLY-160: whether Compose runs under an address-space limit is `(unmeasured)`.
 
 | # | Rule | Test | Red on |
 |---|---|---|---|
@@ -616,7 +617,7 @@ and T-lock, disjoint from every infra path; backend-lead owns the refusal codes 
 | # | Item |
 |---|---|
 | L1 | Criterion 5 says "measured in the restore drill"; drill and timing are POLY-116's. Amend to "the runbook's inputs are proven (T13)", or say otherwise |
-| L2 | `self-update` has no issue; suggest the ops follow-up umbrella |
+| L2 | `self-update` and A19 are POLY-160's |
 | L4 | User steps, in order: the token and its one-call check; the SSH tag-signing key and `RELEASE_SIGNERS` (needed before staging is **served**); `allowed-signers install` on the box with the same key; after the first `build.yml` run, confirm the three new GHCR packages are public `(unmeasured)`; sign and push `edge-1` on a `main` commit built in the last 90 days and wait for its Release |
 | L5 | The note on when to create the `app.` record (S11, S15) is withdrawn. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with `github_read_token` and `staging-auth`, `allowed-signers install`, `first-deploy staging` (again after `provision --stage database` if it asks), `edge-deploy edge-1`, scans. Staging first: it needs no Caddy and this shows it. Also measured there: Caddy while `app.` has no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`) |
 
