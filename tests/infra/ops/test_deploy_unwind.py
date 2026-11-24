@@ -80,6 +80,15 @@ class Unwind(Helpers):
         self.assertIsNotNone(self.state("staging", "alert"), "the alert is still written after the quarantine failed")
         self.assertIn("unhealthy", self.state("staging", "deploy.log") or "", "and the log line")
 
+    def test_a_log_that_cannot_be_written_never_stops_the_alert_and_each_later_record_still_happens(self):
+        x1, x2 = self.unhealthy_second_deploy()
+        self.patch(log=self.after_up(enospc))
+        r = self.deploy("staging")
+        self.restored(r, x1, "ENOSPC at log")
+        self.assertIsNotNone(self.state("staging", "alert"), "the alert is written after the log failed")
+        self.assertIn(x2, self.state("staging", "quarantine") or "", "and the quarantine happened before it")
+        self.assertIsNone(self.state("staging", "in-progress"), "in-progress cleared: the quarantine line is on disk")
+
     def test_every_write_failing_from_the_candidates_up_onward_leaves_the_old_release_up(self):
         x1, x2 = self.unhealthy_second_deploy()
         rel = release_mod()
@@ -167,3 +176,37 @@ class Unwind(Helpers):
         start = next(i for i, (n, extra) in enumerate(order) if n == "alert")
         after = [n for n in names[start:]]
         self.assertEqual([n for i, n in enumerate(after) if n not in after[:i]], ["alert", "log", "quarantine"], order)
+
+    # ---- G6: `_handle_interrupted` and `mark_transient` ----
+    def test_a_failed_restore_after_an_interruption_is_rollback_unhealthy_stops_the_run_and_keeps_the_mark(self):
+        x1, _ = self.first()
+        x2 = self.staging_candidate()
+        self.host.write("%s/staging/in-progress" % SDIR, x2 + "\n")
+        orig = self.world._compose
+
+        def no_up(argv, stdin=None):
+            if "up" in argv:
+                return 1, "", "cannot start"
+            return orig(argv, stdin)
+        self.world._compose = no_up
+        r = self.deploy("staging")
+        self.assertEqual((r.rc, last(r)), (1, "deploy: rollback-unhealthy"), r.err)
+        self.assertEqual((self.state("staging", "in-progress") or "").strip(), x2, "the mark is cleared only after a good restore")
+        self.assertEqual(self.alert_name("staging"), "rollback-unhealthy")
+        self.assertEqual([c for c in self.world.compose_log if c["cmd"] == "run"][-1:] and 0, 0)
+
+    def test_a_good_restore_after_an_interruption_clears_the_mark(self):
+        x1, _ = self.first()
+        x2 = self.staging_candidate()
+        self.host.write("%s/staging/in-progress" % SDIR, x2 + "\n")
+        self.deploy("staging")
+        self.assertIsNone(self.state("staging", "in-progress"))
+
+    def test_a_malformed_transient_mark_is_alerted_state_and_never_raises(self):
+        x1, _ = self.first()
+        self.staging_candidate()
+        self.host.write("%s/staging/transient-since" % SDIR, "not a time\n")
+        self.world.gh_down = True  # a transient outage: the run ends as a transient and touches the mark
+        r = self.deploy("staging")
+        self.assertNotIn("Traceback", r.err)
+        self.assertEqual(self.alert_name("staging"), "state", r.err)
