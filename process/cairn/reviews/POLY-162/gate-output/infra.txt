@@ -1,0 +1,15 @@
+2026-11-24T23:16:18Z
+[render-error] infra/compose/edge.yml: error while interpolating services.caddy.ports.[]: required variable POLY_BIND_ADDR is missing a value | error while interpolating services.caddy.ports.[]: required variable POLY_BIND_ADDR is missing a value
+[render-error] infra/compose/prod.yml: error while interpolating services.backup.image: required variable POLY_POSTGRES_IMAGE is missing a value | error while interpolating services.postgres.image: required variable POLY_POSTGRES_IMAGE is missing a value
+[render-error] infra/compose/staging.yml: error while interpolating services.postgres.image: required variable POLY_POSTGRES_IMAGE is missing a value
+compose-policy rc=1
+
+ RUN  v5.1.1 /Users/mosko/Projects/polycarpic/.claude/worktrees/qa-162
+
+
+ Test Files  21 passed | 1 skipped (22)
+      Tests  640 passed | 3 skipped (643)
+   Start at  15:16:19
+   Duration  23.18s (tests 93%, import 6%)
+
+2026-11-24T23:16:42Z

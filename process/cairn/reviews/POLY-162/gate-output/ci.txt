@@ -1,0 +1,11 @@
+2026-11-24T23:16:05Z
+
+ RUN  v5.1.1 /Users/mosko/Projects/polycarpic/.claude/worktrees/qa-162
+
+
+ Test Files  24 passed (24)
+      Tests  715 passed (715)
+   Start at  15:16:05
+   Duration  11.51s (tests 97%, import 1%, transform 1%)
+
+2026-11-24T23:16:16Z
