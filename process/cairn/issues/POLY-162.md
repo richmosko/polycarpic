@@ -1,7 +1,7 @@
 ---
 id: POLY-162
 title: Deploy test passing end to end
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
@@ -51,3 +51,7 @@ Feature started. Branch: `feature/poly-162-deploy-test-passing` (the three kept 
 ### @team-lead — 2026-11-24
 
 PR opened: https://github.com/richmosko/polycarpic/pull/153. Validate is complete: qa gate `process/cairn/reviews/POLY-162/gate.md` (78888010, CI rows 58c060e2); seceng PASS, 0 BLOCKS (8ee7e8fb); architect PASS WITH FOLLOW-UPS at 08a3f3a5 (4e738ce3); the PR's own CI run 45511840990 green on all ten jobs.
+
+### @team-lead — 2026-11-24
+
+Validate passed; merging via PR #153. Closing.
