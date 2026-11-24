@@ -11,7 +11,7 @@ const runs = (job: string): Step[] => steps(ci().jobs[job]!);
 
 describe('CI wiring (R3)', () => {
   it('no new top-level job: the job set is exactly the POLY-102 set', () => {
-    expect(Object.keys(ci().jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'guard', 'image', 'lint', 'provision', 'unit']); // red: a new job added
+    expect(Object.keys(ci().jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'deploy-real', 'guard', 'image', 'lint', 'provision', 'unit']); // red: a new job added
   });
   it('lint job runs the compose-policy lint over the repo, gated on image or ci', () => {
     const s = runs('lint').find((x) => /infra\/lint\/compose-policy\.mjs/.test(x.run ?? ''));

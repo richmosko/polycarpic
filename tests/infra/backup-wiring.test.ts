@@ -67,7 +67,7 @@ describe('POLY-99 CI steps', () => {
     for (const f of ['infra/backup/backup.sh', 'infra/backup/upload.sh', 'infra/backup/restore-lib.sh', 'infra/restore.sh', 'infra/drill.sh', 'infra/postgres/archive-wal.sh']) expect(sc!.run, f).toContain(f);
   });
   it('no new job and the unit-test discovery picks up the runner tests', () => {
-    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'guard', 'image', 'lint', 'provision', 'unit']);
+    expect(Object.keys(wf('ci.yml').jobs).sort()).toEqual(['app', 'cairn', 'changes', 'db', 'deploy-real', 'guard', 'image', 'lint', 'provision', 'unit']);
     for (const f of ['tests/infra/ops/test_backup.py', 'tests/infra/ops/test_upload.py', 'tests/infra/ops/backup_base.py']) expect(readFileSync(join(ROOT, f), 'utf8').length).toBeGreaterThan(0);
   });
   it('the install bundle carries infra/backup and archive-wal.sh (PATHS), so the box runs the same scripts the tests ran', () => {
