@@ -1,7 +1,7 @@
 ---
 id: POLY-162d
 title: Deploy test: security review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-162
 blocked_by: []
