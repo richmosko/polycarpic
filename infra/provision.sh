@@ -265,12 +265,20 @@ state_files() {
   if [ -f "$STATE/last-dump" ] && [ ! -s "$STATE/last-dump" ]; then rm -f "$STATE/last-dump"; change "removed the unused $STATE/last-dump"; fi
 }
 
-# The directories every deploy run shares (POLY-100 G1): root, exactly 0755, so the unprivileged render user can reach what it must read.
+# The directories every deploy run shares (POLY-100 G1): root, 0755, so the unprivileged render user can reach what it must read. A directory that is
+# too tight is repaired; a link, a non-directory, another owner or any bit beyond 0755 stops the run and is left as found.
 deploy_dirs() {
-  local d
+  local d m
   for d in /opt/polycarpic /opt/polycarpic/releases "$STATE/deploy"; do
-    ensure_dir "$d" 0755 0:0
-    [ "$(stat -c %a "$d")" = 755 ] || { chmod 0755 "$d"; change "mode of $d set to 0755"; }
+    if [ ! -e "$d" ] && [ ! -L "$d" ]; then
+      install -d -m 0755 -o 0 -g 0 "$d"
+      change "created $d"
+      continue
+    fi
+    { [ ! -L "$d" ] && [ -d "$d" ] && [ "$(stat -c %u "$d")" = 0 ]; } || die "$d is a link, not a directory or not root-owned; not changing it"
+    m=$(stat -c %a "$d")
+    [ $((8#$m & ~8#755)) = 0 ] || die "$d is mode $m, looser than 0755; not changing it"
+    [ "$m" = 755 ] || { chmod 0755 "$d"; change "mode of $d set to 0755"; }
   done
 }
 

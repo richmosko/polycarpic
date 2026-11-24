@@ -387,7 +387,7 @@ report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates
 h24=''
 for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy; do
   if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
-  else [ "$(stat -c '%a %u:%g' "$d")" = "755 0:0" ] || h24="$h24 $d is $(stat -c '%a %u:%g' "$d") (want 755 0:0);"; fi
+  else [ "$(stat -c '%a %u' "$d")" = "755 0" ] || h24="$h24 $d is $(stat -c '%a %u' "$d") (want 755, owned by root);"; fi
 done
 report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... creates them; a link or a file in the way must be removed by hand"
 
