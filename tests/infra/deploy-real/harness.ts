@@ -119,6 +119,13 @@ function prepareBox(): void {
   for (const [name, id] of USERS) {
     must(sh(`getent group ${id} > /dev/null || groupadd -g ${id} ${name}; getent passwd ${id} > /dev/null || useradd --system -u ${id} -g ${id} -M -d /nonexistent -s /usr/sbin/nologin ${name}`), `user ${name}`);
   }
+  // the tool's own trust check (R1, K1) wants every parent of its install root-owned and not group- or world-writable: a real box's /opt is; the runner's may not be. Its original mode and owner are kept
+  // for the undo (RUN/opt.orig) and logged; the check itself is never weakened.
+  const opt = root(['stat', '-c', '%a %u:%g', '/opt']).out.trim();
+  log(`runner /opt was ${opt}`);
+  putRoot(`${RUN}/opt.orig`, opt + '\n', '0600');
+  const [omode, oown] = opt.split(' ');
+  if (oown !== '0:0' || (parseInt(omode!, 8) & 0o022) !== 0) must(sh('chown root:root /opt && chmod u=rwx,g=rx,o=rx /opt'), '/opt as a real box has it');
   must(sh('install -d -m 0755 /srv/polycarpic && mount -t tmpfs -o mode=0755,size=1g tmpfs /srv/polycarpic && install -d -m 0700 -o 999 -g 999 /srv/polycarpic/pg-staging'), 'tmpfs at /srv/polycarpic');
   must(sh(`install -d -m 0755 ${ETC} && install -d -m 0700 ${ETC}/staging-secrets ${ETC}/secrets ${ETC}/secrets/host`), '/etc/polycarpic');
   for (const [svc, { gid, files }] of Object.entries(SECRETS)) {
