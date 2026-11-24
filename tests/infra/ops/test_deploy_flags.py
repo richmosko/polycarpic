@@ -49,3 +49,6 @@ class Flows(DeployTest):
         r = self.deploy("staging")
         self.assertEqual(self.world.bad_flags, [], "an option the real subcommand lacks: %r" % (self.world.bad_flags[:3],))
         self.assertEqual(r.rc, 0, r.err)
+        for c in self.world.compose_log:  # G11 (3b62bbe6): F16's collector asserts both options on every compose argv
+            self.assertIn("--project-directory", c["argv"], c["argv"])
+            self.assertIn("--env-file", c["argv"], c["argv"])

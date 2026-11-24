@@ -108,8 +108,9 @@ class Render(DeployTest):
                 fs = [a[i + 1] for i, t in enumerate(a) if t == "-f"]
                 every = [str(self.host.p("%s/staging/%s" % (STATE, n))) for n in self.saved()]
                 self.assertTrue(len(fs) == 1 and fs[0] in every, "a compose call names a bundle's compose file, not a judged render: %r" % (a,))
-                self.assertNotIn("--project-directory", a)
-                self.assertNotIn("--env-file", a)
+                # G11 (ruling 3b62bbe6): the saved file's calls name the render home as project directory and /dev/null as env file: the caller's directory decides nothing
+                self.assertEqual(a[a.index("--project-directory") + 1] if "--project-directory" in a else None, str(self.host.p("/var/lib/polycarpic/state/deploy/render-home")), a)
+                self.assertEqual([a[i + 1] for i, t in enumerate(a) if t == "--env-file"], ["/dev/null"], a)
                 checked += 1
         self.assertGreater(checked, 3)
 

@@ -146,7 +146,7 @@ class Prod(ProdBase):
         self.assertIn("postgres", a)
         self.assertIn("render-%s.json" % x1.split(":")[1][:12], " ".join(a), "from current's saved render (F4)")
         self.assertNotIn("render-%s.json" % x2.split(":")[1][:12], " ".join(a))
-        self.assertNotIn("--env-file", a, "the saved render has the refs baked in: no env file names the bundle")
+        self.assertEqual([a[i + 1] for i, t in enumerate(a) if t == "--env-file"], ["/dev/null"], "the saved render has the refs baked in: no env file names the bundle, /dev/null is named (G11)")
 
     def test_t12_a_failed_or_malformed_premigration_stops_before_check_config_and_migrate(self):
         self.first_prod()
