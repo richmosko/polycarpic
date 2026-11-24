@@ -618,6 +618,9 @@ class DeployTest(OpsTest):
         allow = REPO / "infra" / "deploy" / "compose-allow.json"
         if allow.exists():
             h.write("/opt/polycarpic/ops/%s/infra/deploy/compose-allow.json" % h.ops_id, allow.read_bytes())
+        pinned = REPO / "infra" / "deploy" / "compose-version"  # G10: the installed bundle holds the pinned Compose version (install.sh's PATHS)
+        if pinned.exists():
+            h.write("/opt/polycarpic/ops/%s/infra/deploy/compose-version" % h.ops_id, pinned.read_bytes())
         self.staging_auth_file()
         h.write("/etc/passwd", "root:x:0:0:root:/root:/bin/bash\npolycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin\n")  # A18: the render user, as provision.sh makes it
         self.current_digest = digest("current")
