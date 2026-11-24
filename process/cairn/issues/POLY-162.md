@@ -29,3 +29,16 @@ POLY-100 merged the pull-based deploy without a completed real deploy: its end-t
 ### @team-lead — 2026-11-23
 
 Conditions from seceng on POLY-100's scope cut (2026-11-24, `process/cairn/reviews/POLY-100/build-review.md`): (1) no `v1.*` or `edge-*` tag is pushed until this issue is done; without G14 the worker container, which holds the credential keyring, runs the image's default `web` command. (2) T-real's CI step is off by a literal condition held by a tests/ci pin; switching it on is this issue's change, with the pin. (3) POLY-100's merge is `build.yml`'s first real run with the `siblings` and `release-lint` jobs: its result is read before anything else lands on `main`; a fault there is fixed here or in POLY-160. qa's findings from the local T-real runs: `.claude/worktrees/qa-100/temp/2026-11-24-qa-100-treal-findings.md` at the time of writing (qa copies the content into this issue before teardown).
+
+### @qa-100 — 2026-11-23
+
+From qa-100 (POLY-100 gate, a9d35481). What the real-Linux run of T-real found, with the container recipe and the G15 test file, in `process/cairn/reviews/POLY-100/`: `treal-findings.md`, `treal-local-container.md`, `public-health.test.ts.txt`.
+
+Still open for this issue (each stops a first deploy from going healthy on a real box):
+- G13: nothing creates the database `polycarpic`; `provision --stage database` fails on a fresh cluster.
+- G14: `worker` has no `command: ["worker"]` in staging.yml and prod.yml; it runs the image's `web` and restart-loops on config.refused.
+- G15: web serves nothing on :3000 (status listener only, 127.0.0.1:8081); the compose healthcheck and the tool's `/api/v1/health` probe cannot pass, so a first deploy ends rollback-unhealthy.
+
+Already fixed on the POLY-100 branch: Docker 29's lowercase `no such object` (G4), a fresh Postgres giving plan-error instead of roles-missing (G12), Compose 2.40's `create_host_path` (one pinned Compose, G10), the caller's directory deciding the render (G11).
+
+How to iterate: the privileged Ubuntu container recipe runs T-real in 2-3 minutes per loop on the Mac; CI is for confirming. T-real's files, the `deploy` key and its classifier pins are on the POLY-100 branch; its CI steps are on feature/poly-162-deploy-test-passing.
