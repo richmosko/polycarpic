@@ -326,3 +326,20 @@ Red today: no `render-error` line (reason, stage, exit code or `timeout`, the cl
 | help text printed | red |
 | the control rendered without the isolation | red: `…control_renders_the_installed_bundle_the_same_way…` |
 Not made: the control using the candidate's images.env (the build passes fixed placeholders and takes nothing of the release; my test asserts the candidate's digest is absent from the control's argv).
+
+## G10, G11, G12 mutants on devops-100's build (76fcd22e, 7604a39b, 087ceef8, 26842803), Edit tool, restored by `git checkout`
+
+| Mutant | Test | Result |
+|---|---|---|
+| G10: `>=` instead of equal | test_deploy_compose_version.py | red ×3 (5.8.0 refused only when equality is required) |
+| G10: asking root only (`as_user = as_root`) | same | red ×3 |
+| G10: a rollback is refused, not warned | same | red: `test_a_rollback_warns_and_goes_on…` |
+| G10: the refusal quarantines | same | GREEN, EQUIVALENT: the check runs before any digest is known (nothing to quarantine); the no-Q assertions hold either way |
+| G10: checking after the pull | — | not made: needs the call moved; `test_the_version_is_asked_before_the_pull_not_after` and the no-network-call assertion pin the order |
+| G12: a failed query read as 0 (exit code ignored) | test_deploy_roles.py | red: `…anything_else_is_roles_read…` |
+| G12: asking with a `current` | same | red ×2 |
+| G12: `plan-error` quarantines | same | red ×2 |
+| G11: no cwd `/` in the bytes runner | test_deploy_cwd.py | red: `test_run_bytes_starts_the_child_in_the_root_directory` |
+| G11: no `--env-file` in `compose.opts` | same | red ×3 |
+| G11: a render home that accepts any entry | same | red ×2 (`.env`, a stray file) |
+| G10 box (host.test.ts G10 cases) | the cases are red-first on the pre-G10 build; devops-100 asked for the container run to show them green on its code: NOT run by me (scope closed to POLY-162 for further work); mutants for the box cases not made |
