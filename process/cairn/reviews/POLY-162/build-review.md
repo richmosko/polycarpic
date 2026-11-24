@@ -87,3 +87,12 @@ Cheap with F4, not required: the main.ts test counts exactly one call.
 ## SECURITY
 
 1.20.2: C-83 states the command, entrypoint and health-check pins, what T-real shows and fakes, and what the guard does not judge (U1). It holds once the CI condition above is met.
+
+## Delta `a1d5da3f..78888010` (F1 to F5, B9): **confirmed, PASS; CI condition OPEN**
+
+Product tip `a975ba56`; after it only gate records. **By reading**, nothing run by me. Nothing new blocks.
+- **F1/B9 met:** the two logs are separate files, the sweep is `always()`, before the undo, and the upload is tied to its success; the list must hold every name the harness registers. `e14f1e67` drops the `touch`, so an absent log is refused in CI too.
+- **F2, F3, F5 met.** **F4:** met in the lint for all services. In the guard the committed cases are staging's; prod's `backup` and `uploader` and caddy have none. Accepted to POLY-160 with U2: one loop with no project branch, and I ran it for prod and caddy at `a1d5da3f` (`compose_guard.py` is unchanged since). `gate.md` gives the reason as "the tool deploys staging only": it deploys prod and edge too, and the guard judges both. The gap is the tests', not the tool's reach.
+- **U4** is done here (`install-compose.sh` is in the trigger).
+- **gitleaks:** five fixture fingerprints reviewed (`bf79faf6`); clean over `origin/main..HEAD` on the lead's re-run.
+- **CI, run 45507656076 at `a975ba56`:** when written, `deploy-real` is green (T-real, sweep, undo, upload; job 6 min 59 s of its 15) and so are `guard`, `lint`, `unit`, `db`, `provision`; `image` still runs and `app` has not started. The condition is met when the run concludes success, and is void if the product tip moves.
