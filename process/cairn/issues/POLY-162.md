@@ -18,12 +18,12 @@ POLY-100 merged the pull-based deploy without a completed real deploy: its end-t
 
 ## Acceptance criteria
 
-- [ ] G13: `provision --stage database` creates the `polycarpic` database from `template0` when it is missing.
-- [ ] G14: every service's command and entrypoint are pinned in the compose files, the guard and the lint; the worker runs `worker`.
-- [ ] G15: the minimal health listener in `web` (`GET /api/v1/health` on 3000, a fixed 404 for all else, seceng's conditions S42), and web's compose healthcheck on the health path requiring 200. Builder: backend-lead for `apps/web`.
-- [ ] T-real passes in CI on its narrow trigger, with its rollback case, started from an unreadable directory holding a hostile `.env`; its CI step is switched on.
-- [ ] T-real's measured time is recorded; if the `image` job exceeds 17 of its 20 minutes, T-real moves to its own job.
-- [ ] Every product fault T-real finds on the way is fixed here or filed, each with a test shown red on the fault.
+- [x] G13: `provision --stage database` creates the `polycarpic` database from `template0` when it is missing. — `tests/infra/image/provision-db-create.test.ts`: "absent: created from template0 (a table planted in template1 is not in it), owned by poly_owner after roles.sql, PUBLIC has no CONNECT", the rerun, restored-cluster and failed-read cases; T-real's `provision --stage database` step in `tests/infra/deploy-real/1-first-deploy.test.ts`
+- [x] G14: every service's command and entrypoint are pinned in the compose files, the guard and the lint; the worker runs `worker`. — `tests/infra/ops/test_deploy_guard.py` (G14 cases for every staging service and key), `tests/infra/lint.test.ts` (`G14_ROWS`: every service of the three files), `tests/infra/deploy-real/1-first-deploy.test.ts` (worker `Cmd` is `["worker"]`, `RestartCount` 0)
+- [x] G15: the minimal health listener in `web` (`GET /api/v1/health` on 3000, a fixed 404 for all else, seceng's conditions S42), and web's compose healthcheck on the health path requiring 200. Builder: backend-lead for `apps/web`. — `apps/web/src/ops/public-health.test.ts` (16 cases; every ruled mutant run: `process/cairn/reviews/POLY-162/g15-mutants.md`); the healthcheck pin in `tests/infra/ops/test_deploy_guard.py` and the "web healthcheck" rows of `tests/infra/lint.test.ts`
+- [x] T-real passes in CI on its narrow trigger, with its rollback case, started from an unreadable directory holding a hostile `.env`; its CI step is switched on. — `tests/infra/deploy-real/1-first-deploy.test.ts` ("verdict B4" hostile-directory case), `2-rollback.test.ts` ("the second release (web never answers) is offered and polled"), `tests/ci/deploy-key.test.ts` ("T-real is on, gated by the deploy key alone"); CI run 45507656076: 3 files, 17 of 17, job `deploy-real`
+- [x] T-real's measured time is recorded; if the `image` job exceeds 17 of its 20 minutes, T-real moves to its own job. — `process/cairn/reviews/POLY-162/gate.md` ("Time" table: T-real step 290 s, `image` 602 s without it); T-real moved to its own job `deploy-real`, pinned in `tests/ci/deploy-key.test.ts` ("it is its own job")
+- [x] Every product fault T-real finds on the way is fixed here or filed, each with a test shown red on the fault. — `process/cairn/reviews/POLY-100/treal-findings.md` (G13 to G15 fixed here, each test shown red: `process/cairn/reviews/POLY-162/faulted-runs.md` and the pins above); the one left over, a hanging candidate `check-config` that blocks a poll for 10 minutes, is POLY-160's
 
 ## Comments
 
