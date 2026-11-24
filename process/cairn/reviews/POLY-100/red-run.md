@@ -313,3 +313,16 @@ T-real (tests/infra/deploy-real, tests/ci/deploy-key.test.ts): written, not run 
 ## G9 / S39 (ruling 69f538ae), red on a66b0cf9-era build: `test_deploy_render_error.py` (9)
 
 Red today: no `render-error` line (reason, stage, exit code or `timeout`, the cleaned and cut text), the control render of the installed bundle is never made, so a box fault is `guard-render` with a quarantine instead of `render-env` without one; a timeout is not `render-env`. Green today with no mutant yet (UNTESTED until it is red on: printing stdout, the help text, an install command): `test_stdout_is_never_printed`, `test_no_install_command_and_no_help_text…`. The fake gained `config_rules` (fail one file and pass another, exit with stderr/stdout, or time out).
+
+## G9 mutants on devops-100's build (compose_guard.render_refusal / _control_passes)
+
+| Mutant | Result |
+|---|---|
+| cut to 300 bytes before cleaning | red: `…cleaned_before_it_is_cut_to_300_bytes` |
+| stdout quoted (`_last_line(out + err)`) | GREEN: my stdout case had a non-empty stderr whose last line won; added a case with empty stderr |
+| stdout quoted when stderr is empty (`err or out`) | red: `test_stdout_is_never_printed` |
+| quarantine on a timeout | red: `…timeout_is_render_env…` |
+| an install command printed after the reason | red ×2 |
+| help text printed | red |
+| the control rendered without the isolation | red: `…control_renders_the_installed_bundle_the_same_way…` |
+Not made: the control using the candidate's images.env (the build passes fixed placeholders and takes nothing of the release; my test asserts the candidate's digest is absent from the control's argv).

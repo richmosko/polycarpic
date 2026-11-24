@@ -106,11 +106,13 @@ class RenderError(DeployTest):
         self.assertEqual(len(quoted), 300, "clean first (one '?' per character), then cut: %d characters" % len(quoted))
 
     def test_stdout_is_never_printed(self):
-        self.first()
-        self.staging_candidate()
-        self.fail_release("plain", 1, "error: x\n", stdout="STDOUT-MARK secret-looking value\n")
-        r = self.deploy("staging")
-        self.assertNotIn("STDOUT-MARK", r.err + (self.state("staging", "deploy.log") or ""))
+        for stderr in ("error: x\n", ""):  # with stderr empty, a stdout-quoting build has nothing else to print
+            self.setUp()
+            self.first()
+            self.staging_candidate()
+            self.fail_release("plain", 1, stderr, stdout="STDOUT-MARK secret-looking value\n")
+            r = self.deploy("staging")
+            self.assertNotIn("STDOUT-MARK", r.err + (self.state("staging", "deploy.log") or ""), "stderr %r" % stderr)
 
     def test_no_install_command_and_no_help_text_for_guard_render_and_the_alert_holds_the_name_only(self):
         self.first()
@@ -159,9 +161,12 @@ class RenderError(DeployTest):
             def rule(argv, stdin, which=which):
                 if stage_of(argv, stdin) != "plain":
                     return None
-                return "timeout" if candidates_file(argv) == (which == "release") else None
+                if candidates_file(argv):
+                    return "timeout" if which == "release" else (1, "error: the release's file fails\n")  # the control only runs on a failure
+                return "timeout" if which == "control" else None
             self.world.config_rules.append(rule)
             r = self.deploy("staging")
             self.assertEqual((r.rc, last(r)), (1, "deploy: refused render-env"), "%s timed out: %s" % (which, r.err))
             self.assertNotIn(x, self.state("staging", "quarantine") or "", "%s timed out: no Q" % which)
-            self.assertTrue(any("timeout" in l for l in r.err.splitlines() if "render-error" in l), r.err)
+            if which == "release":  # the line records the release's own failure; a control that timed out only decides render-env
+                self.assertTrue(any("timeout" in l for l in r.err.splitlines() if "render-error" in l), r.err)
