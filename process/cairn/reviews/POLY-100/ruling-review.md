@@ -901,3 +901,9 @@ the architect's estimate too; the 17-minute rule decides.
 - *(c)* The kept log is a named list: the step's own output and `deploy.log`. Never `/etc/polycarpic`, `state/deploy` as a whole, a saved render or an environment dump: artifacts of a public repository are public.
 - *(d)* Fixture secrets are random per run, and a sweep at the end finds none of them in the kept log.
 - *(e)* No token reaches the step: no `GH_TOKEN`, `persist-credentials: false` as now.
+
+## `3765f358..69f538ae` (T-real as built, G5's sidecar, G9)
+
+**Met.** T-real carries S38, the directories it must not create, the exact exits, the real units and the recorded `/opt`. G5 reads as I ruled it: `up` and `run` compare with the record in memory, the sidecar serves the readers
+without one. **S39 (G9):** Compose's error text only from a render that reads no secret, cleaned before it is cut, on one line under its own event; the control render takes nothing from the release; no quarantine on a timeout. **A19**
+(cap the render child's memory, since it parses untrusted YAML on prod's host) is not taken and is the lead's to place. Nothing else of mine is open.
