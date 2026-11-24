@@ -136,6 +136,16 @@ class ReadersAndOthers(ProdBase):
         r.on(lambda a: True, out="")
         return r
 
+    def test_read_only_commands_leave_a_missing_render_home_missing(self):
+        """devops-100's `dirs.peek` (1785ff6a): `status`, `list-secrets`, `gate-check` and the other read-only commands check the render home and create or repair nothing (POLY-99: status changes no file)."""
+        import shutil
+        self.first_prod("v1.0.0")
+        home = self.host.p(HOME)
+        for args in (("status",), ("list-secrets",), ("gate-check",), ("restart", "web"), ("backup", "list-premigration"), ("upload",), ("cli", "user", "invite", "ops@example.com")):
+            shutil.rmtree(str(home), ignore_errors=True)
+            self.host.go(*args, runner=self.recording(), ctx_extra={"owner_of": self.world.owner_of})
+            self.assertFalse(home.exists(), "%s created the render home" % (args,))
+
     def test_backup_upload_cli_restart_and_status_name_both_options_on_every_compose_call(self):
         self.first_prod("v1.0.0")
         for args in (("backup", "nightly"), ("backup", "premigration"), ("upload",), ("cli", "user", "invite", "ops@example.com"), ("restart", "web"), ("status",)):

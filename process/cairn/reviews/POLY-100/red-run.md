@@ -343,3 +343,4 @@ Not made: the control using the candidate's images.env (the build passes fixed p
 | G11: no `--env-file` in `compose.opts` | same | red ×3 |
 | G11: a render home that accepts any entry | same | red ×2 (`.env`, a stray file) |
 | G10 box (host.test.ts G10 cases) | the cases are red-first on the pre-G10 build; devops-100 asked for the container run to show them green on its code: NOT run by me (scope closed to POLY-162 for further work); mutants for the box cases not made |
+| G11 (devops-100 1785ff6a): `dirs.peek` calls `ensure` (a read-only command creates the render home) | test_deploy_cwd.py `test_read_only_commands_leave_a_missing_render_home_missing` (status, list-secrets, gate-check, restart, backup, upload, cli) and test_status `…no_file_changes` | red ×2; ops unit 555/555 green at 1785ff6a |
