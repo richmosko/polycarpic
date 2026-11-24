@@ -156,6 +156,10 @@ class World(object):
         self.run_hang, self.run_names, self.stuck_oneoff, self.run_started = set(), [], set(), set()
         self.inspect_fail, self.inspect_calls = {}, []
         self.config_rules = []
+        self.compose_versions = {"root": "5.7.1", "render": "5.7.1"}  # G10: what `docker compose version --short` answers per identity: a string, None (fails) or (code, out, err)
+        self.version_asks = []
+        self.roles_answer = (0, "1\n", "")  # G12: what `SELECT count(*) FROM pg_roles WHERE rolname = 'poly_migrator'` answers; default: the role exists
+        self.role_queries = []
         self.inspect_missing_msg = "No such object\n"  # what `docker inspect` of an unknown name says (Docker 29.1.3: `error: no such object: <name>`)
         self.child_secs = None  # G7: each health child (compose ps, exec; docker inspect) after the run's first `up` takes this long on the fake clock, or its timeout if shorter (and then times out)
         self.hang, self.raise_cmd, self.hang_from, self.hang_through = set(), {}, 10 ** 9, False
@@ -253,6 +257,7 @@ class World(object):
         self._runner = runner
         runner.on(lambda a: a[0] == "docker", fn=self._docker)
         runner.on(lambda a: a[0] == "unshare", fn=self._unshare)
+        runner.on(lambda a: a[0] == "setpriv", fn=self._setpriv)
         runner.on(lambda a: a[0] == "gh", fn=self._gh)
         runner.on(lambda a: a[0] in ("git", "ssh-keygen"), fn=self._real)
         runner.on(lambda a: a[0] == "systemctl", fn=self._systemctl)
@@ -330,6 +335,18 @@ class World(object):
         finally:
             self._isolated = False
 
+    def _setpriv(self, argv, stdin):
+        """G10: `setpriv ... -- docker compose version --short` as the render user, with no network namespace: served as that user's docker, not recorded as a render."""
+        try:
+            inner = argv[len(argv) - argv[::-1].index("docker") - 1:]
+        except ValueError:
+            return 1, "", "FAKE setpriv: no docker command inside %r\n" % (argv,)
+        self._isolated = True
+        try:
+            return self._docker(inner, stdin)
+        finally:
+            self._isolated = False
+
     def _docker(self, argv, stdin):
         self.docker_log.append(list(argv))
         bad = bad_options(argv)
@@ -337,6 +354,15 @@ class World(object):
             self.bad_flags.append((list(argv), bad))
             return 1, "", "unknown flag: %s\n" % bad[0][1]
         sub = argv[1]
+        if argv[:4] == ["docker", "compose", "version", "--short"]:  # G10: the pinned Compose, asked as root and as the render user (setpriv, its own HOME)
+            who = "render" if self._isolated else "root"
+            got = self.compose_versions[who]
+            self.version_asks.append(who)
+            if got is None:
+                return 1, "", "FAKE: compose is not installed for %s\n" % who
+            if isinstance(got, tuple):
+                return got
+            return 0, got + "\n", ""
         if sub == "pull":
             if argv[2] in self.registry:
                 self.pulled.append(argv[2])
@@ -506,6 +532,9 @@ class World(object):
             if "--plan" in tail:
                 return self.plan_code, self.plan_out, ""
             return self.run_codes.get((svc, tail[0] if tail else ""), 0), "", ""
+        if subcmd == "exec" and "psql" in argv and stdin and "pg_roles" in stdin:  # G12
+            self.role_queries.append(list(argv))
+            return self.roles_answer
         if subcmd == "exec" and "psql" in argv:
             return self.psql_result  # S19's table read: (code, out, err); stdout's last line is the user-table count
         if subcmd == "exec":
