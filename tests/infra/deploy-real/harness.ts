@@ -22,6 +22,7 @@ export const RUN = '/run/poly-deploy-real';
 export const ETC = '/etc/polycarpic';
 export const STATE = '/var/lib/polycarpic/state/deploy/staging';
 export const TOOL = '/usr/local/sbin/polycarpic-ops';
+export const CALLER = '/run/poly-deploy-real/caller';
 export const REG = 'ghcr.io/richmosko';
 export const APP_IMAGE = process.env.POLY_APP_TEST_IMAGE ?? 'polycarpic:ci';
 
@@ -146,6 +147,9 @@ function prepareBox(): void {
   // the two real deploy units (ruling 1ccc4fb9): `first-deploy` enables the timer for real; the undo stops both, removes both and reloads
   for (const u of ['polycarpic-deploy@.service', 'polycarpic-deploy@.timer']) must(root(['install', '-m', '0644', '-o', 'root', '-g', 'root', join(ROOT, 'infra/deploy/systemd', u), `/etc/systemd/system/${u}`]), `unit ${u}`);
   must(root(['systemctl', 'daemon-reload']), 'daemon-reload');
+  must(sh(`install -d -m 0700 ${CALLER}`), 'the caller\'s directory');
+  putRoot(`${CALLER}/.env`, 'COMPOSE_PROFILES=migrate,operator\nCOMPOSE_FILE=/nonexistent/hostile.yml\nV=hostile\n', '0600');
+  putRoot(`${CALLER}/compose.yaml`, 'services:\n  planted:\n    image: example.invalid/planted@sha256:' + '4'.repeat(64) + '\n', '0600');
   must(sh(`install -m 0600 /dev/null ${RUN}/gh-calls.log && touch ${RUN}/prepared`), 'prepared marker');
 }
 
@@ -271,7 +275,8 @@ export function diagnoseRender(): string {
 
 /** The installed dispatcher as root under the umask 077 it sets itself. */
 export function ops(args: string[], label: string, timeout = 1_200_000): Res {
-  const r = root(['sh', '-c', 'umask 077; exec "$@"', 'sh', TOOL, ...args], { timeout });
+  // G11 (ruling 3b62bbe6): the tool is started from a 0700 directory that holds a hostile `.env` (COMPOSE_PROFILES) and a compose.yaml. A caller's directory decides nothing: not working around it is the case.
+  const r = root(['sh', '-c', 'cd "$1" && shift && umask 077 && exec "$@"', 'sh', CALLER, TOOL, ...args], { timeout });
   logRun(label, r);
   if (r.code !== 0) {
     const dl = readRoot(`${STATE}/deploy.log`) ?? '(no deploy.log)';

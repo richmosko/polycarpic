@@ -33,6 +33,9 @@ suite('T-real part 1: first-deploy staging, for real', () => {
     expect(r.code, r.err).toBe(4);
     expect(r.err + r.out).toContain('roles-missing');
     expect(r.err + r.out).toContain('provision --stage database --project staging');
+    // G12 (fcca8d3b): asked of Postgres, not read from an authentication error: no one-off was started, and a box fault bans no digest
+    expect(root(['sh', '-c', 'docker ps -a --format {{.Names}} | grep -c -- "-run-" || true']).out.trim(), 'a one-off `compose run` was started').toBe('0');
+    expect(stateFile('quarantine') ?? '', 'roles-missing is no reason to ban the digest').not.toContain(rel1.app);
   });
 
   it('provision --stage database: the real roles.sql and the login passwords, on the real Postgres', () => {
