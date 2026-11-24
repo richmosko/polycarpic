@@ -1,7 +1,7 @@
 ---
 id: POLY-162b
 title: Deploy test: ops build
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-162
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-162.md, process/cairn/reviews/POLY-162/**, pro
 stage: execute
 estimate.cost_usd: "50.00"
 estimate.gate_cycles: 4
+actual.cost_usd: "2.6888"
+actual.tokens: 15098817
+actual.gate_cycles: 2
+actual.wall_clock: 4
+ratio: "0.05"
 labels: []
 priority: null
 pr: null
