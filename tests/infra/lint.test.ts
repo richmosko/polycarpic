@@ -75,7 +75,29 @@ describe.concurrent('compose-policy lint: pass fixtures', () => {
 
 // [name, mutation applied to the pass set, expected rule id, what turns the test red]
 type Row = [string, (s: FxSet) => void, string, string];
+// B5 (verdict.md): G14 says EVERY service of the three files; one generated row per service and key: missing, replaced, extended, added.
+const G14_ROWS: Row[] = (() => {
+  const rows: Row[] = [];
+  const b = baseline();
+  for (const kind of ['edge', 'prod', 'staging'] as const) {
+    for (const [name, def] of Object.entries(b[kind].services as Record<string, Record<string, unknown>>)) {
+      for (const key of ['command', 'entrypoint'] as const) {
+        const want = def[key] as string[] | undefined;
+        const at = `${kind}/${name} ${key}`;
+        if (want) {
+          rows.push([`${at} removed`, (s) => { delete svc(s, kind, name)[key]; }, 'app-command', 'a missing value accepted']);
+          rows.push([`${at} replaced`, (s) => { svc(s, kind, name)[key] = ['/bin/sh']; }, 'app-command', 'another value accepted']);
+          rows.push([`${at} extended`, (s) => { svc(s, kind, name)[key] = [...want, '--extra']; }, 'app-command', 'an extended value accepted']);
+        } else {
+          rows.push([`${at} added`, (s) => { svc(s, kind, name)[key] = ['/bin/sh']; }, 'app-command', 'an added value accepted']);
+        }
+      }
+    }
+  }
+  return rows;
+})();
 const ROWS: Row[] = [
+  ...G14_ROWS,
   // INFRA §2.2 hardening list, per service shape
   ['root user (uid 0)', (s) => { svc(s, 'prod', 'web').user = '0:0'; }, 'user-nonroot', 'uid 0 accepted'],
   ['user missing', (s) => { delete svc(s, 'prod', 'worker').user; }, 'user-nonroot', 'missing user: accepted (image default may be root)'],

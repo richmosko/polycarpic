@@ -137,6 +137,22 @@ CASES = [
 ]
 
 
+# B5 (verdict.md): G14 covers every service the staging bundle has, for both keys: missing, replaced, extended, added
+_WANT = {
+    "postgres": {"command": ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]},
+    "web": {"command": ["web"]}, "auth": {"command": ["auth"]}, "worker": {"command": ["worker"]}, "migrate": {"command": ["migrate"]},
+    "operator": {"entrypoint": ["/app/bin/polycarpic", "cli"]},
+}
+for _s, _w in _WANT.items():
+    for _k in ("command", "entrypoint"):
+        if _k in _w:
+            CASES.append((f"G14 {_s} {_k} removed", both(delkey(_s, _k)), "pinned"))
+            CASES.append((f"G14 {_s} {_k} replaced", both(svc(_s, **{_k: ["/bin/sh"]})), "pinned"))
+            CASES.append((f"G14 {_s} {_k} extended", both(svc(_s, **{_k: _w[_k] + ["--extra"]})), "pinned"))
+        else:
+            CASES.append((f"G14 {_s} {_k} added", both(svc(_s, **{_k: ["/bin/sh"]})), "pinned"))
+
+
 class Guard(DeployTest):
     def candidate(self, hooks=None):
         w = self.world

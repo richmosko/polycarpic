@@ -41,6 +41,8 @@ const ROWS: [string, string][] = [
   ['apps/auth/src/bind.ts', 'startup code'],
   ['apps/worker/src/jobs/index.ts', 'startup code'],
   ['apps/web/src/ops/health.ts', 'the health route'],
+  ['apps/web/src/ops/public-health.ts', 'G15: the public health listener the first deploy waits on'],
+  ['apps/web/src/ops/probe.ts', 'the probe'],
   ['tests/infra/deploy-real/first-deploy.test.ts', 'the test'],
   ['tests/infra/vitest.deploy-real.config.ts', "the suite's config"],
   ['infra/ci/changes.mjs', 'its trigger'],
@@ -129,6 +131,9 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
 
   it('no token reaches it (S38 e): the checkout persists no credentials, the step and the job set no GH_TOKEN or GITHUB_TOKEN, permissions are contents: read and nothing more  [red if: a token is added]', () => {
     expect(JSON.stringify(real?.env ?? {})).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
+    // B8: a workflow-level or job-level env reaches every step of the job too
+    expect(JSON.stringify((doc as { env?: unknown }).env ?? {}), 'workflow env').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
+    expect(JSON.stringify((doc.jobs.image as { env?: unknown }).env ?? {}), 'image job env').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|secrets\./);
     expect(real?.run ?? '').not.toMatch(/GH_TOKEN|GITHUB_TOKEN|\bgh\s|secrets\./);
     expect(doc.jobs.image!.permissions).toEqual({ contents: 'read' });
     const checkout = steps.find((s) => (s.uses ?? '').startsWith('actions/checkout'));
