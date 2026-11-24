@@ -83,6 +83,8 @@ describe('G15: the public health listener (real sockets)', () => {
     const { port } = await start();
     const a = parse((await raw(port, get('/api/v1/health'))).data);
     expect([a.status, a.body]).toEqual([503, '{"ok":false}']);
+    expect(Object.keys(a.headers).filter((h) => !['content-type', 'cache-control', 'connection', 'content-length', 'date'].includes(h)), 'B7: nothing else in the 503\'s headers').toEqual([]);
+    expect([a.headers['content-type'], a.headers['cache-control'], a.headers.connection]).toEqual(['application/json', 'no-store', 'close']);
     handleHealth.mockImplementation(async () => { throw new Error('probe exploded'); });
     const b = parse((await raw(port, get('/api/v1/health'))).data);
     expect([b.status, b.body]).toEqual([503, '{"ok":false}']);
@@ -101,6 +103,8 @@ describe('G15: the public health listener (real sockets)', () => {
       if (!c.startsWith('HEAD')) expect(r.body).toBe(NOT_FOUND);
       expect(r.headers['content-type']).toBe('application/json');
       expect(r.headers['cache-control']).toBe('no-store');
+      expect(Object.keys(r.headers).filter((h) => !['content-type', 'cache-control', 'connection', 'content-length', 'date'].includes(h)), `B7: nothing else in the 404's headers (${JSON.stringify(c.split('\r\n')[0])})`).toEqual([]);
+      expect(r.headers.connection, 'the 404 closes the connection').toBe('close');
     }
   });
 
@@ -197,11 +201,14 @@ describe('G15: the public health listener (real sockets)', () => {
       });
     `], { encoding: 'utf8', timeout: 8000 });
     expect(r.status, r.stderr).toBe(1);
+    expect(r.stderr, 'B7: exit 1 with the ruled bind-failure line, not an uncaught error (which is also exit 1)').toContain('public-health.bind_failed');
+    expect(r.stderr, 'the failure line carries no address').not.toMatch(/\d+\.\d+\.\d+\.\d+|EADDRINUSE/);
   });
 });
 
 describe('G15: source and agreement', () => {
   const src = () => readFileSync(SRC, 'utf8');
+  const code = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
 
   it('one createServer, no other export, no import beyond node:http and ./health.ts; 0.0.0.0 and 3000 are constants and nothing reads the environment', () => {
     const s = src();
@@ -210,13 +217,15 @@ describe('G15: source and agreement', () => {
     const imports = [...s.matchAll(/^import .* from '([^']+)'/gm)].map((m) => m[1]);
     expect(imports.sort()).toEqual(['./health.ts', 'node:http']);
     expect(s).toMatch(/['"]0\.0\.0\.0['"]/);
-    expect(s).toMatch(/\b3000\b/);
+    expect(code(s), 'B7: 3000 in code, not in a comment').toMatch(/\b3000\b/);
+    expect(code(s)).toMatch(/['"]0\.0\.0\.0['"]/);
     expect(s, 'the bind must not be configurable').not.toMatch(/process\.env/);
   });
 
   it('main.ts starts it once, after init() and the status listener', () => {
     const m = readFileSync(join(HERE, '..', 'main.ts'), 'utf8');
-    expect((m.match(/startPublicHealth|public-health/g) ?? []).length).toBeGreaterThanOrEqual(2); // the import and the call
+    expect((m.match(/startPublicHealth\(/g) ?? []).length, 'B7: exactly one call (two starts would pass a >= 2 count)').toBe(1);
+    expect((m.match(/from '\.\/ops\/public-health\.ts'/g) ?? []).length, 'and one import').toBe(1);
     const iInit = m.indexOf('init(');
     const iStatus = m.indexOf('startStatusServer(');
     const iPublic = m.search(/\bawait\s+start\w*Health\w*\(|\bstart\w*Public\w*\(/);

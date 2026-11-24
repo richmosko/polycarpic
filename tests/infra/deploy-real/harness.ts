@@ -297,7 +297,15 @@ export const containers = (): { name: string; image: string; status: string }[] 
     const [name, image, status] = l.split('|');
     return { name: name!, image: image!, status: status! };
   });
-export const containerImages = (): Record<string, string> => {
+/** Every container of the staging project (running or not) with its compose service label, as the project holds them. */
+export const projectContainers = (): { service: string; name: string; status: string }[] =>
+  must(dockerRoot(['ps', '-a', '--filter', 'label=com.docker.compose.project=polycarpic-staging', '--format', '{{.Label "com.docker.compose.service"}}|{{.Names}}|{{.Status}}']), 'docker ps (services)').out.trim().split('\n').filter(Boolean).map((l) => {
+    const [service, name, status] = l.split('|');
+    return { service: service!, name: name!, status: status! };
+  });
+/** The project's `RestartCount` of one container, by name. */
+export const restartCount = (name: string): string => dockerRoot(['inspect', '-f', '{{.RestartCount}}', name]).out.trim();
+export const containerImages =(): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const c of containers()) {
     const r = dockerRoot(['inspect', '-f', '{{.Config.Image}}', c.name]);

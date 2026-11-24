@@ -161,6 +161,23 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
     expect(p.replace(/\$\{\{[^}]*\}\}/g, 'X').trim().split(/\s+/).length, 'one path').toBe(1);
   });
 
+  it('B1: `CI` and the step summary reach the suite through sudo, and every part refuses to skip when CI is true  [red if: sudo drops CI, so a missing tool is a green skip]', () => {
+    const run = real?.run ?? '';
+    const kept = /--preserve-env=([^\s]+)/.exec(run)?.[1]?.split(',') ?? [];
+    expect(kept, 'sudo --preserve-env names CI').toContain('CI');
+    expect(kept, 'and the step summary the harness appends to').toContain('GITHUB_STEP_SUMMARY');
+    for (const f of ['1-first-deploy', '2-rollback', '3-sweep']) {
+      const t = readFileSync(join(ROOT, 'tests', 'infra', 'deploy-real', `${f}.test.ts`), 'utf8');
+      expect(t, `${f} throws in CI when a tool is missing`).toMatch(/if \(gap\.length && IN_CI\) throw new Error/);
+    }
+    expect(readFileSync(join(ROOT, 'tests', 'infra', 'deploy-real', 'harness.ts'), 'utf8')).toMatch(/export const IN_CI = process\.env\.CI === 'true'/);
+  });
+
+  it('B9: the step\'s own output joins the kept log by appending (tee -a), never overwriting the harness\'s lines  [red if: plain tee]', () => {
+    expect(real?.run ?? '').toMatch(/\btee -a\b/);
+    expect(real?.run ?? '').not.toMatch(/\btee (?!-a)[^-\s]/);
+  });
+
   it('the step keeps its failure: it pipes through tee under pipefail, so the vitest exit code is the step\'s  [red if: the pipe hides the exit code]', () => {
     expect(real?.run ?? '').toMatch(/set -o pipefail/);
   });
