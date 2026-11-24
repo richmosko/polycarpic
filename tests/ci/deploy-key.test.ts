@@ -28,6 +28,7 @@ const ROWS: [string, string][] = [
   ['infra/ci/image.sh', 'the images'],
   ['infra/ci/images-env.sh', 'images.env'],
   ['infra/ci/deploy-real-undo.sh', 'the undo the step leaves behind'],
+  ['infra/ci/deploy-real-sweep.mjs', 'B9: the sweep that gates the kept log'],
   ['packages/config/src/check.ts', 'PLAID_ENV, MAIL_FROM: the settings contract'],
   ['packages/config/package.json', 'the settings contract'],
   ['packages/db/migrations/0001_init.sql', 'migrations'],
@@ -154,7 +155,7 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
     }
     const up = steps.slice(iReal + 1).filter((s) => (s.uses ?? '').startsWith('actions/upload-artifact') && s.with?.name === 'deploy-real-log');
     expect(up.length, 'the real deploy\'s log is not kept').toBe(1);
-    expect(up[0]!.if).toBe(`always() && ${DEPLOY_ON}`);
+    expect(up[0]!.if).toContain(`always() && ${DEPLOY_ON}`); // B9 adds the sweep's outcome, pinned in its own case
     const p = String(up[0]!.with?.path);
     expect(p).toContain('deploy-real');
     expect(p).not.toMatch(/etc\/polycarpic|\/var\/lib|state|\*|render|\/opt/);
@@ -176,6 +177,24 @@ describe('T-real is on, gated by the deploy key alone (ruling "Job", S38 b/c/e; 
   it('B9: the step\'s own output joins the kept log by appending (tee -a), never overwriting the harness\'s lines  [red if: plain tee]', () => {
     expect(real?.run ?? '').toMatch(/\btee -a\b/);
     expect(real?.run ?? '').not.toMatch(/\btee (?!-a)[^-\s]/);
+  });
+
+  it('B9: the sweep runs always (under the key), before the undo, and the upload needs its outcome == success; the kept path is its output, never a file the harness or tee writes  [red if: no sweep, a sweep after the undo, or an upload not tied to it]', () => {
+    const iSweep = steps.findIndex((s) => /deploy-real-sweep\.mjs/.test(s.run ?? ''));
+    expect(iSweep, 'no step runs infra/ci/deploy-real-sweep.mjs').toBeGreaterThan(iReal);
+    const sweepStep = steps[iSweep] as Step & { id?: string };
+    expect(sweepStep.if).toBe(`always() && ${DEPLOY_ON}`);
+    expect(sweepStep.id, 'the sweep step has an id for the upload to name').toMatch(/^[a-z][a-z0-9_-]*$/);
+    const iUndo = steps.findIndex((s) => /(bash|sh|sudo)\s+(\.\/)?infra\/ci\/deploy-real-undo\.sh/.test(s.run ?? ''));
+    expect(iSweep, 'the undo deletes the secret list the sweep reads: sweep first').toBeLessThan(iUndo);
+    expect(sweepStep.run ?? '').toMatch(/--secrets\s/);
+    const up = steps.find((s) => (s.uses ?? '').startsWith('actions/upload-artifact') && s.with?.name === 'deploy-real-log')!;
+    expect(up.if, 'the upload needs the sweep to have succeeded').toBe(`always() && ${DEPLOY_ON} && steps.${sweepStep.id}.outcome == 'success'`);
+    expect(up.if).not.toMatch(/!= 'failure'|failure\(\)|success\(\)/);
+    const out = /--out\s+(\S+)/.exec(sweepStep.run ?? '')?.[1];
+    expect(out, 'the sweep writes one named output').toBeTruthy();
+    expect(String(up.with?.path), 'the upload is exactly the sweep\'s output').toBe(out);
+    for (const s of steps) if (s !== real) expect(s.run ?? '', s.name).not.toMatch(/tee\s+(-a\s+)?\S*deploy-real\/(log|harness)/);
   });
 
   it('the step keeps its failure: it pipes through tee under pipefail, so the vitest exit code is the step\'s  [red if: the pipe hides the exit code]', () => {
