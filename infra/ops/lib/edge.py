@@ -112,6 +112,7 @@ def _run(tag, ctx, work, seen, run):
         raise why
     deployer.require_data_mount(ctx)
     deployer.check_edge_env(ctx)  # F10, before any network call and so before V1
+    compose_guard.check_compose_version(ctx)  # G10, before any network call
     cur = rel.load_pointer(ctx, "edge", "current")
     rel.load_pointer(ctx, "edge", "previous")
     run["cur"] = cur
@@ -215,6 +216,7 @@ def rollback(ctx):
         try:
             deployer.require_data_mount(ctx)
             dirs.ensure_shared(ctx, "edge")  # G1
+            compose_guard.check_compose_version(ctx, warn_only=True)  # G10: a rollback warns and goes on
         except Refusal as err:
             ctx.err("rollback: refused %s" % err.name)
             return err.code

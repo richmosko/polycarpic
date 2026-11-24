@@ -4,7 +4,7 @@ Quarantines `current`, re-checks `previous`'s tree hash, runs the installed guar
 """
 import os
 
-from lib import deployer as deploy, dirs, edge, release as rel
+from lib import compose_guard, deployer as deploy, dirs, edge, release as rel
 
 HELP = "rollback prod|staging|edge (bring back the previous release; no network)"
 WAIT = 10 * 60
@@ -26,6 +26,7 @@ def run(args, ctx):
         try:
             deploy.require_data_mount(ctx)  # F13
             dirs.ensure_shared(ctx, project)  # G1
+            compose_guard.check_compose_version(ctx, warn_only=True)  # G10: a rollback warns and goes on
         except rel.Refusal as err:
             ctx.err("rollback: refused %s" % err.name)
             return err.code

@@ -149,7 +149,29 @@ install_docker() {
     change "added Docker's apt repository (key fingerprint verified)"
   fi
   apt-get update -y > /dev/null
-  apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null
+  apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin > /dev/null
+  install_compose
+}
+
+# The one Compose version every render, judge and start uses (POLY-100 G10, S40): the exact `N.N.N` in infra/deploy/compose-version, from Docker's
+# repository, that package alone held so engine, containerd and runc stay free to take fixes. A newer or held plugin is brought to the version with
+# the downgrade and held flags for that one package; a version the repository does not list stops, and a newer one is never taken instead.
+install_compose() {
+  local file want have cand
+  file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deploy/compose-version"
+  want=$(tr -d '[:space:]' < "$file" 2> /dev/null || true)
+  [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "$file does not hold one version N.N.N; nothing installed"
+  have=$(dpkg-query -W -f='${Version}' docker-compose-plugin 2> /dev/null || true)
+  if [[ "$have" == "$want"-* || "$have" == "$want" ]]; then
+    apt-mark hold docker-compose-plugin > /dev/null
+    return 0
+  fi
+  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2); if (index($2, w "-") == 1) { print $2; exit } }')
+  [ -n "$cand" ] || die "Docker's repository does not list docker-compose-plugin $want; nothing installed"
+  apt-mark unhold docker-compose-plugin > /dev/null 2>&1 || true
+  apt-get install -y --no-install-recommends --allow-downgrades --allow-change-held-packages "docker-compose-plugin=$cand" > /dev/null
+  apt-mark hold docker-compose-plugin > /dev/null
+  change "docker-compose-plugin $cand installed and held (infra/deploy/compose-version)"
 }
 
 write_daemon_json() {

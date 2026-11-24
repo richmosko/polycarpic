@@ -195,6 +195,7 @@ def _deploy(project, ctx, work, first, existing_data):
 
 def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
     require_data_mount(ctx)
+    compose_guard.check_compose_version(ctx)  # G10, before any network call
     tok = rel.token(ctx)
     tokenexp.refresh(ctx, tok, work)
     cur = rel.load_pointer(ctx, project, "current")

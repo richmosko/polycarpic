@@ -383,6 +383,25 @@ else
 fi
 report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates it; a different existing user must be removed by hand after checking nothing uses it"
 
+# ------------------------------------------------------------------ H25 one Compose version (POLY-100 G10, S40)
+# `docker compose version --short` equals infra/deploy/compose-version as root AND as the render user with its own HOME; the package is Docker's,
+# and held; nothing sits in /root/.docker/cli-plugins (a plugin there could start what another Compose judged).
+h25=''
+want25=$(tr -d '[:space:]' < "$here/deploy/compose-version" 2> /dev/null || true)
+if ! [[ "$want25" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then h25=" $here/deploy/compose-version does not hold one version;"
+else
+  root25=$(docker compose version --short 2> /dev/null || true)
+  rhome=$(mktemp -d)
+  user25=$(HOME="$rhome" setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs -- docker compose version --short 2> /dev/null || true)
+  rm -rf "$rhome"
+  [ "$root25" = "$want25" ] || h25="$h25 root's Compose is '${root25:-none}' (want $want25);"
+  [ "$user25" = "$want25" ] || h25="$h25 the render user's Compose is '${user25:-none}' (want $want25);"
+  apt-cache policy docker-compose-plugin 2> /dev/null | grep -q 'download.docker.com' || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
+  apt-mark showhold 2> /dev/null | grep -qx docker-compose-plugin || h25="$h25 docker-compose-plugin is not held;"
+fi
+[ -z "$(ls -A /root/.docker/cli-plugins 2> /dev/null)" ] || h25="$h25 /root/.docker/cli-plugins holds a plugin;"
+report H25 "compose version" "$h25" "sudo bash provision.sh --stage host ... installs and holds it; remove /root/.docker/cli-plugins by hand"
+
 # ------------------------------------------------------------------ H24 shared deploy directories (POLY-100 G1)
 h24=''
 for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy; do

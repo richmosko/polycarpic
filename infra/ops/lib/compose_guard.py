@@ -85,6 +85,44 @@ def render_argv(rdir, project, env_files, raw):
     return argv + ["--format", "json"]
 
 
+COMPOSE_VERSION = "infra/deploy/compose-version"
+
+
+def pinned_version(ctx):
+    """The one Compose version of the installed ops bundle, or None when the file is not one line `N.N.N`."""
+    try:
+        with open(ctx.bundle(COMPOSE_VERSION), encoding="utf-8") as fh:
+            text = fh.read(64).strip()
+    except OSError:
+        return None
+    return text if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", text) else None
+
+
+def _version_of(ctx, argv, env=None):
+    try:
+        code, out, _ = ctx.run(argv + ["docker", "compose", "version", "--short"], timeout=30, extra_env=env)
+    except (TimeoutError, OSError):
+        return None
+    return out.strip() if code == 0 and out.strip() else None
+
+
+def check_compose_version(ctx, warn_only=False):
+    """G10 (S40): `docker compose version --short` equals the pinned version, as root and as the render user with its own HOME. Different, unreadable
+    or failing: the refusal `render-env` (alert, no quarantine), both versions on stderr, the fix named. A rollback only warns: the guard still
+    judges what it renders, and refusing would take the way back away. Called before any network call."""
+    want = pinned_version(ctx)
+    as_root = _version_of(ctx, [])
+    as_user = _version_of(ctx, ISOLATION[3:], _render_env(ctx))  # setpriv … -- (the render user; no network namespace is needed to ask)
+    if want is not None and as_root == want and as_user == want:
+        return
+    msg = "compose: pinned %s, root's is %s, the render user's is %s; fix: sudo bash provision.sh --stage host" % (want or "unreadable", as_root or "unreadable", as_user or "unreadable")
+    if warn_only:
+        ctx.err("warning: " + msg)
+        return
+    ctx.err("deploy: " + msg)
+    raise Refusal("render-env")
+
+
 def stdin_render(project):
     return ISOLATION + ["docker", "compose", "-p", "polycarpic-" + project, "-f", "-", "--profile", "*", "config", "--format", "json"]
 

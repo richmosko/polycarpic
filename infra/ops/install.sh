@@ -22,7 +22,7 @@ case "$key" in -*) echo "install.sh: bad --ssh-key" >&2; exit 2 ;; esac
 case "$commit" in *[!0-9a-f]*) echo "install.sh: bad --commit" >&2; exit 2 ;; esac
 if [ -n "$commit" ] && [ "${#commit}" -ne 40 ]; then echo "install.sh: bad --commit" >&2; exit 2; fi
 
-PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/deploy/compose-allow.json infra/deploy/systemd infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
+PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/deploy/compose-allow.json infra/deploy/compose-version infra/deploy/systemd infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
 
 if [ -n "$commit" ]; then
   # no checkout: a checkout would run C's tracked git hooks on this machine
