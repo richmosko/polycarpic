@@ -14,6 +14,11 @@ import { parse } from 'yaml';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KINDS = ['edge', 'prod', 'staging'];
 const violations = [];
+const SERVICE_EXEC = {
+  postgres: { command: ['postgres', '-c', 'config_file=/etc/postgresql/postgresql.conf'] },
+  web: { command: ['web'] }, auth: { command: ['auth'] }, worker: { command: ['worker'] }, migrate: { command: ['migrate'] },
+  operator: { entrypoint: ['/app/bin/polycarpic', 'cli'] },
+};
 const v = (id, file, msg) => violations.push(`[${id}] ${file}: ${msg}`);
 const HOST_SECRETS = /(^|\/)secrets\/host(\/|$)/;
 
@@ -131,11 +136,11 @@ for (const [kind, path] of Object.entries(files)) {
       if (s.command !== undefined || s.entrypoint !== undefined) v('caddy-env', rel, 'caddy must have no command or entrypoint');
     }
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
-    // G14: every app service names its command (the image's own default is `web`), and has no entrypoint of its own
-    if (['web', 'auth', 'worker', 'migrate'].includes(sn)) {
-      const cmd = Array.isArray(s.command) ? s.command : null;
-      if (!cmd || cmd.length !== 1 || cmd[0] !== sn) v('app-command', rel, `${sn}: command must be exactly ["${sn}"]`);
-      if (s.entrypoint !== undefined) v('app-command', rel, `${sn}: must not set an entrypoint`);
+    // G14: every service's `command` and `entrypoint` is the exact value below or absent (the image's own default is `web`, so each app service names its own)
+    {
+      const want = SERVICE_EXEC[sn] ?? {};
+      for (const k of ['command', 'entrypoint'])
+        if (JSON.stringify(s[k] ?? null) !== JSON.stringify(want[k] ?? null)) v('app-command', rel, `${sn}: ${k} must be ${JSON.stringify(want[k] ?? null)}`);
     }
     for (const key of ['networks', 'secrets', 'volumes', 'user', 'cap_drop', 'cap_add', 'security_opt', 'healthcheck', 'command', 'tmpfs'])
       if (hasVar(s[key])) v('raw-interpolation', rel, `${sn}: \${…} in ${key}`);

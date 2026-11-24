@@ -27,6 +27,8 @@
        "target": "/config"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "env_exact": [
       "POLY_DOMAIN",
       "POLY_STAGING_ALLOW",
@@ -129,6 +131,7 @@
      "command": [
       "auth"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -201,6 +204,8 @@
        "target": "/etc/backup/age-recipients.txt"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -246,6 +251,7 @@
      "command": [
       "migrate"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -291,6 +297,11 @@
      "user": "10003:10003"
     },
     "operator": {
+     "command": null,
+     "entrypoint": [
+      "/app/bin/polycarpic",
+      "cli"
+     ],
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -372,6 +383,12 @@
        "target": "/spool/wal"
       }
      ],
+     "command": [
+      "postgres",
+      "-c",
+      "config_file=/etc/postgresql/postgresql.conf"
+     ],
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -437,6 +454,8 @@
        "target": "/etc/uploader/host.env"
       }
      ],
+     "command": null,
+     "entrypoint": null,
      "image": "tools",
      "keys": [
       "cap_drop",
@@ -481,6 +500,7 @@
      "command": [
       "web"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env"
      ],
@@ -532,6 +552,7 @@
      "command": [
       "worker"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/host.env",
       "/etc/polycarpic/mail.env"
@@ -603,6 +624,7 @@
      "command": [
       "auth"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"
@@ -656,6 +678,7 @@
      "command": [
       "migrate"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -701,6 +724,11 @@
      "user": "10103:10103"
     },
     "operator": {
+     "command": null,
+     "entrypoint": [
+      "/app/bin/polycarpic",
+      "cli"
+     ],
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -767,6 +795,12 @@
        "target": "/etc/postgresql/pg_hba.conf"
       }
      ],
+     "command": [
+      "postgres",
+      "-c",
+      "config_file=/etc/postgresql/postgresql.conf"
+     ],
+     "entrypoint": null,
      "image": "postgres",
      "keys": [
       "cap_drop",
@@ -812,6 +846,7 @@
      "command": [
       "web"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env"
      ],
@@ -863,6 +898,7 @@
      "command": [
       "worker"
      ],
+     "entrypoint": null,
      "env_files": [
       "/etc/polycarpic/staging-host.env",
       "/etc/polycarpic/staging-mail.env"

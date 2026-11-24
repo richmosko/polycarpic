@@ -547,7 +547,7 @@ stage_database() {
   have=$(printf '%s\n' "SELECT 1 FROM pg_database WHERE datname = 'polycarpic';" \
     | "${dc[@]}" exec -T postgres psql -X -tA -v ON_ERROR_STOP=1 -U postgres -d postgres) || die "could not read the database list of $project; nothing created"
   if [ -z "$have" ]; then
-    printf '%s\n' "CREATE DATABASE polycarpic;" | "${dc[@]}" exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres > /dev/null \
+    printf '%s\n' "CREATE DATABASE polycarpic TEMPLATE template0;" | "${dc[@]}" exec -T postgres psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres > /dev/null \
       || die "CREATE DATABASE polycarpic failed on $project"
     change "created database polycarpic on $project"
   elif [ "$have" != 1 ]; then
