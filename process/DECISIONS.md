@@ -993,3 +993,10 @@ Add new decisions ABOVE this comment, newest first.
 - Merge without it and prove only the unhealthy path (option B).
 - A stand-in image for the test, or pointing the health rule at the internal status page (neither recommended).
 **Approved by:** Mosko
+
+### 2026-11-24 — POLY-100's scope is closed; the end-to-end deploy test is finished in POLY-162
+**Decision:** No more scope enters POLY-100. It lands what is built and tested: the deploy, the fixes for both security reviews, and the three fixes the end-to-end test found (G10 the pinned Compose version, G11 the fixed working directory and no `.env`, G12 the first-deploy role check). Moved to POLY-162: the health listener (G15, ruled, not built), creating the database (G13) and the service commands (G14), both built without tests, and getting the end-to-end test (T-real) to pass. In POLY-100 T-real's files stay and its CI step is switched off; POLY-162 switches it on. POLY-104 waits on POLY-162, POLY-160 and POLY-161. This replaces, for POLY-100, the decisions of the same day that T-real and the health listener land in it.
+**Why:** The loop had passed three times its estimated cost and kept growing as the end-to-end test found faults outside the deploy code (no health answer in the image, no database created, the worker's command). The Principal: "no more scope creep on this issue. it's already gone too far." What is accepted: the deploy code merges without ever having completed a real deploy, and it is known that today it cannot; nothing is deployed anywhere, and nothing can be until POLY-162 is done.
+**Alternatives considered:**
+- Keep going in POLY-100 until T-real passes.
+**Approved by:** Mosko

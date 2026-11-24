@@ -1,7 +1,7 @@
 ---
 id: POLY-100g
 title: Deploy health listener
-status: todo
+status: cancelled
 milestone: POLY-M1
 parent: POLY-100
 blocked_by: []
@@ -18,3 +18,9 @@ updated: 2026-11-23
 ---
 
 The minimal public health listener in apps/web, to the POLY-100 ruling's row for it (Principal, 2026-11-24, option A): GET /api/v1/health from the existing handleHealth on 0.0.0.0:3000 and a fixed 404 for everything else, with seceng's conditions. Replaced by the real server (see the web-server issue); it never runs beside it.
+
+## Comments
+
+### @team-lead — 2026-11-23
+
+Cancelled here, not dropped: the health listener (ruling G15) moves to POLY-162 with the rest of the end-to-end work, by the Principal's scope cut of 2026-11-24.
