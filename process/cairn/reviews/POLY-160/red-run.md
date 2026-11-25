@@ -69,3 +69,14 @@ Counts (three discover patterns because the host hook blocks one un-tiered run):
 - `test_deploy_recover_edge…edge_run_that_started_stuck…not_stopped`: edge's form of the same: `rollback-unhealthy` over `not-stopped`. The staging form (`FinalAlert…started_stuck…not_stopped`) is green.
 
 Test faults fixed (mine): the first-deploy cuts hung from `len(up_marks)`, which lands at Postgres's own `up` (now `+1`, and the SIGHUP hook waits for the app `up`); two quarantine fixtures had time and reason swapped (now `<digest> <time> <reason> [bundle]`); the lifted-line test now uses a stored bundle id that is not the installed one, shown red on its mutant (`_held` as a plain search of the file, reverted).
+
+## T-real's two cases (`tests/infra/deploy-real/`)
+
+Written, **not run here**: T-real needs Linux, root and Docker (`deploy-real` job), and takes about 8 minutes; the Mac cannot run it. They are checked by reading against the harness (`ops`, `stateFile`, `containerImages`) and `tsc` (only the old harness line 242 errors). Red-on-today and wall time come from the first `deploy-real` run in CI; the gate records them.
+
+| Case | What it asserts | Red on today's build because |
+|---|---|---|
+| `2-rollback.test.ts` "C28" | release 2 offered; `deploy staging` SIGKILLed after its `up` line (pkill of the tool, the mark is there); the installed bundle's `compose-version` set to a wrong value; `deploy staging` again: exit 1, last line `deploy: refused render-env`, alert `render-env`, no mark, `current` and every web/auth/worker container on release 1 and healthy, release 2 not quarantined; file and `interrupted`/`alert` put back in `finally` | today refuses before it recovers: release 2's containers stay up and the mark is kept |
+| `1-web-served.test.ts` "T-real 1c" | `poly_app`, `poly_auth`, `poly_worker` all connected (90 s, never skipped); `docker restart` of the Postgres container; health 200 within 60 s; `StartedAt` and `RestartCount` of web/auth/worker unchanged 15 s later; no `process.crash`; the worker's next `job.run` is ok; no password in the logs | without `survive()` the client's unhandled error ends the process and Docker restarts it |
+
+**Deviation from the ruling (S):** the `db.connection_lost.*` lines of the three services are not asserted. A client idle at the restart is dropped by the pool without a line (R5's `survive`); only a checked-out one reports, and an outside test cannot decide which it was. The unit and database cases cover the reported path.
