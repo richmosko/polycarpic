@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-101
 blocked_by: []
 assignee: qa-engineer
-paths: [tests/ci/**, packages/auth/src/**, process/cairn/reviews/POLY-101/**, process/cairn/issues/POLY-101.md, process/cairn/issues/POLY-101c.md]
+paths: [tests/ci/**, packages/auth/src/**, process/cairn/reviews/POLY-101/**, process/cairn/issues/POLY-101.md, process/cairn/issues/POLY-101c.md, tests/db/auth-route-policy.test.ts]
 stage: implement
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 1

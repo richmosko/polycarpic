@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96, POLY-86]
 assignee: devops-engineer
-paths: [.github/workflows/ci.yml, infra/ci/**, tests/ci/**, packages/auth/src/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, process/cairn/issues/POLY-101.md, process/cairn/reviews/POLY-101/**]
+paths: [.github/workflows/ci.yml, infra/ci/**, tests/ci/**, packages/auth/src/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, process/cairn/issues/POLY-101.md, process/cairn/reviews/POLY-101/**, tests/db/auth-route-policy.test.ts]
 labels: [ci, security]
 priority: null
 pr: null
