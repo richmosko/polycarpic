@@ -79,6 +79,31 @@ V1's second half and V7's "red when broken": on the tree without the steps, the 
 The first `.fails` scan missed a call inside the chain: a failing `it.runIf(true).fails` or `it.skipIf(false).fails` is reported `passed`
 (run) and the script accepted it. 6 cases red at 9ff95076; fixed at 1cddc3af (any `.fails` property).
 
+## seceng follow-ups F1 to F3 and one correction (final sha f18b6f70)
+
+On f18b6f70: `tests/ci` 877 / 877 (84 s), `tests/layers` 568 / 568, `eslint packages apps scripts/layers` exit 0; `auth-row.mjs lint`
+`11 passed (floor 11)`; `auth-row.mjs db` on the battery's saved report `43` and `40` at their floors. No container run was repeated: since
+1cddc3af nothing the db battery executes has changed. **The LINT floor is now 11** (counted from the run's JSON), not the 9 above.
+
+Each fault planted by Edit alone, then undone:
+
+| | Fault | Went red |
+|---|---|---|
+| F1 | `generate.mjs`: the adapter's `patterns.push` (`/*`) line removed | `boundaries.test.ts` "refuses a subpath import" only (10 / 11) |
+| F1 | `generate.mjs`: the adapter's `banned.push` line removed | `boundaries.test.ts` "refuses a dynamic import(), bare and subpath" only (10 / 11) |
+| F2 | `auth-row.mjs`: the file-status line removed | "the file's own status is failed while every assertion passed", for all 3 files |
+| F3 | `aggregate.mjs`: `lint` dropped from `node` | "output node=true, lint skipped" only |
+| F3 | `aggregate.mjs`: `lint` dropped from `layers` | "output layers=true, lint skipped" only |
+| F3 | `aggregate.mjs`: `db` dropped from `db` | "output db=true, db skipped" only |
+
+F1 needed no rule change. In the first F3 pass my `layers` and `db` edits did not match (the tool had dropped a trailing space), which left
+`node` and `db` faulted together; I restored the line, and the `layers` and `db` rows above are separate re-runs.
+
+**Correction, "one TLS mode only".** The table above cites the case "one TLS mode only, run twice". As written at 9eaf595c it stayed green
+with the describe match removed from `auth-row.mjs`: the script was still red, but as "passed 2 times", and that reason also names the
+missing mode (five other cases caught the fault, seceng's reproduction). I made the case itself catch it: it now requires
+`passed 0 times` for the private-CA mode. With the describe match removed it is red (9d9fae20), and green restored.
+
 ## Criterion 1, what is not proved
 
 No newer better-auth was installed (ruling §5). The standing proof is the control on the pinned version; one-off (a) is the same set
