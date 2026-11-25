@@ -16,7 +16,7 @@ const CONTROL_TITLES = [
 // `floor` is the least number of passed tests in the file. `required` names tests that must be among them, by exact title and
 // outermost describe, each exactly once.
 export const ROWS = {
-  lint: [{ file: 'packages/auth/src/boundaries.test.ts', floor: 9, required: [] }],
+  lint: [{ file: 'packages/auth/src/boundaries.test.ts', floor: 11, required: [] }],
   db: [
     {
       file: 'tests/db/auth-route-policy.test.ts',
