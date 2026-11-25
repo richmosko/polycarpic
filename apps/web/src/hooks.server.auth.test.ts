@@ -70,12 +70,21 @@ describe('page requests (criterion 14, POLY-153 R7.2)', () => {
     expect(m.withSession).not.toHaveBeenCalled();
   });
 
-  for (const p of ['/sign-in', '/sign-in/anything', '/healthz'])
+  // POLY-161 R6: an exact set, not a prefix. The crawl on the built server (tests/db/web-server.test.ts) is the full proof; this is the fast pin.
+  for (const p of ['/api/v1/health', '/sign-in', '/sign-in/cancel-method', '/sign-in/forgot', '/sign-in/reset', '/sign-in/second-step', '/sign-up', '/sign-in/forgot/__data.json', '/sign-up/__data.json'])
     it(`signed out on ${p}: not redirected, and nothing is entered  [red if: a redirect loop on the sign-in page or the health probe]`, async () => {
       const { res, resolve } = run(p);
       expect((await res).status).toBe(200);
       expect(resolve).toHaveBeenCalled();
       expect(m.withSession).not.toHaveBeenCalled();
+    });
+  for (const p of ['/sign-in/anything', '/sign-in/reset/x', '/sign-in/', '/healthz', '/api/v1/health/__data.json', '/sign-up/x', '/sign-in/anything/__data.json'])
+    it(`signed out on ${p}: not public; the guard redirects  [red if: isPublic is a prefix test, or /healthz survived]`, async () => {
+      const { res, resolve } = run(p);
+      const r = await res;
+      expect(r.status).toBe(303);
+      expect(r.headers.get('location')).toMatch(/^\/sign-in\?next=/);
+      expect(resolve).not.toHaveBeenCalled();
     });
 
   it('S12: next=//evil.example never survives: a protocol-relative path becomes /  [red if: next is built from the raw path]', async () => {
@@ -168,6 +177,8 @@ describe('SvelteKit CSRF (S12)', () => {
     const cfg = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'vite.config.ts'), 'utf8');
     expect(cfg).not.toMatch(/checkOrigin\s*:\s*false/);
     expect(cfg).not.toMatch(/trustedOrigins/);
-    expect(cfg).toMatch(/'img-src': \['self', 'data:'\]/); // criterion 15: the CSP is not widened
+    const csp = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'lib', 'csp.ts'), 'utf8');
+    expect(csp).toMatch(/'img-src': \['self', 'data:'\]/); // criterion 15: the CSP is not widened (its one home since POLY-161 R15)
+    expect(cfg).toMatch(/CSP_DIRECTIVES/);
   });
 });
