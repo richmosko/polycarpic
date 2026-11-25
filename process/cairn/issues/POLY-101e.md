@@ -7,7 +7,7 @@ parent: POLY-101
 blocked_by: []
 assignee: architect
 paths: [process/cairn/reviews/POLY-101/**, docs/ARCH/**, process/cairn/issues/POLY-101e.md]
-stage: validate
+stage: review
 estimate.cost_usd: "2.00"
 estimate.gate_cycles: 1
 labels: []

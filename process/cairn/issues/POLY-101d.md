@@ -1,15 +1,20 @@
 ---
 id: POLY-101d
 title: Route-policy row build
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-101
 blocked_by: []
 assignee: devops-engineer
 paths: [.github/workflows/ci.yml, infra/ci/**, docs/INFRA/**, process/cairn/reviews/POLY-101/**, process/cairn/issues/POLY-101d.md, scripts/layers/**, tests/layers/**, eslint.config.js]
-stage: implement
+stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 1
+actual.cost_usd: "1.6467"
+actual.tokens: 6851828
+actual.gate_cycles: 1
+actual.wall_clock: 17
+ratio: "0.41"
 labels: []
 priority: null
 pr: null
