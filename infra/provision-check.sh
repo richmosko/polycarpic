@@ -392,7 +392,9 @@ want25=$(tr -d '[:space:]' < "$here/deploy/compose-version" 2> /dev/null || true
 if ! [[ "$want25" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then h25=" $here/deploy/compose-version does not hold one version;"
 else
   root25=$(docker compose version --short 2> /dev/null || true)
+  # a HOME like the deploy's render home: root's, 0755 and empty. mktemp's 0700 hides it from 10020, and docker then loses its plugins (POLY-104 F9)
   rhome=$(mktemp -d)
+  chmod 0755 "$rhome"
   user25=$(HOME="$rhome" setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs -- docker compose version --short 2> /dev/null || true)
   rm -rf "$rhome"
   [ "$root25" = "$want25" ] || h25="$h25 root's Compose is '${root25:-none}' (want $want25);"
