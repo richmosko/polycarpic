@@ -159,6 +159,8 @@ describe('auth-row.mjs: a failing test reported as passed (seceng, vitest JSON)'
     ['it.concurrent.fails', "it.concurrent.fails('x', () => {});"],
     ['it.fails.each', "it.fails.each([1])('x %s', () => {});"],
     ['it.fails on a new line', "it\n  .fails('x', () => {});"],
+    ['.fails after a call in the chain (runIf)', "it.runIf(true).fails('x', () => {});"],
+    ['.fails after a call in the chain (skipIf)', "test.skipIf(process.env.NEVER === '1').fails('x', () => {});"],
     ['a fails: option', "it('x', { fails: true }, () => {});"],
     ['a fails: option on describe, spaced', "describe('x', { timeout: 1, fails : true }, () => {});"],
   ];
