@@ -179,3 +179,41 @@ describe('withOperatorTx (@poly/db/operator)', () => {
     expect(Object.keys(operator)).toEqual(expect.arrayContaining(['withOperatorTx', 'close']));
   });
 });
+
+// POLY-160 R5, C20 and C21: a backend that dies under a held transaction is an error to the caller, never the result, and never kills the process.
+// [red if: the pool's per-client 'connect' → client.on('error') line is removed: the unhandled 'error' event ends the test process]
+describe('a backend lost inside withSession (POLY-160 C20, C21)', () => {
+  const pidOf = async (tx: any) => (await q(tx, `select pg_backend_pid()::int p`))[0].p as number;
+  const kill = (pid: number) => must(`select pg_terminate_backend(${pid})`);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const nobody = async () => (await auth.withContextFreeTx(async (tx: any) => (await q(tx, `select app.current_user_id() is null as denied`))[0])).denied;
+
+  it('terminated with no query in flight, before COMMIT: an error, never the result; the next checkout carries no identity', async () => {
+    let result: unknown = 'not reached';
+    await expect(
+      m.withSession(handleFor(db, UID, SID), async (tx: any) => {
+        kill(await pidOf(tx));
+        await sleep(300); // the client's own 'error' event arrives while the callback holds it
+        result = 'RESULT';
+        return result;
+      }),
+    ).rejects.toBeDefined();
+    expect(await nobody()).toBe(true);
+    // and the pool is usable again
+    const ok = await m.withSession(handleFor(db, UID, SID), async (tx: any) => (await q(tx, `select 1 as n`))[0].n);
+    expect(ok).toBe(1);
+  });
+
+  it('terminated during a query: that query rejects, the wrapper rejects, the next checkout carries no identity', async () => {
+    let pid = 0;
+    const running = m.withSession(handleFor(db, UID, SID), async (tx: any) => {
+      pid = await pidOf(tx);
+      return q(tx, `select pg_sleep(5)`);
+    });
+    for (let i = 0; i < 50 && !pid; i++) await sleep(20);
+    await sleep(200);
+    kill(pid);
+    await expect(running).rejects.toBeDefined();
+    expect(await nobody()).toBe(true);
+  });
+});
