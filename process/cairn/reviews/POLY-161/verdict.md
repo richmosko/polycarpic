@@ -12,6 +12,7 @@ Architect. Checklist pre-registered with the ruling, before any test was written
 | A4 | Criterion 4: T-real | a CI run at the gate's product sha, counts read in the log, no skip; trigger rows pinned | | |
 | A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | | |
 | A6 | R6: what is served | crawl over the manifest red on an unguarded new route and on a prefix `isPublic`; seceng's review has no open item | | |
+| A12 | R13: `safeNext` | every row of addendum 1 red on today's module or on its mutant; the two Chromium cases green | | |
 | A7 | R4: limits and Host | each limit driven, not read; 421 and 400 asserted with bodies; positive case through the public host | | |
 | A8 | R5: logging | a real 500 (database down) and a planted `console.error(object)` leave no request or error text; red without `handleError` and without the guard, separately | | |
 | A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | | |
@@ -55,3 +56,6 @@ Each is settled in the first tests or the first build. Open at the gate: CHANGES
 | B29 | trigger | a row whose regex another row already matches | the existing "every row is needed" case covers each new row | qa, devops |
 | B30 | ops-hardening crash | exits 1 because the build is missing | `23505` is the one crash, with the build present | qa |
 | B31 | db job | the build step missing: a suite that skips without `build/handler.js` is green | it fails, never skips, in CI | qa, devops |
+| B32 | `safeNext` | Node's parser stands in for the browser | the two Chromium cases end on our origin after a real sign-in | qa |
+| B33 | `safeNext` | only tab tested, or only in second position; the origin check hides a missing control check | every control, two positions; each rule dropped in turn is red | qa |
+| B34 | remotes | an empty `remotes` object asserted on a name that does not exist (undefined) | the key exists and has no entry; the header request is made | qa |
