@@ -64,3 +64,13 @@ Items placed here from the POLY-161 loop (2026-11-25). Sources: `process/cairn/r
 - **With U1:** unpinned environment keys now reach the whole web app, not a health path (`NODE_OPTIONS` in `environment`; it can also choose the `types` condition of web's `#web-build` import). Same attested commit; not new reach.
 - **The weekly re-scan of the published image cannot see bundled packages;** make it read the bundle's package list kept in the image (`build/packages.json`, POLY-161 R14). Until then the check after release is the lockfile audit, which runs on PRs only.
 - **Make bits-ui a dev dependency,** so `svelte` and `@sveltejs/acorn-typescript` leave the runtime install and the image check's `@sveltejs` allow-list becomes empty (seceng's S9 ruling).
+
+### @team-lead — 2026-11-24
+
+**Scope cut by the Principal, 2026-11-25** (`process/DECISIONS.md`; it amends the 2026-11-24 decision that every item here precedes POLY-104). This issue now holds only what must be true before the first staging deploy; the prod and real-data gates moved to their own umbrella in POLY-M6 (see the issue blocked by this one), which blocks POLY-164. What stays here, from the architect's reading (`architect-m1r`, 2026-11-25):
+- **H1** (the Principal's gate): recovery runs before the Compose and token checks, the `interrupted` mark is kept, `edge-deploy` included.
+- **The pool `error` listener** in `packages/db` (backend-lead builds): a Postgres restart must not take web, auth and the worker down.
+- **H2:** a wrong `current` after a failed state save, where a later rollback brings up a quarantined release. **H4 and H5:** a post-`up` refusal retried every poll, a double crash, a slow or hung `check-config`, `rel.log` raising; each can stop staging's poll silently. H2, H4 and H5 are the architect's additions with no gate text of their own; they share H1's functions.
+- `provision.sh`'s relative path and H6's `--project-directory`, both exercised by POLY-104.
+- INFRA §4.4 to §4.6 and the Ctrl-C runbook line; the end-to-end deploy test green with its time recorded.
+Read the acceptance criteria above against this list: the third (`self-update`) and every "follow-up" finding that gates prod are no longer this issue's.

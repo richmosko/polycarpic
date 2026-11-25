@@ -14,7 +14,7 @@ ga: false
 
 **Target:** ready by 2026-12-13 (lead's estimate, 2026-11-25; a readiness date, not a prod-open date). Runs after POLY-M1; it does not block POLY-M2.
 
-**Operations:** POLY-163 (edge limits at Caddy), POLY-157 (prod maintenance page), POLY-158 (rollback: copy back into prod), POLY-159 (daily off-box bucket check), POLY-103 (monitoring, heartbeat, alerts), POLY-156 (edge follow-ups 2), POLY-135 (CodeQL scanning).
+**Operations:** POLY-163 (edge limits at Caddy), POLY-157 (prod maintenance page), POLY-158 (rollback: copy back into prod), POLY-159 (daily off-box bucket check), POLY-103 (monitoring, heartbeat, alerts), POLY-156 (edge follow-ups 2), POLY-135 (CodeQL scanning), POLY-165 (deploy follow-ups: before prod; split from POLY-160).
 
 **Identity:** POLY-155 (auth follow-ups 2; its gate part is the operator's second-step reset with the owner's email, the per-email sign-in limit, the reused-code refusal, the lock notice and the recent-changes view; the cut is confirmed by seceng at its ruling).
 
