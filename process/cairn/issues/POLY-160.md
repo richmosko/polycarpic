@@ -18,9 +18,9 @@ The lesser findings from POLY-100's third build review, and other deploy items P
 
 ## Acceptance criteria
 
-- [ ] Every finding seceng's third build review of POLY-100 marks "follow-up" (`process/cairn/reviews/POLY-100/build-review.md`) is fixed, each with a test shown red on the fault.
-- [ ] The end-to-end deploy test (T-real) still passes, and its measured CI time is recorded against the image job's 20-minute limit.
-- [ ] `self-update` installs the ops bundle from the attested release (POLY-98 R-b; POLY-100 ruling §L2), or is given its own issue with the reason.
+- [ ] Every item of the Principal's scope cut (last scope comment) is fixed as `process/cairn/reviews/POLY-160/ruling.md` rules, each with a test shown red on the fault.
+- [ ] The end-to-end deploy test (T-real) passes, and the `deploy-real` job's measured CI time is recorded against its 15-minute limit.
+- [ ] Postgres restarted under the running services: web, auth and the worker stay up, and health recovers.
 
 ## Comments
 
