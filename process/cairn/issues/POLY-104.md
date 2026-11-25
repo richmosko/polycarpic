@@ -65,3 +65,7 @@ From POLY-100 (seceng advisory A19, `process/cairn/reviews/POLY-100/ruling-revie
 ### @team-lead — 2026-11-24
 
 From the POLY-161 loop (2026-11-25, `process/cairn/reviews/POLY-161/verdict.md` @ 43ce99c0): Caddy in front of the real web server is unproven until this deploy. The end-to-end deploy test reaches web on 3000 inside the box and never through Caddy, so the first staging deploy is where the sign-in pages, the static files, the `no-store` and `nosniff` headers Caddy sets, the client address, and the allowlist with basic auth are first seen together. Not before this issue: POLY-160's pool error listener (a database restart takes web, auth and the worker down until compose restarts them). Prod is not opened to the internet before POLY-163.
+
+### @team-lead — 2026-11-24
+
+From the POLY-160 loop (2026-11-25; `process/cairn/reviews/POLY-160/verdict.md`, "For filing"), three checks for the first real box: the runbook's Ctrl-C line run once on a real `edge-deploy`; a reboot after a stand-down, to see that the stopped containers stay stopped (unmeasured); `docker compose --project-directory` on the box's Compose 5.7.1 with no render home (measured only on 5.7.0 on the Mac).

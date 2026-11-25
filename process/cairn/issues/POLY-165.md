@@ -36,3 +36,12 @@ Placed from devops-100's hand-off notes of 2026-11-24 (POLY-100 loop), at the te
 - **`render_user_ok` refuses a user that appears in its own group's member field.** Alpine's `adduser` writes that; Ubuntu's `useradd` does not. Not the cause of any failure seen; a box where the render user is added to its own group by hand would be refused.
 - **`test_install_commit`'s bad-hosts case is order-dependent and unproven.** It failed three times in whole-directory runs on the Mac and passed alone every time and in the last whole run; the assertion text was not captured.
 - Measured, for the record: `compose_guard.judge` as root with umask 077 under `unshare --net` and `setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs`, an empty root-owned HOME, secrets directories 0750 root:gid and files 0440, returns a Judged record; the uid, the unreadable secret directories, the empty HOME and the isolation do not make the render fail.
+
+### @team-lead — 2026-11-24
+
+Items placed here from the POLY-160 loop (2026-11-25), all before the first prod deploy. Sources: `process/cairn/reviews/POLY-160/build-review.md` ("Delta read @ 655fb279", the table ruling `gate.md` §5), `verdict.md` ("For filing", D1 to D3), `process/DECISIONS.md` 2026-11-25.
+- **A decision for the Principal: boot-time recovery for `first-deploy` and `edge-deploy`.** A hand-run deploy cut by a hard kill or a power loss leaves the never-healthy release running until the operator reruns it (SECURITY R-35). Accepted for staging only.
+- **Prod only:** the unlimited `check-config-timeout` retry makes a pre-migration backup set every poll; whether the `held-` lift (another installed ops bundle) is enough on prod; prod's Caddy when a prod restore fails; prod's settle steps one by one and `edge-probe-baseline` raising.
+- **D1:** on Ctrl-C, when the stop could not be shown, the alert `interrupted` overwrites `not-stopped` (the name only; two lines and one test).
+- **Tests owed, of code that reads right (seceng's table, each by name):** C21 "during COMMIT" in the proxy form; a render home not root-owned or group- or other-writable; `clear_transient` raising; edge forms of the rollback exit and of the tree check; a second signal inside the stop; stderr closed in `recover`; the read-back against a `docker stop` that exits 0 and leaves the container up; an unreadable quarantine file; a second `rollback`.
+- **Mutants owed:** settle's list, `clear_transient`, edge's tree check, status 08, the provision scripts, the `check-config` timeout per service, `rel.log` after `up`.

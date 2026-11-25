@@ -76,8 +76,15 @@ def write(ctx, path, text, mode=0o644):
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
     with os.fdopen(fd, "w") as fh:
         fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
     os.chmod(tmp, mode)
     os.replace(tmp, path)
+    dfd = os.open(os.path.dirname(path) or ".", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
 
 
 def put(ctx, project, name, text):
@@ -124,6 +131,9 @@ def bundle_id(ctx):
 QLINE = re.compile(r"(sha256:[0-9a-f]{64}) ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z) ([a-z0-9-]{1,40})( [^ ]{1,64})?")
 
 
+LIFTING = ("guard-", "held-")  # reasons that lift with another installed bundle: a box fault is not the release's
+
+
 def _quarantine_lines(ctx, project):
     """The quarantine file's lines, each checked; a malformed one stops the run with `state` and the file is never rewritten from a partial read (F5)."""
     text = read(ctx, project, "quarantine") or ""
@@ -139,22 +149,24 @@ def _quarantine_lines(ctx, project):
 
 
 def quarantine(ctx, project, digest, reason):
-    """A `guard-<rule>` line adds a fourth field, the installed bundle id: it lifts once another bundle is installed (R8, S18)."""
-    prev, _ = _quarantine_lines(ctx, project)
+    """A `guard-<rule>` or `held-<name>` line adds a fourth field, the installed bundle id: it lifts once another bundle is installed (R8, S18, POLY-160 R3)."""
+    prev, lines = _quarantine_lines(ctx, project)
     extra = ""
-    if reason.startswith("guard-"):
+    if reason.startswith(LIFTING):
         extra = " " + (bundle_id(ctx) or "-")
+    if any(d == digest and r == reason and s == extra.strip() for d, r, s in lines):
+        return  # idempotent per digest, reason and bundle id: a retried record adds no second line
     put(ctx, project, "quarantine", prev + "%s %s %s%s\n" % (digest, now_utc(ctx), reason, extra))
 
 
 def quarantined(ctx, project):
-    """The digests the poll skips. A digest with a non-guard reason is skipped for good; one with only `guard-<rule>` lines is skipped
+    """The digests the poll skips. A digest with a non-guard reason is skipped for good; one with only `guard-<rule>` or `held-<name>` lines is skipped
     only while the installed bundle id equals the stored one; a missing or malformed id on either side keeps it."""
     _, lines = _quarantine_lines(ctx, project)
     now = bundle_id(ctx)
     held = {}
     for digest, reason, stored in lines:
-        if reason.startswith("guard-"):
+        if reason.startswith(LIFTING):
             lifts = bool(stored and BUNDLE_ID.fullmatch(stored) and now and stored != now)
             held[digest] = held.get(digest, False) or not lifts
         else:

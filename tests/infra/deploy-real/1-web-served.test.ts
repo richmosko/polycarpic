@@ -201,3 +201,54 @@ suite('T-real 1b: the running web container serves the real app', () => {
     step('web logs checked', () => log(`web log events: ${[...new Set(events)].join(', ')}`));
   });
 });
+
+// POLY-160 R5 (C20, C23, C24), the literal restart: Postgres restarts under the running web, auth and worker. None of the three restarts or crashes, health answers 200 again, and the worker's next job.run is ok.
+// [red if: survive() is removed from a pool: the process ends on the unhandled client error and Docker restarts it (StartedAt and RestartCount change)]
+// Each service's own `db.connection_lost.<pool>` line is asserted (app, auth, worker): the `connect` listener is on idle clients too, so the restart is reported (build review B6). The line carries a type and a code only.
+suite('T-real 1c: Postgres restarts under the running services', () => {
+  const sleep = (s: number) => root(['sleep', String(s)]);
+  const pg = (sql: string) => exec('postgres', ['psql', '-U', 'postgres', '-d', 'polycarpic', '-X', '-Atc', sql]).out.trim();
+  const health = () => one({ path: '/api/v1/health' }).status;
+  const probe = (name: string) => { const r = root(['docker', 'inspect', '-f', '{{.State.StartedAt}} {{.RestartCount}}', nameOf(name)]); return r.out.trim(); };
+  const lines = (service: string) => { const r = root(['docker', 'logs', nameOf(service)]); return (r.out + r.err).split('\n').filter((l) => l.trim() !== ''); };
+  const jobOk = (l: string) => { try { const j = JSON.parse(l); return j.event === 'job.run' && j.outcome === 'ok'; } catch { return false; } };
+
+  it('poly_app, poly_auth and poly_worker are connected at once; `docker restart` of Postgres; health is 200 within 60 s; the three are not restarted; the worker runs a job ok afterwards  [red if: a pool lets the lost connection end its process]', () => {
+    // make all three roles hold a connection: health and a page for app, auth's own endpoint, and the worker's drain (every 30 s, idle clients live 10 s)
+    const seen = (): string[] => pg("select distinct usename from pg_stat_activity where usename in ('poly_app','poly_auth','poly_worker') order by 1").split('\n');
+    let have: string[] = [];
+    for (let t = 0; t < 90; t += 3) {
+      health();
+      exec('auth', ['node', '-e', "fetch('http://127.0.0.1:3000/api/auth/ok',{headers:{'x-forwarded-for':'127.0.0.1'}}).then(()=>process.exit(0))"]);
+      have = seen();
+      if (have.join() === 'poly_app,poly_auth,poly_worker') break;
+      sleep(3);
+    }
+    expect(have, 'all three roles connected before the restart (never skipped)').toEqual(['poly_app', 'poly_auth', 'poly_worker']);
+    const before = { web: probe('web'), auth: probe('auth'), worker: probe('worker') };
+    const okBefore = lines('worker').filter(jobOk).length;
+    const r = root(['docker', 'restart', nameOf('postgres')], { timeout: 120_000 });
+    expect(r.code, r.err).toBe(0);
+    let status = 0;
+    for (let t = 0; t < 60 && status !== 200; t += 2) {
+      status = health();
+      if (status !== 200) sleep(2);
+    }
+    expect(status, 'health is 200 within 60 s of the restart').toBe(200);
+    sleep(15);
+    expect({ web: probe('web'), auth: probe('auth'), worker: probe('worker') }, 'StartedAt and RestartCount of the three are unchanged').toEqual(before);
+    for (const s of ['web', 'auth', 'worker']) expect(lines(s).filter((l) => /process\.crash/.test(l)), `${s} logged no crash`).toEqual([]);
+    let ok = false;
+    for (let t = 0; t < 90 && !ok; t += 3) {
+      ok = lines('worker').filter(jobOk).length > okBefore;
+      if (!ok) sleep(3);
+    }
+    expect(ok, 'the worker\'s next job.run after the restart is ok').toBe(true);
+    for (const [s, pool] of [['web', 'app'], ['auth', 'auth'], ['worker', 'worker']] as const) {
+      const lost = lines(s).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }).filter((j) => j.event === `db.connection_lost.${pool}`);
+      expect(lost.length, `${s} reported the lost connection for the ${pool} pool`).toBeGreaterThanOrEqual(1);
+      for (const j of lost) expect(Object.keys(j.err ?? {}).every((k) => k === 'type' || k === 'code'), `${s}: ${JSON.stringify(j.err)}`).toBe(true);
+    }
+    for (const s of ['web', 'auth', 'worker']) expect(lines(s).join('\n'), `${s}'s logs hold no password`).not.toContain(user.password || 'no-password-recorded');
+  }, 15 * 60_000);
+});

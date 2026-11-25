@@ -3,8 +3,32 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Writable } from 'node:stream';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cloneMigrated, dbEnv, freshDb } from './helpers/api';
+import net from 'node:net';
+
+// the service's JSON log lines, collected (pino writes to the descriptor, not process.stdout.write); the real stream is kept so the output stays visible
+const sunk = vi.hoisted(() => ({ lines: [] as string[] }));
+vi.mock('../../packages/config/src/log.ts', async (orig) => {
+  const m = (await orig()) as any;
+  return { ...m, createLogger: (o: any) => m.createLogger({ ...o, stream: new Writable({ write(c, _e, cb) { sunk.lines.push(String(c)); process.stdout.write(c); cb(); } }) }) };
+});
+
+// A TCP forwarder in front of Postgres with down()/up() on the same port (kept here: the auth area's test files may not import another area's helper).
+async function startProxy(host: string, port: number) {
+  const socks = new Set<net.Socket>();
+  const make = () => net.createServer((c) => {
+    const up = net.connect(port, host);
+    for (const x of [c, up]) { socks.add(x); x.on('close', () => socks.delete(x)); x.on('error', () => x.destroy()); }
+    c.pipe(up); up.pipe(c);
+  });
+  let server = make();
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const own = (server.address() as net.AddressInfo).port;
+  const down = async () => { for (const x of socks) x.destroy(); if (server.listening) await new Promise<void>((r) => server.close(() => r())); };
+  return { port: own, kill: down, down, up: async () => { if (server.listening) return; server = make(); await new Promise<void>((r, j) => server.once('error', j).listen(own, '127.0.0.1', () => r())); } };
+}
 
 const SECRET = 'qa-auth-main-secret-0123456789abcdef0123456789abcdef';
 const dir = mkdtempSync(join(tmpdir(), 'poly152-main-'));
@@ -73,4 +97,43 @@ describe('R1.2 startup checks: exit unless current_user is poly_auth, the secret
     const s = await f.startAuthService(envFor(db));
     await s.close();
   });
+});
+
+// POLY-160 R5 (C23, C24): the database lost under a running auth service. A request that needs it answers an error and writes auth.request_failed; the service keeps running and the next
+// request, once the database is back, works. [red if: survive() is removed from the auth pool: the process ends with an unhandled client error]
+describe('the database lost under the auth service (POLY-160 R5)', () => {
+  it('a request that needs the database fails with a logged auth.request_failed, then works again after the database returns', async () => {
+    const base = dbEnv('poly_auth', db);
+    const proxy = await startProxy(base.DATABASE_HOST!, Number(base.DATABASE_PORT));
+    const lines = sunk.lines;
+    lines.length = 0;
+    let svc: Svc | undefined;
+    try {
+      svc = await start(envFor(db, { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(proxy.port) }));
+      const session = () => fetch(`${svc!.publicOrigin}/api/auth/sign-in/email`, { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1', 'content-type': 'application/json', origin: 'https://app.qa.test' }, body: JSON.stringify({ email: 'nobody@qa.test', password: 'qa-wrong-password-1' }) });
+      const first = (await session()).status;
+      expect(first, 'with the database up, an unknown account is a client error').toBeLessThan(500);
+      await proxy.down();
+      await new Promise((r) => setTimeout(r, 500));
+      const down = await session();
+      expect(down.status).toBeGreaterThanOrEqual(500);
+      expect(lines.join('\n')).toContain('auth.request_failed');
+      await proxy.up();
+      let status = 999;
+      for (let i = 0; i < 30 && status >= 500; i++) { status = (await session()).status; if (status >= 500) await new Promise((r) => setTimeout(r, 500)); }
+      expect(status, 'the same request is a client error again').toBe(first);
+      expect(lines.join('\n')).not.toContain('qa-poly_auth');
+      // B6: the registration in main.ts: one warn line for the auth pool, carrying a type and a code only (no message, no detail, no client)
+      const lost = lines.flatMap((l) => l.split('\n')).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }).filter((j) => j.event === 'db.connection_lost.auth');
+      expect(lost.length, 'the connection loss is reported for the auth pool').toBeGreaterThanOrEqual(1);
+      for (const j of lost) {
+        expect(j.level).toBe('warn');
+        expect(Object.keys(j.err ?? {}).sort().every((k) => k === 'type' || k === 'code'), JSON.stringify(j.err)).toBe(true);
+        expect(JSON.stringify(j)).not.toMatch(/password|detail|client|poly_auth/i);
+      }
+    } finally {
+      await svc?.close();
+      await proxy.kill().catch(() => undefined);
+    }
+  }, 60_000);
 });

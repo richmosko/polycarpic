@@ -1,14 +1,15 @@
 ---
 id: POLY-160
 title: Deploy follow-ups
-status: backlog
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
 assignee: devops-engineer
+paths: [process/cairn/issues/POLY-160.md, process/cairn/issues/POLY-165.md, process/cairn/issues/POLY-104.md, process/cairn/reviews/POLY-160/**, infra/**, .github/workflows/**, Dockerfile, packages/db/**, packages/*/package.json, apps/*/package.json, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, .gitignore, process/STATE.md, process/DECISIONS.md, apps/*/src/**, apps/*/tests/**]
 labels: [ops, deploy, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/157
 created: 2026-11-23
 updated: 2026-11-24
 ---
@@ -17,9 +18,9 @@ The lesser findings from POLY-100's third build review, and other deploy items P
 
 ## Acceptance criteria
 
-- [ ] Every finding seceng's third build review of POLY-100 marks "follow-up" (`process/cairn/reviews/POLY-100/build-review.md`) is fixed, each with a test shown red on the fault.
-- [ ] The end-to-end deploy test (T-real) still passes, and its measured CI time is recorded against the image job's 20-minute limit.
-- [ ] `self-update` installs the ops bundle from the attested release (POLY-98 R-b; POLY-100 ruling §L2), or is given its own issue with the reason.
+- [x] Every item of the Principal's scope cut (last scope comment) is fixed as `process/cairn/reviews/POLY-160/ruling.md` rules, each with a test shown red on the fault. — `tests/infra/ops/test_deploy_recover.py`, `test_deploy_recover_checks.py`, `test_deploy_recover_rows.py`, `test_deploy_recover_edge.py`, `test_deploy_standdown.py`, `test_deploy_commit.py`, `test_deploy_retry.py`, `test_deploy_build_review.py`, `test_deploy_unwind_more.py` (a)/(b), `test_deploy_hang.py` leftover-mark case, `test_release_records.py`, `test_status.py` (R1.12), `tests/infra/provision-render-home.test.ts` and `tests/infra/provision/host.test.ts` (POLY-160 R6, R7), `packages/db/src/pool-errors.test.ts`, `tests/db/{wrappers,web-server,auth-service-main,worker-mail-jobs}.test.ts`; each red on the fault or its mutant: `process/cairn/reviews/POLY-160/red-run.md`
+- [x] The end-to-end deploy test (T-real) passes, and the `deploy-real` job's measured CI time is recorded against its 15-minute limit. — `tests/infra/deploy-real/2-rollback.test.ts` (C28, B7), `1-web-served.test.ts` (T-real 1c): CI run 45565943755, `deploy-real` 631 s of 900 s (70 %); local container 27 / 27, 502 s; `process/cairn/reviews/POLY-160/gate.md` §2
+- [x] Postgres restarted under the running services: web, auth and the worker stay up, and health recovers. — `tests/infra/deploy-real/1-web-served.test.ts`: "T-real 1c: Postgres restarts under the running services" (StartedAt and RestartCount unchanged, health 200, the worker's next `job.run` ok, each service's `db.connection_lost.<pool>` line); `tests/db/web-server.test.ts`: "the database restarted under a running web"
 
 ## Comments
 
@@ -74,3 +75,15 @@ Items placed here from the POLY-161 loop (2026-11-25). Sources: `process/cairn/r
 - `provision.sh`'s relative path and H6's `--project-directory`, both exercised by POLY-104.
 - INFRA §4.4 to §4.6 and the Ctrl-C runbook line; the end-to-end deploy test green with its time recorded.
 Read the acceptance criteria above against this list: the third (`self-update`) and every "follow-up" finding that gates prod are no longer this issue's.
+
+### @team-lead — 2026-11-24
+
+Feature started. Branch: `feature/poly-160-deploy-follow-ups`. Scope is the Principal's cut of 2026-11-25 (the comment above): H1, the pool `error` listener, H2, H4, H5, `provision.sh`'s relative path, H6's `--project-directory`, INFRA §4.4 to §4.6 with the Ctrl-C runbook line, and T-real green with its time recorded. The Principal delegated this loop's decisions and the merge to the lead (2026-11-25); each decision is recorded in `process/DECISIONS.md` as taken.
+
+### @team-lead — 2026-11-24
+
+Verified at `655fb279`: CI run 45565943755 green on all ten jobs (`deploy-real` 631 s of its 900 s limit); architect's verdict `37600cff` and seceng's delta read `bb1d06ff` with `26579880`, both pass with follow-ups. Follow-ups are on POLY-165 (before prod) and POLY-104 (first box). Decisions: `process/DECISIONS.md`, 2026-11-25. PR opening; awaiting merge under the Principal's delegation.
+
+### @team-lead — 2026-11-24
+
+Validate passed (qa's gate, seceng and the architect: pass with follow-ups; CI green on the PR head); merging via PR #157 under the Principal's delegation of 2026-11-25. Closing.

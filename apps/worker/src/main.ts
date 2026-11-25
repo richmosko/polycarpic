@@ -3,11 +3,18 @@
 // The schedule (POLY-137 R5): three purges and the mail drain.
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
+import { onConnectionLost } from '@poly/db/startup';
 import { resendMailer } from '@poly/mail';
 import { buildJobs, startSchedule } from './jobs/index.ts';
 import { startupGuard } from './startup.ts';
 
 const log = createLogger({ service: 'worker' });
+
+// POLY-160 R5: a lost database connection is a warning, not a crash. The original error never leaves pool.ts (it carries the password).
+onConnectionLost((e) => {
+  const err = Object.assign(new Error(e.type), { name: e.type, ...(e.code ? { code: e.code } : {}) });
+  log.warn(`db.connection_lost.${e.pool}`, { outcome: 'error', err });
+});
 
 const crash = (e: unknown): never => {
   log.fatal('process.crash', { outcome: 'error', err: e });

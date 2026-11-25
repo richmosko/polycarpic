@@ -35,7 +35,10 @@ def run(args, ctx):
         except rel.Refusal:
             ctx.err("rollback: a state pointer is present but unparsable: stopped (state)")
             return 1
-        if not cur or not prev:
+        code = deploy.recovered_first(project, ctx, cur)
+        if code is not None:
+            return code
+        if not cur or not prev or prev["digest"] == cur["digest"]:
             ctx.err("rollback: there is no previous release")
             return 4
         try:  # G2: restore first, then the records
@@ -59,18 +62,18 @@ def run(args, ctx):
         try:  # the pointers after the restore: a failed write is reported, exit 1, with the old release up
             rel.save_pointer(ctx, project, "current", prev)
             rel.save_pointer(ctx, project, "previous", cur)
-            link = ctx.p("%s/%s-current" % (rel.RELEASES, project))
-            tmp = link + ".new"
-            if os.path.lexists(tmp):
-                os.unlink(tmp)
-            os.symlink("sha256-" + prev["digest"].split(":", 1)[1], tmp)
-            os.replace(tmp, link)
+            deploy.link_current(ctx, project, rel.release_dir(ctx, prev["digest"]))
         except Exception:
-            ctx.err("rollback: the previous release is up but the pointers could not be written")
+            try:
+                rel.alert(ctx, project, "rollback-pointers")
+            except Exception:
+                pass
+            ctx.err("rollback: the previous release is up but the pointers could not be written; free space and run rollback again")
             return 1
         deploy._note(ctx, project, "rolled-back", cur["digest"])
         try:
             rel.clear_alert(ctx, project)
+            deploy._unlink(ctx, project, "in-progress")  # a healthy end clears the mark
         except Exception:
             pass
         return code

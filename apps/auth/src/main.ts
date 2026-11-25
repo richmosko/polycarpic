@@ -6,7 +6,7 @@ import { authOptions, createAuth } from '@poly/auth';
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
 import { resendMailer, type Mailer } from '@poly/mail';
-import { assertRole, assertSchemaNotBehind, closePools, configureAuthPool } from '@poly/db/startup';
+import { assertRole, onConnectionLost, assertSchemaNotBehind, closePools, configureAuthPool } from '@poly/db/startup';
 import { publicPort } from './bind.ts';
 import { closeServer, listen, listener } from './http.ts';
 import { handlePublic } from './public.ts';
@@ -22,6 +22,11 @@ export async function startAuthService(
   deps: { mailer?: Mailer } = {},
 ): Promise<AuthService> {
   const log = createLogger({ service: 'auth' });
+  // POLY-160 R5: a lost database connection is a warning, not a crash. The original error never leaves pool.ts (it carries the password).
+  onConnectionLost((e) => {
+    const err = Object.assign(new Error(e.type), { name: e.type, ...(e.code ? { code: e.code } : {}) });
+    log.warn(`db.connection_lost.${e.pool}`, { outcome: 'error', err });
+  });
   const config = loadConfig('auth', env);
   // POLY-150 R4: a delivery stand-in is a development-only argument; the process wrapper passes none, and a release image refuses one.
   if (deps.mailer && config.appEnv !== 'development') {

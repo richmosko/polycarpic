@@ -32,19 +32,24 @@ export interface Web {
 export const port3000Free = () => new Promise<boolean>((res) => { const s = net.createServer().once('error', () => res(false)).listen(3000, '0.0.0.0', () => s.close(() => res(true))); });
 export const freePort = () => new Promise<number>((res, rej) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => res(p)); }); s.on('error', rej); });
 
-/** A TCP forwarder in front of Postgres: `kill()` makes the database unreachable for a running web (existing sockets destroyed, new ones refused). */
-export interface DbProxy { port: number; kill: () => Promise<void> }
+/** A TCP forwarder in front of Postgres: `kill()` makes the database unreachable for good; `down()` does the same until `up()` listens again on the SAME port (a restart that the running web must ride out). */
+export interface DbProxy { port: number; kill: () => Promise<void>; down: () => Promise<void>; up: () => Promise<void> }
 export async function startProxy(host: string, port: number): Promise<DbProxy> {
   const socks = new Set<net.Socket>();
-  const server = net.createServer((c) => {
+  const make = () => net.createServer((c) => {
     const up = net.connect(port, host);
     for (const s of [c, up]) { socks.add(s); s.on('close', () => socks.delete(s)); s.on('error', () => s.destroy()); }
     c.pipe(up); up.pipe(c);
   });
+  let server = make();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const own = (server.address() as net.AddressInfo).port;
+  const down = async () => { for (const s of socks) s.destroy(); if (server.listening) await new Promise<void>((r) => server.close(() => r())); };
   return {
-    port: (server.address() as net.AddressInfo).port,
-    kill: async () => { for (const s of socks) s.destroy(); await new Promise<void>((r) => server.close(() => r())); },
+    port: own,
+    kill: down,
+    down,
+    up: async () => { if (server.listening) return; server = make(); await new Promise<void>((r, j) => server.once('error', j).listen(own, '127.0.0.1', () => r())); },
   };
 }
 

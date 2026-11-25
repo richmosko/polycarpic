@@ -4,6 +4,7 @@
 // because importing it runs Kit's server init.
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
+import { onConnectionLost } from '@poly/db/startup';
 import { init } from './startup.ts';
 import { guardConsole } from './ops/console.ts';
 import { startStatusServer } from './ops/status.ts';
@@ -11,6 +12,12 @@ import { startWebServer, type WebHandler } from './ops/server.ts';
 import { verifyZone } from './ops/zone.ts';
 
 const log = createLogger({ service: 'web' });
+
+// POLY-160 R5: a lost database connection is a warning, not a crash. The original error never leaves pool.ts (it carries the password).
+onConnectionLost((e) => {
+  const err = Object.assign(new Error(e.type), { name: e.type, ...(e.code ? { code: e.code } : {}) });
+  log.warn(`db.connection_lost.${e.pool}`, { outcome: 'error', err });
+});
 
 // Node's default crash dump prints own properties such as pg's `detail`, which quotes values. Log type and code only.
 const crash = (e: unknown): never => {

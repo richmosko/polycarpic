@@ -106,6 +106,16 @@ def _version_of(ctx, argv, env=None):
     return out.strip() if code == 0 and out.strip() else None
 
 
+def version_ok(ctx):
+    """True only when the pinned version is readable and both the root's and the render user's Compose equal it. Any failure, timeout or refusal in
+    asking is a mismatch (a recovery asks only to choose between a fresh render and the saved pair; it never refuses on the answer)."""
+    try:
+        want = pinned_version(ctx)
+        return want is not None and _version_of(ctx, []) == want and _version_of(ctx, ISOLATION[3:], _render_env(ctx)) == want
+    except Exception:
+        return False
+
+
 def check_compose_version(ctx, warn_only=False):
     """G10 (S40): `docker compose version --short` equals the pinned version, as root and as the render user with its own HOME. Different, unreadable
     or failing: the refusal `render-env` (alert, no quarantine), both versions on stderr, the fix named. A rollback only warns: the guard still
@@ -310,10 +320,12 @@ def verify(judged, project=None, digest=None):
     return judged
 
 
-def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore=False):
+def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore=False, keep=False):
     """Render (isolated), correct, judge, and require the fixed point in memory (the corrected bytes rendered once more on stdin); only then save
-    them beside their sha256 (G5). With `restore` (S36) a failed save is survivable: the saved pair is used when its hash holds and its bytes pass
-    the guard now. -> Judged."""
+    them beside their sha256 (G5). With `restore` (S36) a failed save is survivable: the saved pair is used when its hash holds, its bytes pass
+    the guard now and every service's `environment` in it equals the fresh render's. With `keep` (a recovery under a Compose that is not the pinned
+    one) the pair is never written: fresh bytes equal to the saved pair are used; anything else falls back to the saved pair under the same tests,
+    and a fresh render that cannot be made at all is a refusal. -> Judged."""
     if not render_user_ok(ctx):
         raise Refusal("render-user", code=4)
     policy = load_policy(ctx)
@@ -326,40 +338,70 @@ def judge(ctx, rdir, project, env_files, images, digest, bind_addr=None, restore
         raw, plain = renders(ctx, rdir, project, env_files)
     except RenderFail as f:
         raise render_refusal(ctx, project, f, edge_env)
-    corrected = correct(plain, policy, project, strict=False)  # the policy's own refusals come first; a stray empty number is `guard-render` after
-    check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
-    corrected = correct(corrected, policy, project)
-    data = canonical(corrected)
+    fresh = correct(plain, policy, project, strict=False)  # the policy's own refusals come first; a stray empty number is `guard-render` after
     try:
-        again = _json(ctx, stdin_render(ctx, project), stdin=data.decode("utf-8"), stage="stdin")
-    except RenderFail as f:
-        raise render_refusal(ctx, project, f, edge_env)
-    if canonical(correct(again, policy, project)) != data:
-        fail("render")
+        check(policy, project, raw, fresh, images, rdir, bind_addr, ctx=ctx)
+        corrected = correct(fresh, policy, project)
+        data = canonical(corrected)
+        try:
+            again = _json(ctx, stdin_render(ctx, project), stdin=data.decode("utf-8"), stage="stdin")
+        except RenderFail as f:
+            raise render_refusal(ctx, project, f, edge_env)
+        if canonical(correct(again, policy, project)) != data:
+            fail("render")
+    except Refusal:
+        if not keep:
+            raise
+        return _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr, fresh)
+    if keep:
+        path = render_path(ctx, project, digest)
+        if pair_ok(path) and _bytes(path) == data:
+            return Judged(project, digest, path, stored_sha(path))
+        return _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr, fresh)
     try:
         path = (save if restore else write_pair)(ctx, project, digest, data)
     except OSError:
         if not restore:
             raise Refusal("state")
-        return _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr)
+        return _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr, corrected)
     return Judged(project, digest, path, hashlib.sha256(data).hexdigest())
 
 
-def _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr):
-    """S36: the save failed. The saved pair serves only if its hash holds and its bytes, read back through the isolated stdin render, pass the guard now."""
+def _bytes(path):
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def same_environment(saved, fresh):
+    """The one comparison of a saved pair with a fresh render: every service's `environment`, key and value, in both. Anything else may differ."""
+    a, b = (saved or {}).get("services") or {}, (fresh or {}).get("services") or {}
+    if set(a) != set(b):
+        return False
+    return all(((a[n] or {}).get("environment") or {}) == ((b[n] or {}).get("environment") or {}) for n in a)
+
+
+def _saved_pair(ctx, project, digest, policy, raw, images, rdir, bind_addr, fresh):
+    """S36: the save failed, or a recovery under another Compose could not use its fresh render. The saved pair serves only if its hash holds, its bytes,
+    read back through the isolated stdin render, pass the guard now, and its `environment` values equal the fresh render's (else the refusal `state`)."""
     path = render_path(ctx, project, digest)
     if not pair_ok(path):
         raise Refusal("state")
-    with open(path, "rb") as fh:
-        data = fh.read()
+    data = _bytes(path)
+    if data is None:
+        raise Refusal("state")
     try:
         plain = _json(ctx, stdin_render(ctx, project), stdin=data.decode("utf-8"), stage="stdin")
-    except RenderFail:
+    except (RenderFail, UnicodeDecodeError):
         fail("render")
     corrected = correct(plain, policy, project)
     if canonical(corrected) != data:
         fail("render")
     check(policy, project, raw, corrected, images, rdir, bind_addr, ctx=ctx)
+    if not same_environment(corrected, fresh):
+        raise Refusal("state")
     return Judged(project, digest, path, stored_sha(path))
 
 
