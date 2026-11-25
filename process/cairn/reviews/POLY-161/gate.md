@@ -72,6 +72,18 @@ M3 (guard on traversal, case, `//`, absolute form, `__data.json`): crawl and nea
 - The db harness left six `poly83-qa-*` containers up after the gate and e2e runs (no vitest process was running); I removed them by exact name.
 - Containers now: none of mine running; `poly-treal` is stopped, not removed (image `polycarpic-qa161:ci` and the base stay local).
 
+## Suite time (web unit tier, the layer suite's 60 s cap is not raised)
+
+`pnpm --filter @poly/web test`, same machine, two runs each: `main` 180 tests, 6.9 s (vitest duration; 7.7 to 9.9 s wall). This branch 343 tests, 10.6 s (11.5 s wall). The layer suite's "web: its vitest tests run alone" case was 65.9 s at `44e93416` (it timed out at 60 s) and passes at `4971dc28` (the whole layers run took 21 s). What moved it: the real-time cases (10, 30 and 60 s limits, driven over sockets) are in `tests/db/web-server-limits.test.ts`, the db tier. What stays in the unit tier by file (parallel, longest first): `ops/zone.test.ts` 10.4 s (real UDP waits, late answers, retries), `ops/console.test.ts` 5.7 s (child processes), `ops/server.test.ts` 5.2 s (3 s idle case, 512 cap). The db tier gained about 70 s of wall time in `web-server-limits` (60 s of it the hung-handler timer), run serially after the parallel files.
+
+## F1 (build review): the one cookie
+
+On a dead handle `getSetCookie()` equals exactly the clearing line, all attributes, in the unit test, the db test and T-real. Every signed-out answer in the crawl (every method, every `__data.json`, public pages included) carries no `Set-Cookie`; unit rows say the same for six signed-out paths and a signed-in page, and that `event.cookies.set` is never called. The source test counts `set-cookie` occurrences (one), header appends (one) and refuses `cookies.set(`. Shown red on a build with `event.cookies.set` in the public branch (unit 5 red, db crawl 1 red) and, in unit, on a second `set-cookie` append; control: db `web-server.test.ts` 31 of 31 green.
+
+## F2 (build review): `**/.env*`
+
+`tests/infra/web-stage.test.ts` pins `.dockerignore` as patterns: `**/.env*`, `**/.svelte-kit`, `apps/web/build`, `apps/web/tests` present, the root-only `.env*` absent, no `.env` re-include; five mutants. It is red at `176f89b1` because devops-161's fix (`15a0832a`) is not on the branch yet.
+
 ## Not covered
 
 - B38 shown red (above). B35's "floors per side": the plugin writes one union, so a per-side floor needs a change in `bundle-packages.mjs` (devops); the test holds a total floor and the three plants.
