@@ -358,7 +358,7 @@ def on_interrupt(project, ctx, run):
     try:
         if not _mark_present(ctx, project):
             return
-        if run.get("loaded") and not run.get("cur"):
+        if run.get("loaded") and not run.get("cur") and not run.get("committed"):  # a committed release is healthy and current: never stopped
             stand_down(project, ctx, None)
         try:
             rel.alert(ctx, project, "interrupted")
