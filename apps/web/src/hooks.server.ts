@@ -1,7 +1,8 @@
 import { createLogger } from '@poly/config/log';
 import { NoLiveSession, sql, withSession } from '@poly/db';
 import { provisionPerson } from '@poly/tenancy';
-import type { Handle } from '@sveltejs/kit/hooks';
+import type { Handle, HandleServerError } from '@sveltejs/kit/hooks';
+import { PUBLIC_ROUTES } from './lib/public-routes';
 import { safeNext } from './lib/safe-next';
 
 // POLY-153 R7.2: web enters a transaction only by the handle cookie. BetterAuth's cookies are scoped to /api/auth and never reach it.
@@ -46,7 +47,9 @@ async function enter(handle: string) {
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 const isAuthTree = (p: string) => p === '/api/auth' || p.startsWith('/api/auth/');
-const isPublic = (p: string) => p === '/sign-in' || p.startsWith('/sign-in/') || p === '/sign-up' || p === '/healthz';
+// An exact set (POLY-161 R6), never a prefix. A page's data request (`<route>/__data.json`) is as public as the page.
+const DATA = '/__data.json';
+const isPublic = (p: string) => PUBLIC_ROUTES.has(p) || (p.endsWith(DATA) && p !== '/api/v1/health' + DATA && PUBLIC_ROUTES.has(p.slice(0, -DATA.length)));
 
 const SETUP_PATH = '/settings/second-step';
 const SETUP_PATHS = new Set([SETUP_PATH, `${SETUP_PATH}/__data.json`]);
@@ -98,4 +101,13 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.handle = handleValue;
   event.locals.secondStepRequired = entered.secondStepRequired;
   return signedInPage();
+};
+
+// A 500 logs the route id and the error's type and code, never a URL or a message; the browser gets Kit's fixed text (R5, C-33).
+export const handleError: HandleServerError = (input) => {
+  const { error, event, kind } = input;
+  // Kit 3 names the origin of the error instead of passing a status: an unknown error is a 500; the others carry their own.
+  const status = kind === 'unknown' ? 500 : ((error as { status?: unknown }).status as number | undefined) ?? 500;
+  if (status >= 500) log.error('web.error', { outcome: 'error', err: error, status, ...(event.route.id ? { route: event.route.id } : {}) });
+  return kind === 'unknown' ? { message: 'Internal Error' } : {};
 };
