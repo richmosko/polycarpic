@@ -69,3 +69,46 @@ H3 stays with POLY-165; the fix must not enable timers early nor make a first de
 | C28 | T-real: a deploy killed (SIGKILL) after `up`, with a Compose mismatch at the next poll, and one by SIGINT, on real Docker; time recorded. If the budget does not allow both: SIGKILL with the mismatch there, SIGINT on the harness, said so | Red on the unfixed code | Fakes only: what Docker leaves running is H1's whole point |
 
 **Accepted risk.** Two items may need one: C9's second form, and C1's residue (a restore that itself fails leaves the new release running, RED, mark kept, tried each poll; no attacker causes it from outside, it takes an interruption and a broken `current`). R-32 closes only when C1 to C12 are shown. A residue left gets its own row, with an approver on record first.
+
+---
+
+## Ruling review @ `54c3d44a`: **CHANGES 13**
+
+Read in full; nothing run. Held also to the lead's two decisions (C9's stop, C1's residue stopped). The shape is right: the mark kept by default, one commit point, recovery first. M6, M8 and M11 confirm by probe what I had only read.
+
+### Required
+
+| # | Ruling | Required change |
+|---|---|---|
+| 1 | R1.1, R1.2b-c, V "finished unwind" | **The lead's two stops, and C4.** After a restore that did not answer True (in `unwind` and in `recover`), or with no `current`, the never-healthy release's `web`, `auth` and `worker` are stopped, Postgres is not. Restore False with a `current`: RED, **mark kept** (R1.1 and the V row say cleared). No `current`: after a confirmed stop the mark may go; the rerun of `first-deploy` is not blocked. "No `current`" includes a first deploy that ends unhealthy without a cut. The stop: only `stop` (no `down`, `rm`, `-v`, `--remove-orphans`), renders nothing of an unjudged file, is read back as stopped, is retried next run if not, cannot stop a record. It stops what is not `current`'s: `current`'s own unhealthy containers stay. When it cannot tell which is which, it stops all three. Tests: the restore fails on tree, guard and health; the stop fails; Ctrl-C in the stop. Mutants: stop dropped; Postgres included; `current`'s stopped; mark cleared |
+| 2 | R1, edge | **Edge's Caddy is the edge release.** The gate names `edge-deploy`, so with edge's restore False, or no edge `current`, the candidate's Caddy is stopped too (edge state only; prod's Caddy on a failed prod restore goes to POLY-165 by name). Otherwise it stays running, and that needs an approver on record |
+| 3 | R1.2c, L2 | **The kept mark must have a way out where there is no `previous`** (staging's second deploy): `rollback` exits 4 there, so the project is stuck with nothing running. Smallest form I accept: after a failed `recover` a candidate whose digest differs from the mark's may go on (verify, guard, all as usual; its first `up` rewrites the mark). Any other tested way out is as good. The alert stays `rollback-unhealthy` until something is healthy |
+| 4 | C-b, C-c, C-d | **Not answered.** On a Compose mismatch: the restore does not overwrite `current`'s saved pair; when the render or the fixed point refuses, the saved pair serves only if its sha256 holds and its bytes pass the installed guard, else #1's stop. R1's test renders differently, not only a different version string. Without this, R1's own case can still end with the bad release up |
+| 5 | R2.4, R8 | **C12 is runbook text only.** `rollback` (project and edge) with the mark present runs `recover` first. Restored: say so, exit non-zero, nothing quarantined; a second `rollback` then does what it says. Not restored: go on to `previous`. After a good rollback the mark is cleared. Tests: mark present, the good digest not quarantined, both forms |
+| 6 | R2.4 | **C13, C15.** A `rollback` whose pointer write fails leaves `current` naming a digest it has just quarantined, with no mark: the next failed deploy restores it. An automatic restore refuses a pointer that is quarantined (named, RED, then #1). An **unreadable** quarantine file does not count as quarantined (G2's Q1 stays fixed) |
+| 7 | R1.2f | C7: `quarantine` adds no second line for the same digest and reason (g's unlink can fail) |
+| 8 | R1.3, V | C11: `edge-deploy` says on stderr that it recovered. V gains: same tag, lower tag, absent Release; no later alert hides `rollback-unhealthy`. C10: tampered tree of `current` with a mark |
+| 9 | S, V, pool | C20, C21: M13 to M15 are not reusable, and the unit test emits on a fake. In an existing db file: backend terminated inside `withSession` with no query in flight, and at COMMIT: the caller gets an error, the process lives, the next checkout has no identity. Red with the `connect` line removed |
+| 10 | R6 | C25: `CDPATH=` and `cd --` (with `CDPATH` set, `bash infra/provision.sh` can resolve elsewhere, as root). A test sets `CDPATH` |
+| 11 | R7 | C26: `-d` follows a link. Link, not root-owned, group- or other-writable, or not empty: refuse (provision) or fail the check (provision-check); only absence falls back to `/`. One test each |
+| 12 | S, C.7 | C28: no T-real case interrupts anything. Add SIGKILL after `up`, then a poll with a mismatched Compose, on real Docker, red on today's code; SIGINT may stay on the harness. Budget: 15 minutes against 7 min 38 s. The runbook's Ctrl-C line is run once (C27) |
+| 13 | R4.1, POLY-165 | On **prod** the pre-migration backup runs before `check-config`, so an unlimited retry makes a backup set every poll. No change for staging; filed on POLY-165 by name as before the first prod deploy, with a lift for R3's quarantine on prod |
+
+### Conditions met as ruled
+
+C1 (position), C2, C3, C5, C6, C8, C14, C16 (by L1), C17, C18, C19, C22, C23. C24: say that `migrate.ts`'s clients are out.
+
+### Section L
+
+1 no objection for staging, with #13's line. **2 objected: #3**, and "an ordinary unhealthy unwind does not block" gives way to #1. 3 no objection for staging, #13. 4 no objection; it is needed (#1's residue below). 5 no objection.
+
+### Section G
+
+No exemption to rule. Any edit to an existing assertion named there still comes to me at red. The three exposures:
+- **Two swallowed `error` events, nothing logged: accepted**, with a test that during an outage `auth` and `worker` each write an error line of their own (else a dead pool is silent where no health route shows it) and #9.
+- **Restore before the Compose check: accepted**, with #4 only.
+- **A malformed mark restoring `current`: accepted.** Kept until an operator removes it: the runbook names the exact command, and the alert names the file's reason.
+
+### A residue for an approver
+
+After a power cut, a kill or a dropped session in a **first** deploy or in `edge-deploy`, no poll exists, so the never-healthy release runs, also after a reboot, until the operator runs the command again; `status` is RED (R1.7). Ctrl-C may try #1's stop on its way out when there is no `current`; I ask for that, best effort. Reach: none from outside; it takes an interruption while an operator is at the keyboard. The gate's text allows it for `edge-deploy` ("the mark is kept"), not for the first deploy.
