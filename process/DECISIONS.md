@@ -1015,3 +1015,18 @@ Add new decisions ABOVE this comment, newest first.
 - Keep the test in `image` and wait for more CI timings before moving it.
 - Defer the checklist items to POLY-160 and merge on the first green run.
 **Approved by:** team-lead, under the Principal's delegation of 2026-11-24 ("If there are decisions to be made, I trust your judgement"); open to reversal.
+
+### 2026-11-25 — POLY-161: the release image serves the web app; four exposure and risk items accepted; loop decisions taken by the lead
+**Decision:** The Principal delegated POLY-161's decisions to the lead on 2026-11-25 ("authorization to go with your recommendation for any decision point") and asked for them in the closing summary; every item here is open to reversal. Records: `process/cairn/reviews/POLY-161/ruling.md`, `ruling-review.md` (P1 to P4), `build-review.md`, `verdict.md`.
+- **P1, exposure.** On prod anyone on the internet reaches the sign-in, sign-up, reset, second-step and cancel pages, the static files and health; on staging only the allowlist with basic auth. Accepted: it is the issue's purpose.
+- **P2, loss of service.** Anyone who reaches prod can fill web's 512 connections or the database pool, by fast requests or by slow connections (measured: a slow reader held a socket 160 s against web's 60 s timeout); health goes red and a deploy in its window rolls back. No disclosure. Accepted for this loop, which deploys nothing; **prod is not opened to the internet before POLY-163** (edge limits at Caddy: rate, a stricter bucket for handle cookies, read and write timeouts, a per-address connection cap).
+- **P3, build tools shape shipped code.** Vite and the Svelte compiler run at build and write the code that handles sessions. Accepted: a built Svelte app cannot ship otherwise. The build stage has no network, and that may not be dropped without a new decision by the Principal; the bundle's package list is compared with a committed list.
+- **P4, the zone check (C-76).** Start is refused only when two public resolvers both answer NXDOMAIN; a forger on the box's network path can keep web down at its next start and gain nothing else; each start tells two DNS operators the domain and the box's address. Accepted.
+- **Also decided:** the open redirect in `safeNext` is fixed in this loop as a blocker; a real sign-in and a signed-in page join the end-to-end deploy test; `main.ts` imports the build through one alias under one exact exemption in the layer guard, with no lint exemption; the `db` CI job also runs on web source changes; the 60-second cap on web's unit tests stays and real-timer tests moved to the db tier; the missing pool error listener (a database restart takes web, auth and the worker down until compose restarts them) goes to POLY-160 as a gate before the first staging deploy.
+**Why:** The issue exists to serve the app, so P1 is its purpose. P2 was offered as "accept for the milestone" by both reviewers; a dedicated issue that prod waits on costs this loop nothing and removes the reliance on memory. P3 has no alternative. For P4, one wrong or filtering resolver stopping every start is the greater harm.
+**Alternatives considered:**
+- A rate limiter inside this loop (a compiled-in Caddy module, its own security review).
+- One resolver for the zone check, so a single answer refuses a start.
+- Fixing the pool error listener here, which widens the loop to the shared database package and a backend builder.
+**Approved by:** team-lead, under the Principal's delegation of 2026-11-25; open to reversal.
+
