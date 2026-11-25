@@ -30,7 +30,7 @@ const NAME = 'Qa Person Onesixone';
 const cookie = () => `${HANDLE_COOKIE}=${handle}`;
 
 beforeAll(async () => {
-  web = await startWeb();
+  web = await startWeb({ proxy: true });
   must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${userId}', '${NAME}', 'qa161@qa.test', true)`, web.db);
   handle = sessionWithHandle(web.db, userId).handle;
 }, 120_000);
@@ -306,6 +306,30 @@ describe('A8: nothing of the request in the logs', () => {
   it('a control line from the same logger is seen, so an empty sweep cannot pass  [red if: the capture is blind]', () => {
     expect(web.lines().some((l) => l.event === 'web.started')).toBe(true);
   });
+});
+
+// POLY-160 R5 (C20): the database goes away and comes back under a running web: the process lives, health says so, and nothing it prints carries the password.
+// [red if: the pool's 'error' or per-client 'error' line is removed: the process ends with an unhandled error; a cached health answer]
+describe('the database restarted under a running web (POLY-160 R5)', () => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  it('health 200, database down: 503, database up on the same port: 200 again; same pid, no process.crash, a bounded log, the password in no output  [red if: survive() is removed from a pool]', async () => {
+    const pid = web.proc.pid;
+    expect((await ask('/api/v1/health')).status).toBe(200);
+    const before = web.lines().length;
+    await web.proxy!.down();
+    await wait(5500); // the health memo
+    expect((await ask('/api/v1/health')).status).toBe(503);
+    expect((await ask('/sign-in')).status).toBe(200);
+    await web.proxy!.up();
+    let status = 0;
+    for (let i = 0; i < 30 && status !== 200; i++) { status = (await ask('/api/v1/health')).status; if (status !== 200) await wait(2000); }
+    expect(status).toBe(200);
+    expect(web.proc.pid).toBe(pid);
+    expect(web.proc.exitCode).toBeNull();
+    expect(web.lines().filter((l) => l.event === 'process.crash')).toEqual([]);
+    expect(web.lines().length - before).toBeLessThan(40); // a bounded number of lines over the outage
+    expect(web.out()).not.toContain('qa-poly_app');
+  }, 120_000);
 });
 
 describe('B15, A8, B21: the database failing under a running web (last: the faults stay)', () => {
