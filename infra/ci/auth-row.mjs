@@ -30,9 +30,9 @@ export const ROWS = {
   ],
 };
 
-// vitest reports a failing `it.fails` as `passed`, so the sources are read too: `.fails` on it/test/describe, chains included,
-// and the `fails:` option.
-const FAILS = [/\b(?:it|test|describe)(?:\s*\.\s*\w+)*\s*\.\s*fails\b/, /\bfails['"]?\s*:/];
+// vitest reports a failing `it.fails` as `passed`, so the sources are read too: any `.fails` property (a chain may hold a call,
+// as in `it.runIf(x).fails`) and the `fails:` option.
+const FAILS = [/\.\s*fails\b/, /\bfails['"]?\s*:/];
 
 export function check(mode, { root, reportPath }) {
   let report;
