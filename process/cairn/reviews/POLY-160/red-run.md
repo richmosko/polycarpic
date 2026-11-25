@@ -80,3 +80,13 @@ Written, **not run here**: T-real needs Linux, root and Docker (`deploy-real` jo
 | `1-web-served.test.ts` "T-real 1c" | `poly_app`, `poly_auth`, `poly_worker` all connected (90 s, never skipped); `docker restart` of the Postgres container; health 200 within 60 s; `StartedAt` and `RestartCount` of web/auth/worker unchanged 15 s later; no `process.crash`; the worker's next `job.run` is ok; no password in the logs | without `survive()` the client's unhandled error ends the process and Docker restarts it |
 
 **Deviation from the ruling (S):** the `db.connection_lost.*` lines of the three services are not asserted. A client idle at the restart is dropped by the pool without a line (R5's `survive`); only a checked-out one reports, and an outside test cannot decide which it was. The unit and database cases cover the reported path.
+
+## T-real, local (privileged Ubuntu container with its own Docker, `POLY-100/treal-local-container.md`), tip `88482c31`
+
+| Run | Result |
+|---|---|
+| unmutated tree | 4 files, 26 tests green, 412 s (6 min 52 s; CI's 7 min 38 s at M17 is the CI figure to compare) |
+| mutant: `check_compose_version` moved back above `recover` in `deployer._deploy_checked` | C28 red: "no mark is left: expected 'sha256:…' to be null"; 18 passed, 1 failed (bail 1) |
+| mutant: `survive()` returns at once, web image rebuilt from the mutated `pool.ts` | the restart case red: "StartedAt and RestartCount of the three are unchanged"; 16 passed, 1 failed |
+
+Both mutations were made on a scratch copy (container tree, and a temporary edit of `pool.ts` reverted before any commit).
