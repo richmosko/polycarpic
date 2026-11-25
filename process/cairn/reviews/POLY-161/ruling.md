@@ -153,4 +153,6 @@ Test rows, refused: the measured four, `/\0/evil.example`, `/x/..//evil.example`
 
 **R15 CSP on every HTML answer (S3).** Measured: the 500 page has no CSP header, because Kit's static error page does not go through it. `apps/web/src/lib/csp.ts` (frontend) holds C-07's directives once; `vite.config.ts` reads them, and `server.ts` sets them as the default header before the handler, which Kit's own (with its nonce) replaces. `(unmeasured: the replacement)`. The `deploy` key gains `csp.ts`, `bundle-packages.ts` and `infra/ci/bundle-packages.mjs`.
 
+**Owners.** Product: S3 (R15), S5 and S8 frontend; S9 devops. Tests and measurements: S1 to S8 and S10 qa; S9 devops's `image.sh check` with qa's Dockerfile cases. P3: `--network=none` may not be dropped; R1's "brings the error to the lead" goes on to the Principal. P2's gate is the list in seceng's "The gate on R4's residual".
+
 **S6, S7** are measured by qa before the gate. If S7 does not fit 384m, the cap comes down, not the memory up; the number comes back to me once.
