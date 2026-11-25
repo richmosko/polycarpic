@@ -605,3 +605,60 @@ describe('H13 and H15 (R4, R6)', () => {
     expect(find(r.out, 'PASS', 'H15')).toBeDefined();
   });
 });
+
+// POLY-160 R6 (box half): the script finds its own directory before it leaves it, whatever the working directory, the spelling of its path or CDPATH.
+// A planted /deploy/compose-version (what `cd /` plus a relative dirname resolves to) says 9.9.9: a run that reads it stops on "does not list ...", or prints 9.9.9.
+// [red if: `here=` is resolved below `cd /`, or `unset CDPATH` is removed]
+describe('POLY-160 R6: relative invocations and CDPATH reach the script\'s own files', () => {
+  const variants: Array<[string, string]> = [
+    ['bash provision.sh from infra/', 'cd /repo/infra && bash provision.sh'],
+    ['bash ./provision.sh from infra/', 'cd /repo/infra && bash ./provision.sh'],
+    ['bash infra/provision.sh from the repo root', 'cd /repo && bash infra/provision.sh'],
+    ['bash provision.sh from infra/ with CDPATH set', 'cd /repo/infra && CDPATH=/:/repo bash provision.sh'],
+    ['bash infra/provision.sh from the repo root with CDPATH set', 'cd /repo && CDPATH=/:/repo/infra bash infra/provision.sh'],
+  ];
+  for (const [name, cmd] of variants) {
+    it(`${name}: the host stage reads the real infra/deploy/compose-version and ends 0`, () => {
+      const r = run(`mkdir -p /deploy; echo 9.9.9 > /deploy/compose-version; ${cmd} ${HOST_ARGS} > /tmp/p.out 2>&1; echo "rc=$?"; tail -5 /tmp/p.out`, { image: HOST });
+      expect(r.out, r.out).toMatch(/rc=0/);
+      expect(r.out).not.toContain('9.9.9');
+      expect(r.out).not.toMatch(/does not hold one version|does not list/);
+    });
+  }
+});
+
+// POLY-160 R7 (box half): the render home is used only as a real, empty, root-owned 0755 directory; absent is `/`; a link or a directory holding `.env` is `/` and H24 FAIL.
+// The fake docker logs its argv; every compose call the check makes names --project-directory and --env-file /dev/null.
+// [red if: the fallback is removed; the link or content check is removed; a call lacks --env-file /dev/null]
+describe('POLY-160 R7: the render home the check hands to compose', () => {
+  const HOME = '/var/lib/polycarpic/state/deploy/render-home';
+  const calls = (setup: string) => {
+    const r = run(`${b2Fixture({})}\n${setup}; : > /var/fake-state/calls.log; ${CHECK} > /tmp/c.out 2>&1; grep -E 'compose' /var/fake-state/calls.log | grep -E 'project-directory' || true; echo '---'; grep -E 'H24' /tmp/c.out; echo '---'; grep -E '^FAIL D1 ' /tmp/c.out`, { image: COMPLETE });
+    const [argv, h24, d1] = r.out.split('---');
+    return { argv: (argv ?? '').split('\n').filter(Boolean), h24: h24 ?? '', all: r.all + (d1 ?? '') };
+  };
+  const dirsOf = (argv: string[]) => argv.map((l) => /--project-directory (\S+)/.exec(l)?.[1]);
+  it('no render home: every compose call names `/` and --env-file /dev/null', () => {
+    const c = calls(`rm -rf ${HOME}`);
+    expect(c.argv.length, c.all).toBeGreaterThan(0);
+    expect(new Set(dirsOf(c.argv))).toEqual(new Set(['/']));
+    for (const l of c.argv) expect(l).toContain('--env-file /dev/null');
+  });
+  it('a real, empty, root-owned 0755 render home is used as it is', () => {
+    const c = calls(`rm -rf ${HOME}; install -d -m 0755 -o 0 -g 0 ${HOME}`);
+    expect(new Set(dirsOf(c.argv)), c.all).toEqual(new Set([HOME]));
+  });
+  it('a link in its place: it is never handed to compose, H24 fails naming it and the database checks FAIL (they do not wait)', () => {
+    const c = calls(`rm -rf ${HOME}; ln -s / ${HOME}`);
+    expect(dirsOf(c.argv).filter((d) => d !== '/'), c.all).toEqual([]);
+    expect(c.h24).toMatch(/FAIL H24/);
+    expect(c.h24).toContain('render-home');
+    expect(c.all).toMatch(/FAIL D1 /);
+  });
+  it('a render home holding `.env`: never handed to compose, H24 fails', () => {
+    const c = calls(`rm -rf ${HOME}; install -d -m 0755 -o 0 -g 0 ${HOME}; echo X=1 > ${HOME}/.env`);
+    expect(dirsOf(c.argv).filter((d) => d !== '/'), c.all).toEqual([]);
+    expect(c.h24).toMatch(/FAIL H24/);
+    expect(c.all).toMatch(/FAIL D1 /);
+  });
+});

@@ -48,3 +48,16 @@ The signal test installs its own raising handlers first, so a build with no hand
 | `test_deploy_hang.py` leftover mark: first half plus `current == x2` and the mark gone; second half on `x3`, no candidate offered, then offered; the tool writes `interrupted`, exactly one quarantine line `interrupted` for `x3`, no `up` names `x3`, `current` x2, mark gone | green today (the rule is unchanged; the fixture no longer plants a mark on the running digest) | the record never quarantines; the first time quarantines; `interrupted` not written; the mark unlinked before the record |
 
 Key for (b): `restart` on `web` (candidate and old release both pass the guard; `labels` and `healthcheck` do not: `guard-key`, `guard-pinned`). `test_deploy_s36_env.py` uses it too.
+
+## R6 and R7 box half (`tests/infra/provision/host.test.ts`, describes "POLY-160 R6" and "POLY-160 R7")
+
+Run in the dry-run box twice: with `provision.sh` and `provision-check.sh` as they were at `7613d4e9` (restored after), and with devops-160's build in the tree.
+
+| Case | `7613d4e9` scripts | build in the tree |
+|---|---|---|
+| R6, five invocations (`bash provision.sh`, `./provision.sh`, `infra/provision.sh`, each also with `CDPATH` set; `/deploy/compose-version` planted with a wrong version) | 5 of 5 red | 5 of 5 green |
+| R7 no render home: every compose call names `/` and `--env-file /dev/null` | red | green |
+| R7 a good home is used as it is | green (positive guard; mutant: the fallback or the home dropped) | green |
+| R7 a link; a home holding `.env`: never handed to compose, H24 FAIL names it, D1 FAIL (not WAIT) | red, red | green, green |
+
+The R6 test reaches the first file read through `install_units` as well as `install_compose`: the box already has Docker, so `install_compose` is not reached by the host stage on its own; the script dies on a resolved-to-`/` read either way. `provision.sh --stage database` stopping on `render-path` is not tested here (it needs the Postgres derivative: `tests/infra/provision/pg.ts`); it is left for the database-stage run at the gate.
