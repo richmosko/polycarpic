@@ -17,7 +17,7 @@ describe('R6: provision.sh resolves its own directory once, before it leaves it'
     expect(uses).toHaveLength(1);
     const at = uses[0]![1];
     const cdroot = idx(provision, /^cd \/( |$)/);
-    const unset = idx(provision, /^unset CDPATH\s*$/);
+    const unset = idx(provision, /^unset CDPATH\b/);
     expect(unset, 'unset CDPATH at top level').toBeGreaterThan(-1);
     expect(unset).toBeLessThan(at);
     expect(at).toBeLessThan(cdroot);
@@ -44,7 +44,8 @@ describe('R7: every compose call names the render home variable and no env file'
     });
   }
   it('both scripts choose `rh` from the render home only when it is a real, empty, root-owned 0755 directory, else `/` or a stop', () => {
-    expect(provision.join('\n')).toMatch(/rh=\//);
+    expect(provision.join('\n')).toMatch(/rh=\$\(render_home\)/);
+    expect(provision.join('\n')).toMatch(/render_home\(\) \{/);
     expect(check.join('\n')).toMatch(/rh=\//);
     expect(provision.join('\n')).toContain('render-path');
     expect(check.join('\n')).toContain('H24');
