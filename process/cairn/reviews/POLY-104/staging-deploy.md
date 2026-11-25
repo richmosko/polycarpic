@@ -53,4 +53,18 @@ With operator tool `git-84dc7374d08f`:
 
 ## Doc corrections (INFRA)
 
-Not yet landed.
+Landed in INFRA 1.3.33 (the run is still in progress; steps not yet run are unchanged except where the code settles them).
+
+| Where | Correction | From |
+|---|---|---|
+| §2.1 Machine and DNS rows; D-2 | the web ports answer on IPv4 only; `A` records and no `AAAA` | F7 |
+| §2.3 volumes | `caddy` and `caddy-config`: owner, mode, who makes them, why before Caddy starts | F6 |
+| §7.1 step 8; the later `dns-check.py` lines | `dns-records.py` and `dns-check.py` without `--ipv6`; the `AAAA` lookup shows nothing | F7 |
+| §7.1 step 9 | the console has no scrollback; what to do with an unverified host key | F1 |
+| §7.1 step 11 | the three edge flags, `edge.env` and H19 | F4, F5 |
+| §7.1 step 11 | `install.sh` ships the checkout the script is in; the line a signal-ended stage prints | F2, F3 |
+| §7.1 step 11 | H18 and H22 wait on a new box | box result |
+| §7.1 step 13 | a staging run never starts Caddy (code: a staging run neither renders nor starts the edge project) | code |
+| §7.1 step 15 | 22, 80 and 443 on IPv4, 22 only on IPv6; the IPv6 scan takes the server's address | F7 |
+| §8 command table, `provision` | `--b2-endpoint` and the three edge flags | F5 |
+| Open questions | OQ-INFRA-12 (host key), OQ-INFRA-13 (web on IPv6) | F1, F7 |
