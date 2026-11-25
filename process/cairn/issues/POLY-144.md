@@ -4,7 +4,7 @@ title: In-app instance invite
 status: backlog
 milestone: POLY-1.0
 parent: null
-blocked_by: [POLY-89, POLY-137, POLY-142, POLY-150, POLY-151]
+blocked_by: [POLY-89, POLY-137, POLY-142, POLY-150, POLY-151, POLY-166]
 assignee: null
 labels: [story, auth]
 priority: null

@@ -15,3 +15,5 @@ ga: false
 **Stories:** POLY-107 (ledger core), POLY-108 (custodial accounts), POLY-130 (secrets seam: seal, open, bound opener; gap filed 2026-11-09), POLY-64, POLY-65, POLY-109 (hash chain + verifier), POLY-110 (export with ledger fingerprint), POLY-63 (in that order: the dashboard needs posted entries to show). With POLY-M1 this is the first Implement slice (Principal, 2026-11-06).
 
 **Hash chain (Principal, 2026-11-07):** the per-entity ledger hash chain and its weekly verifier ship with the ledger (SECURITY C-24, docs/ARCH §3.2.9); its issue is POLY-109, and the export that carries the head is POLY-110.
+
+**From POLY-M1 (regroup of 2026-11-25):** POLY-166 (per-entity second-step lock; designed in POLY-91's ruling, built here before POLY-110 makes shared entities common). POLY-63 is blocked by POLY-133 (the shell's entity selector, POLY-M1). POLY-107 needs only done issues, so this milestone can start before POLY-M1 closes.

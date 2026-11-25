@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-20
+updated: 2026-11-24
 ---
 
 A raise to manager or owner for an unenrolled member is parked on membership.pending_role while they keep viewer access, and promoted only by app.promote_held_roles() at enrolment (ARCH §3.1c; SECURITY A-25; DESIGN Waiting for second step).
@@ -68,3 +68,7 @@ Applies to a user who holds owner or manager on a shared entity but has no secon
 ### @team-lead — 2026-11-20
 
 seceng-150's assessment of the per-entity gate from the POLY-150 loop is at `process/cairn/reviews/POLY-91/seceng-per-entity-gate.md`. Option (a), the single redirect, was built in POLY-150. Option (c), `app.has_role` refusing manager and owner rights on a shared entity while the user has no second step, is the work for this issue (guessed $60 to $80). Never (b), per-loader checks, on its own.
+
+### @team-lead — 2026-11-24
+
+**Scope cut by the Principal, 2026-11-25** (`process/DECISIONS.md`): this issue builds the held raise and the two 0013 fixes (N4 and the narrowed policy), which are POLY-M1's definition of done. The per-entity second-step lock placed here on 2026-11-19 is built in its own POLY-M2 issue, blocked by this one and blocking POLY-110 and POLY-144. **The ruling for this issue still designs both as one mechanism,** as the Principal asked, so the lock's issue builds to it with no second design. The comments above about the lock and its greyed-out state are that issue's sources. Preferred before POLY-129 (N4: an invited viewer is otherwise marked accepted without the raise).

@@ -20,6 +20,8 @@ ga: false
 
 **Close:** POLY-106 (M1 integration check, ARCH §11).
 
-**Regrouped 2026-11-25** (Principal; `process/DECISIONS.md`): POLY-92 moved to POLY-1.2, POLY-93 to POLY-1.0, POLY-94 to POLY-1.1, POLY-103 and the prod gates to POLY-M6 (Production readiness), POLY-131 and POLY-143 to POLY-D. The definition of done above is unchanged; it ends at staging.
+**Targets** (set 2026-11-25; the lead's estimate checked by the architect, unmeasured): staging healthy by 2026-11-29; POLY-104 closed about 2026-12-02 (it carries over 25 measurements); milestone closed by POLY-106 on 2026-12-05. Critical path: POLY-160 (staging gates) and POLY-101, POLY-104, POLY-88's staging proof, POLY-106. Beside it: POLY-90, POLY-91, POLY-129 (design first), POLY-133, POLY-134, POLY-105. The dates need from the Principal: the release signing key and the signed tag, DNS, the Resend keys, and the Google and GitHub OAuth apps registered by about 2026-12-01.
+
+**Regrouped 2026-11-25** (Principal; `process/DECISIONS.md`): POLY-92 moved to POLY-1.2, POLY-93 to POLY-1.0, POLY-94 to POLY-1.1, POLY-103 and the prod gates to POLY-M6 (Production readiness), POLY-131 and POLY-143 to POLY-D; POLY-160's prod and real-data gates to POLY-165 (POLY-M6); the per-entity second-step lock out of POLY-91 to POLY-166 (POLY-M2). The definition of done above is unchanged; it ends at staging.
 
 **Filing rule:** a follow-up is filed in the milestone whose gate it serves, never in the milestone of the loop that found it. This milestone takes a new issue only if its definition of done cannot be met without it; anything else is filed as a later milestone's issue, or in POLY-D if it is tooling.
