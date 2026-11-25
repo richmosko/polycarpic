@@ -11,9 +11,12 @@ def staging_ups(world):
     return [c for c in world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"]
 
 
-class RecoverFirst(Hang):
+class RecoverBase(Hang):
     def plant_mark(self, digest):
         self.host.write("%s/staging/in-progress" % SDIR, digest + "\n")
+
+
+class RecoverFirst(RecoverBase):
 
     def test_a_mark_with_a_different_compose_restores_the_old_release_before_render_env(self):
         """mutant: the strict Compose check moved back above `recover`"""

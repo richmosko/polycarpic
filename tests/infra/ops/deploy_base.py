@@ -147,6 +147,7 @@ class World(object):
         self.docker_log, self.unhandled, self.pulled = [], [], []
         self.cids = {}
         self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
+        self.stopped_names, self.stop_log, self.stop_fail = set(), [], set()  # POLY-160: plain `docker ps -q` / `inspect <cid>` / `stop`; stop_fail holds cids, ("ps", proj, svc) or "stop"
         self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
@@ -383,6 +384,27 @@ class World(object):
             return 0, "", ""
         if sub == "compose":
             return self._compose(argv, stdin)
+        if sub == "ps" and "-q" in argv:  # POLY-160 R1.2: stand_down lists by compose labels, plain Docker
+            flt = [argv[j + 1] for j, a in enumerate(argv) if a == "--filter"]
+            lab = dict(f.split("=", 1)[1].split("=", 1) for f in flt if f.startswith("label="))
+            proj, svc = lab.get("com.docker.compose.project"), lab.get("com.docker.compose.service")
+            c = self.containers.get(proj, {}).get(svc)
+            self.stop_log.append(("ps", proj, svc))
+            if c is None or c["name"] in self.stopped_names or ("ps", proj, svc) in self.stop_fail:
+                return (1, "", "FAKE: ps failed\n") if ("ps", proj, svc) in self.stop_fail else (0, "", "")
+            return 0, "cid-%s\n" % c["name"], ""
+        if sub == "inspect" and len(argv) > 2 and argv[2].startswith("cid-"):
+            c = self.by_name.get(argv[2][4:])
+            if c is None:
+                return 1, "[]", self.inspect_missing_msg
+            return 0, json.dumps([{"Id": argv[2], "Config": {"Image": c["image"]}, "State": {"Status": "running"}}]), ""
+        if sub == "stop":
+            cid = argv[-1]
+            self.stop_log.append(("stop", cid))
+            if cid in self.stop_fail or "stop" in self.stop_fail:
+                return 1, "", "FAKE: cannot stop\n"
+            self.stopped_names.add(cid[4:])
+            return 0, cid + "\n", ""
         if sub == "inspect" and "inspect" in self.hang and self.hang_from < len(self.up_marks) <= self.hang_from + (10 ** 9 if self.hang_through else 1):
             raise TimeoutError("inspect")
         if sub == "inspect":
@@ -568,6 +590,7 @@ class World(object):
         c = {"name": name, "image": ref}
         self.containers.setdefault(project, {})[svc] = c
         self.by_name[name] = c
+        self.stopped_names.discard(name)  # an `up` starts it again
 
     def run_bytes(self, argv, stdin, timeout, env):
         self.runner._rec("run_bytes", argv, stdin, timeout, env)
