@@ -142,7 +142,8 @@ describe('auth-row.mjs: required titles', () => {
   });
   it('one TLS mode only, run twice -> red (the other mode never ran)', () => {
     const res = change(good('db'), RP, 1, { ancestorTitles: [MODES[0]!] });
-    red(run('db', res), MODES[1]!);
+    // The reason must say the other mode ran 0 times: a script that ignores the describe is also red, but counts the one title twice.
+    red(run('db', res), `required test passed 0 times, not 1: ${MODES[1]} > ${LIVE}`);
   });
   it('a required title that is only a prefix match -> red', () => {
     red(run('db', change(good('db'), RP, 0, { title: LIVE.split('  [')[0]! })), RP, LIVE.slice(0, 60));
