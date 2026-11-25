@@ -131,3 +131,12 @@ Each mutant is one text edit of `infra/ops/**`, made on a scratch copy in this w
 **Red on the build and not a mutant row:** `EdgeRows…allowlist_changed_since_under_the_pinned_compose…` (devops-160 has it: edge's restore under a pinned Compose with a changed environment value does not come up; staging's twin is green).
 
 **Not mutated** (named, per B5): `settle`'s step list (R2.2), `clear_transient` raising, the position of `check_edge_env`, of `rel.token` and of the unmounted-volume check relative to `recover`, edge's tree check, status 08's conditions, `provision*.sh` (the box tests were run on the old scripts instead), R4.1 per service, `rel.log` after `up`. Their tests exist and were red on the base; the mutant run of each is owed.
+
+## B7 and B6's T-real lines, local container, tip `db8cf1c5`
+
+| Run | Result |
+|---|---|
+| unmutated | 27 / 27 green, 502 s (8 min 22 s): the three services' own `db.connection_lost.<pool>` lines, B7's stop on real Docker and the recovery after it |
+| mutant: `stand_down` replaced by `stopped = True` after a failed recovery restore | B7 red: "web is stopped: expected 'Up Less than a second (health: starting)' to match /^Exited/"; 19 passed, 1 failed (bail 1) |
+
+`tests/infra/ops` at `6bc343e9`: 633 tests, 0 failed.
