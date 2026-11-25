@@ -1,12 +1,12 @@
 # POLY-160a ruling: deploy follow-ups (staging gates only)
 
-Architect. Read at `d07cd4a1`. Scope: the Principal's cut (last scope comment of `POLY-160.md`). H3, H6's glob, H7, H8, H10, U1–U3 are POLY-165's.
+Architect. Read at `d07cd4a1`. Scope: the Principal's cut (last scope comment of `POLY-160.md`). H3, H6's glob, H7, H8, H10, U1–U3 are POLY-165's. Re-issued whole to answer seceng's conditions (`ruling-review.md` @ `c5858550`) and the lead's two decisions.
 
 ## M. Measured
 
 Probes ran on the existing harness (`tests/infra/ops`, fakes for Docker and GitHub), `python3 -W ignore temp/probe_h.py`; the pool on a real local Postgres 17 with
 `pg_ctl -m fast restart` (pg 8.23.1, pg-pool 3.14.0; Node 26 here, the image's Node not used). No containers. The probes live in my worktree's `temp/` and are not evidence qa may reuse: qa writes its own red.
-Two of my first commands were refused as too complex by the worktree guard; I split them (files with the Write tool, each command alone).
+Some of my commands were refused as too complex by the worktree guard; I split them (files with the Write tool, each command alone).
 
 | # | Case | Today |
 |---|---|---|
@@ -24,145 +24,197 @@ Two of my first commands were refused as too complex by the worktree guard; I sp
 | M12 | `check-config` times out | `refused check-config`, **quarantined** |
 | M13 | pool, no listener: idle / checked out / in a query | process dies, all three |
 | M14 | `pool.on('error')` alone | idle survives; checked out and in-query still die |
-| M15 | M14 plus `pool.on('connect', c => c.on('error', …))` | all three survive; in-flight query rejects `57P01`, the next on that client rejects "not queryable", the pool drops it and the next `pool.query` works |
+| M15 | M14 plus `pool.on('connect', c => c.on('error', …))` | all three survive; the in-flight query rejects `57P01`, the next on that client rejects "not queryable", the pool drops it and the next `pool.query` works |
 | M16 | `docker compose --project-directory /nonexistent … ps`, `ps -q`, `exec -T` (5.7.0, macOS) | same exit and text as `/`: H6's doubt does not reproduce. On the box's 5.7.1: (unmeasured) |
 | M17 | CI `deploy-real`, run 45538719357 (2026-11-25) | 7 min 38 s wall of a **15-minute** limit; it is its own job, no longer the image job |
 
-By reading, not run: `state/deploy` files are written with no `fsync`, and a new name is not covered by ext4's replace-via-rename flush, so a power cut can lose or empty the mark (M6 is what an empty one does).
+By reading, not run: `state/deploy` files are written with no `fsync`, and a new name is not covered by ext4's replace-via-rename flush, so a power cut can lose or empty the mark. Plain `docker stop` on `unless-stopped` containers staying stopped over a reboot: Docker's documented behaviour (unmeasured).
 
 ## R. The ruling
 
-Build order: **R1, R2, R3, R4** (one sequence, same functions, one commit each), then R6, R7; R5 independent.
+Build order: **R1, R2, R3, R4** (one sequence, same functions, one commit each), then R6, R7; R5 independent. "Mark" is `in-progress`.
 
-### R1 (H1) the mark is kept by default; recovery comes first — `lib/deployer.py`, `lib/edge.py`, `lib/release.py`, `status/08_deploy.py`
+### R1 (H1) the mark is kept by default; recovery comes first — `lib/deployer.py`, `lib/edge.py`, `lib/release.py`, `lib/compose_guard.py`, `commands/rollback.py`, `status/08_deploy.py`
 
-1. **Three places clear `in-progress`:** the end of a finished `unwind` (quarantine line on disk; as today, whether or not the restore was healthy, so a fix-forward is never blocked) and the end of `settle` (R2); the end of a good `recover`. The two `finally` blocks that unlink it, and `run["held"]`, are removed. Nothing else clears it, so Ctrl-C, `SystemExit` and a raise inside the unwind keep it.
-2. **`recover(project, ctx, cur)`** replaces `_handle_interrupted`. Order inside:
-   a. mark absent (`FileNotFoundError` only) → return. Present, whatever it holds or whether it can be read, means interrupted.
-   b. with a `cur`: restore it (`restore`, or `edge.restore`), `except Exception` → not ok. With no `cur` nothing is restored (the rerun of `first-deploy` tries again, as today). **No write, log, alert, token, network or Compose-version call precedes the restore.**
-   c. not ok → alert and log `rollback-unhealthy`, each in its own `try`; stderr; `_Stop(1)`; mark kept.
-   d. mark unreadable or not one digest → `Refusal("state")`, mark kept (restored every poll until the operator removes the file; a no-op `up`).
-   e. mark names `cur` → `settle` (R2); no `interrupted`, no quarantine. Settle fails → `_Stop(1)`, mark kept.
-   f. else alert `interrupted` and log, each in its own `try`; then the record: second time for this digest → quarantine, first → `interrupted` file. **The record not on disk → stderr, `_Stop(1)`, mark kept** (else a full disk retries the candidate every poll).
-   g. unlink the mark.
-3. **Position.** `_deploy_checked`: `require_data_mount` → load `current` → `recover` → then today's order: Compose version (strict), token, `tokenexp`, `previous`, `transient-since`, the rest. `edge._run`: `owned_by_prod` → `require_data_mount` → load `current` → `recover` → `check_edge_env`, Compose version, `previous`, the rest. The data mount stays first (F13: restoring onto an unmounted volume starts a fresh cluster); so does `ensure_shared` (a loosened state directory means the pointers cannot be trusted). A damaged `current` is `state`: there is nothing safe to restore.
-4. **The work directory** is made after `recover` (inside the run's handler, path kept in `run["work"]`, removed in `locked`'s and `edge.deploy`'s `finally`), so M4 is `internal` with the restore done. `rel.clear_incoming` may stay first (it ignores errors).
-5. **On any non-`Exception` leaving `locked` / `edge.deploy` with the mark present:** best-effort `alert interrupted`, stderr `deploy: interrupted; run the same command again`, re-raise. The wrapper is outside every other handler, so a Ctrl-C inside the unwind is covered too.
-6. **`rel.write` fsyncs the temp file before `os.replace`, and the directory after it, the directory's `OSError` ignored** (a raise after the replace would report a written file as unwritten).
-7. **`status` 08:** mark present, no `alert`, and (project is `edge`, or no `current`) → RED `interrupted or running; run the command again`. Nothing polls those two. `alert` still wins; a project with a `current` and a timer is unchanged.
+**Decided by the lead.** (D1) A first deploy cut short: the never-healthy candidate's `web`, `auth`, `worker` are stopped; Postgres stays; no `down`, `rm`, `--remove-orphans`; the mark does not block a rerun of `first-deploy`. (D2) A restore that fails: the new release's `web`, `auth`, `worker` are stopped too, RED, mark kept, retried each poll, no quarantine line per poll. Both are buildable here.
+
+1. **Who clears the mark:** a finished `unwind` whose restore answered True, or that had no `current` and stood down, with the quarantine line on disk; `settle` (R2); a `recover` that ends well; the fallback of R1.9. The two `finally` unlinks and `run["held"]` go. Every other exit keeps it, a second Ctrl-C inside the unwind or the recovery included, and an unwind whose restore answered False with a `current`.
+2. **`stand_down(project, ctx, keep_ref=None) -> bool`.** Plain Docker, since Compose or the render may be the fault. Per service of `web`, `auth`, `worker` (edge: `caddy`): `docker ps -q --no-trunc --filter label=com.docker.compose.project=polycarpic-<p> --filter label=com.docker.compose.service=<svc>`; `docker inspect <id>`; `docker stop --time 30 <id>` (client timeout 60 s) unless its `Config.Image` equals `keep_ref`, `current`'s own reference. An image that cannot be read is stopped. Each child in its own `try`; anything not shown stopped → False and alert `not-stopped`. Containers are left, with their logs.
+3. **`recover(project, ctx, cur, run)`** replaces `_handle_interrupted`:
+   a. mark absent (`FileNotFoundError` only) → return. Anything else is an interruption, readable or not.
+   b. with a `cur`: restore it, `except Exception` → not ok. **No write, log, alert, token or network call comes before it**; stderr says `deploy: recovering an interrupted run`. `cur` listed in a readable quarantine file → nothing is upped, not ok, alert `current-quarantined`; an unreadable quarantine file bans nothing here. The unwind's restore has the same check.
+   c. not ok → `stand_down(keep_ref)`; then alert and log `rollback-unhealthy` (or b's name), each in its own `try`; **no `interrupted`, no quarantine**; mark kept; `run["stuck"]` is the mark's digest, None when unreadable. The unwind does the same stand-down when its restore answers False, its quarantine line once.
+   d. mark unreadable or not one digest (after a good restore) → `Refusal("state")`, mark kept.
+   e. mark names `cur`, just waited healthy again → `settle`; never `interrupted`, never quarantined. Settle fails → `_Stop(1)`.
+   f. no `cur`: `stand_down()`; prod also puts Caddy back on edge's `current`, as the unwind does. Not stopped → `_Stop(1)`, mark kept; else on to g and h, so the rerun proceeds.
+   g. alert `interrupted` and log, each in its own `try`; then the record (second time for this digest → quarantine; first → the `interrupted` file). Not on disk → stderr, `_Stop(1)`, mark kept.
+   h. unlink the mark.
+4. **`stuck` does not wedge the project.** The run goes on to look for a candidate; a candidate equal to `stuck`, no candidate (`_Skip`), or an unreadable mark ends `rollback-unhealthy`, exit 1. A **different** digest passes every check and may deploy; its `put` overwrites the mark and a healthy end clears it. Without this, a release whose migration broke the old one could never be fixed forward. A run that started stuck and did not end healthy writes `rollback-unhealthy` as its last alert and last stderr line, so nothing hides it.
+5. **Position.** `_deploy_checked`: `require_data_mount` → load `current` → `recover` → today's order (Compose strict, token, `tokenexp`, `previous`, `transient-since`, …). `edge._run`: `owned_by_prod` → `require_data_mount` → load `current` → `recover` → `check_edge_env`, Compose, `previous`, the tag rules. Ahead of recovery only the lock, `ensure_shared` and those. A damaged `current` is `state`: nothing safe to restore. No Compose-version call precedes the restore; the strict one after it prints both versions and refuses.
+6. **The restore in a recovery never writes a render.** `judge(…, restore=True, keep=True)`: bytes equal to the saved pair → used; different, or the plain or stdin render or its judgement refused → `_saved_pair` (hash holds, bytes pass the installed guard now); the raw render failed, that refuses too, or no saved pair → not ok (3c). Isolation, tree hash, ownership, `--pull never`, health: as any restore.
+7. **The work directory** is made after `recover`, inside the handler, path in `run["work"]`, removed in the outer `finally`.
+8. **Signals.** Outermost wrapper in `locked` and `edge.deploy`, outside every handler: on a non-`Exception` with the mark present: with no `current`, `stand_down`; then best-effort alert `interrupted`, stderr `deploy: interrupted; run the same command again`, re-raise. `SIGHUP` and `SIGTERM` raise `SystemExit` for the length of the run (handlers put back after). SIGKILL and power loss keep the mark; the next run recovers.
+9. **`rollback` by hand with a mark** (project, edge): recover first. Good → stderr `recovered; nothing rolled back`, exit 0, nothing quarantined but by 3g. Not good → the ordinary rollback to `previous`; a healthy end clears the mark.
+10. **`rel.write`** fsyncs the temp file, replaces, fsyncs the directory. Errors raise: before `up` that is a refusal; R2's re-read covers a raise after the replace.
+11. **`rel.quarantine` is idempotent** per digest, reason and bundle id.
+12. **`status` 08:** mark present, no `alert`, and (edge, or no `current`) → RED `interrupted or running; run the command again`.
+13. No container can write the state directories: the guard's `guard-mount` refuses a source the policy does not name, and no policy entry names `state/deploy`. After a reboot `unless-stopped` starts the candidate until the first poll (up to 6 minutes); unchanged.
 
 ### R2 (H2) one commit point — `lib/deployer.py`, `lib/edge.py`, `commands/rollback.py`
 
-1. **`commit(project, ctx, cur, new, run)`**, used by `_healthy` and `edge._promote`: compute the tree hash first; save `previous`; save `current`; set `run["committed"] = True`. If either save raises: re-read `current`; it names the new digest → committed; else put `previous` back best-effort and raise (the unwind restores the old).
-2. **`settle(project, ctx, rdir, digest) -> bool`**, idempotent, each step in its own `try`: link; prod `images.env`; `first-attempt`; `interrupted` when it names this digest; prune (its failure does not count). All good → clear the alert, then the mark, `_note healthy`, True. Else alert `records`, stderr, **mark kept**, False. Edge: link, prune and the rest; no `images.env`, no `first-attempt`.
-3. **After the commit nothing unwinds.** `_internal`, the `Refusal` handlers (both modules) and any post-commit raise check `run["committed"]`: alert `records`, exit 1, mark kept; the next run's R1.2e finishes it. The `edge-probe-baseline` alert after `_healthy` goes in its own `try`.
-4. **`rollback`, project and edge:** `previous` naming the same digest as `current` is "no previous release", exit 4. A pointer write that fails also raises the alert `rollback-pointers` (best-effort) and says to free space and run `rollback` again; `rollback.py` uses `deployer.link_current`.
-5. A first deploy whose settle fails still leaves the timers off and a rerun `already-deployed`: that is H3, POLY-165. Not worsened here.
+1. **`commit(project, ctx, cur, new, run)`**, used by `_healthy` and `edge._promote`: tree hash first; save `previous`; save `current`; `run["committed"] = True`. If either save raises: re-read `current`; it names the new digest → committed; else put `previous` back best-effort and raise (the unwind restores the old).
+2. **`settle(project, ctx, rdir, digest) -> bool`**, idempotent, each step in its own `try`: link; prod `images.env`; `first-attempt`; `interrupted` when it names this digest; prune (its failure does not count). All good → clear the alert, then the mark, `_note healthy`, True. Else alert `records`, stderr, mark kept, False. Edge: no `images.env`, no `first-attempt`.
+3. **After the commit nothing unwinds.** `_internal` and the `Refusal` handlers (both modules) check `run["committed"]`: alert `records`, exit 1, mark kept; the next run's 3e finishes it. The `edge-probe-baseline` alert after `_healthy` goes in its own `try`.
+4. **`rollback`, project and edge:** `previous` naming `current`'s digest is "no previous release", exit 4. A pointer write that fails also raises the alert `rollback-pointers` (best-effort) and says to free space and run `rollback` again; `rollback.py` uses `deployer.link_current`.
+5. A first deploy whose settle fails still leaves the timers off and a rerun `already-deployed`: H3, POLY-165. Not worsened here.
 
-### R3 (H4) — `lib/deployer.py`, `lib/edge.py`
+### R3 (H4) — `lib/deployer.py`, `lib/edge.py`, `lib/release.py`
 
-Every exit after the candidate's first `up` that is not healthy and not committed quarantines: `reason = err.name` for a `Refusal`, quarantine flag or not; `unhealthy` otherwise. Pre-`up` refusals are unchanged.
+After the candidate's first `up`, every unhealthy, uncommitted exit writes a quarantine line. `unhealthy`, `internal` and refusals that quarantine: as today. **A refusal that does not** (a box fault, `unjudged`): reason `held-<name>` with the bundle id as fourth field; `quarantine` and `quarantined` treat `held-` as they treat `guard-`, so it lifts with another installed bundle, and another digest is never affected. The alert stays RED until a healthy run. Recovery never reads it for the candidate.
 
 ### R4 (H5) — `lib/deployer.py`, `lib/edge.py`
 
-1. `check-config` timeout: 120 s; a **client timeout** is `check-config-timeout` (alert, exit 1, **no quarantine**, tried next poll). An exit code, 124 included, is `check-config` and quarantines as today: told apart by the timeout, not the number. `oneoff-stuck` unchanged.
-2. `rel.log` in both `Transient` handlers, in `busy`, and every `rel.log` after the first `up` becomes `_note`.
-3. The double crash on the running digest is R1.2e. `deploy-real-undo.sh` in the trigger is already done (POLY-162).
+1. `check-config` client timeout 120 s each (480 s at most, plus removal). A **client timeout** is `check-config-timeout`: alert, exit 1, no quarantine, container gone first (`oneoff-stuck` unchanged). An exit code, 124 included, quarantines as `check-config`: told apart by the timeout, not the number. The next poll takes the newest candidate, so a newer digest is not blocked.
+2. `rel.log` in both `Transient` handlers and `busy`, and every `rel.log` after the first `up`, becomes `_note`; `clear_transient` never raises. Both print one stderr line when they fail.
+3. The double crash on the running digest is R1.3e. `deploy-real-undo.sh` in the trigger is done (POLY-162).
 
-### R5 (pool) — `packages/db/src/pool.ts` only; backend-lead
+### R5 (pool) — `packages/db/src/pool.ts`, `startup.ts`, `apps/{web,auth,worker}/src/main.ts`; backend-lead
 
 ```ts
-function survive(pool: pg.Pool): pg.Pool {
-  pool.on('error', () => undefined);                                  // an idle client's: the pool has already removed it
-  pool.on('connect', (c) => { c.on('error', () => undefined); });     // a checked-out client's: its queries reject, release() drops it
+export type PoolName = 'app' | 'auth' | 'worker' | 'operator';
+export interface LostConnection { pool: PoolName; type: string; code: string | undefined } // never the error itself
+let lost: (e: LostConnection) => void = () => undefined;
+export function onConnectionLost(fn: (e: LostConnection) => void): void { lost = fn; }     // re-exported by db/startup only
+function survive(name: PoolName, pool: pg.Pool): pg.Pool {
+  pool.on('error', () => undefined);                                      // idle: the pool has already removed the client
+  pool.on('connect', (c) => { c.on('error', (e) => tell(name, c, e)); }); // the client's whole life, checked out included
   return pool;
 }
 ```
-Each of the four constructors becomes `survive(new pg.Pool({ …, Client: ExtendedClient, … }))`, the literal kept in place (the seam scan counts four). **Nothing is logged here:** pg-pool sets `err.client`, which holds the password. The failure is seen where it matters: the query rejects and health answers unreachable. The `uncaughtException` handlers stay as they are. No connect timeout, no retry. `connect` fires in the same tick the idle listener is swapped out, so there is no gap (pg-pool read; M15).
+`tell`: once per client, and at most one call per pool in 10 s; `type` is `e.name` when it matches `/^[A-Za-z]{1,40}$/` (else `unknown`), `code` when it matches `/^[0-9A-Z_]{2,20}$/` (else undefined); a callback that throws is ignored. Each constructor becomes `survive('<name>', new pg.Pool({ …, Client: ExtendedClient, … }))`, the literal kept. Each `main.ts` registers, before its first pool, a callback that logs `warn`, event `db.connection_lost.<pool>`, with a fresh `Error` carrying only that name and code in `err` (no schema change). pg-pool sets `err.client`, which holds the password, so the original never leaves `pool.ts`. No `console`, no process-wide handler change, no retry, no connect timeout. `release()` drops a client that errored (M15). A COMMIT whose connection is lost rejects and nothing is retried. `migrate.ts`'s own clients are out of scope: one shot, a crash is a failed run.
 
 ### R6 — `infra/provision.sh`
 
-`here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)` goes directly above `cd /` (as `provision-check.sh` has it), top level; the three later resolutions (compose version, units, roles) use `$here`; no other `BASH_SOURCE` remains.
+`unset CDPATH`, then `here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)` or `die … 2`, top level, directly above `cd /`; the three later resolutions use `$here`; no other `BASH_SOURCE` remains.
 
 ### R7 (H6) — `infra/provision-check.sh`, `infra/provision.sh`
 
-One `rh` variable per script: the render home if it is a directory, else `/`, as `compose.opts` does; used at all four call sites. `--env-file /dev/null` stays on each. M16 says today's form works; this stops it resting on Compose's tolerance.
+One `rh` per script: no render home → `/` (as `compose.opts`); one that exists is used only as a real directory (no link), owner 0, mode 0755, empty. Otherwise `provision.sh --stage database` stops (`render-path`, nothing changed), and `provision-check.sh` reports H24 FAIL naming it and the database checks FAIL, not wait. The check creates nothing; `--env-file /dev/null` stays on every call.
 
 ### R8 — INFRA (devops), ARCH §8.1 (architect, at the verdict), SECURITY C-83 and R-32 (seceng)
 
-INFRA §4.4: R1–R4 replace the matching sentences ("Failure handling", "The record": `in-progress` lasts until an unwind or settle finishes; a malformed mark restores first; `check-config-timeout`; `records`). §4.5: the pre-migration backup is named once (Order and the step list). §4.6: manual rollback restores, then quarantines; the poll retries an interrupted restore.
-Runbook line, `edge-deploy` row: "After Ctrl-C, a dropped connection or a power cut, run `edge-deploy` again with the same tag, not `rollback edge`: rollback would quarantine the good release. With the tag that was running before, it only recovers (the recovery is before any network call). Interrupting the same tag twice bans it; cut the next `edge-<n>`." §8.6 says the same for `rollback staging` while `in-progress` exists: wait one poll first, unless the poll says `rollback-unhealthy`.
+INFRA §4.4: R1–R4 replace the matching sentences ("Failure handling", "The record"). §4.5: the pre-migration backup is named once. §4.6: manual rollback restores, then quarantines; "nothing else is changed" goes (the stand-down).
+Runbook, `edge-deploy` row: "After Ctrl-C, a dropped connection or a power cut, run `edge-deploy` again with the same tag, not `rollback edge`. With the tag that was running before, it only recovers; recovery is before any network call. Interrupting the same tag twice bans it: cut the next `edge-<n>`." §8.6: after an interrupted run `rollback` recovers first and rolls back only if that fails. The line is run once: on the harness here, on the box in POLY-104.
 
 ## S. Test seams
 
-- **Deploy:** `Hang`, `Helpers` (`tests/infra/ops/test_deploy_unwind.py`) and `EdgeBase`; `world.raise_cmd={"exec": KeyboardInterrupt()}` with `hang_from`; `world.compose_versions`; `patch(write=, put=, log=, alert=, quarantine=)`; `tempfile.mkdtemp`; `world.up_marks` and `compose_log` for "the last `up` names `render-<12 hex>.json` of the old digest". Names qa may call: `deployer.recover(project, ctx, cur)`, `deployer.commit(project, ctx, cur, new, run)`, `deployer.settle(project, ctx, rdir, digest)`. State: `in-progress` and `interrupted` stay `sha256:<64 hex>\n`; no new file. New alert names: `records`, `rollback-pointers`, `check-config-timeout`. No new log event. New tests go in `test_deploy_recover.py` (R1), `test_deploy_commit.py` (R2), `test_deploy_retry.py` (R3, R4); `test_status.py` for R1.7.
-- **Pool, unit:** `packages/db/src/pool-errors.test.ts`, no database: for each of the four pools, `pool.emit('error', new Error('x'), {})` does not throw, and after `pool.emit('connect', c)` with `c = new EventEmitter()`, `c.emit('error', …)` does not throw.
-- **Pool, process:** one case in the existing `tests/db/web-server.test.ts` (`startWeb({proxy: true})`; the proxy gains `down()` that closes the sockets and refuses, and `up()` on the same port): health 200, `down()`, health unreachable, `up()`, health 200, same pid, no `process.crash`. No new `tests/db` file.
-- **Pool, literal restart:** T-real, `1-web-served.test.ts`, last case: wait until `pg_stat_activity` shows `poly_app`, `poly_auth` **and** `poly_worker` at once (ask health and auth to make them; mail drain runs every 30 s and idle clients live 10 s; fail after 90 s, never skip), `docker restart` the Postgres container, then web's health is 200 within 60 s and `State.StartedAt` and `RestartCount` of web, auth and worker are unchanged 15 s later. (That staging's worker in T-real has a mailer: unmeasured; if not, qa says so at red.)
-- **Provision:** in the dry-run box, `cd /repo/infra && bash provision.sh …` and `cd /repo && bash infra/provision.sh …` both reach their first file reads; argv of the fake `docker` for R7 with and without the render home.
+- **Deploy:** `Hang`, `Helpers` (`test_deploy_unwind.py`) and `EdgeBase`; `world.raise_cmd={"exec": KeyboardInterrupt()}` with `hang_from`; `world.compose_versions`; `patch(write=, put=, log=, alert=, quarantine=)`; `tempfile.mkdtemp`; `compose_log` for "the last `up` names the old digest's `render-<12 hex>.json`". The fake gains `docker ps` by label, `docker inspect <id>`, `docker stop`. Names: `recover(project, ctx, cur, run)`, `stand_down(project, ctx, keep_ref=None)`, `commit(project, ctx, cur, new, run)`, `settle(project, ctx, rdir, digest)`, in `deployer`. State files unchanged (`sha256:<64 hex>\n`), no new one. New alerts: `records`, `rollback-pointers`, `check-config-timeout`, `not-stopped`, `current-quarantined`. No new log event. New files: `test_deploy_recover.py` (R1), `test_deploy_commit.py` (R2), `test_deploy_retry.py` (R3, R4); `test_status.py` for R1.12.
+- **Pool, unit:** `packages/db/src/pool-errors.test.ts`, no database: for each of the four pools `pool.emit('error', new Error('x'), {})` does not throw; after `pool.emit('connect', c)` with `c = new EventEmitter()`, `c.emit('error', …)` does not throw and calls the callback once with name and code only; a canary password on `err.client` and a canary `detail` are in nothing it received.
+- **Pool, process:** `tests/db/web-server.test.ts` (existing; the proxy gains `down()` and `up()` on the same port): 200, `down()`, 503, `up()`, 200, same pid, no `process.crash`, line count bounded over the outage, canaries in no output. A planted throw still exits 1.
+- **C20, C21:** `tests/db/wrappers.test.ts` (existing): backend terminated inside `withSession` with no query in flight, before COMMIT and during it: an error, never the result; the next checkout carries no identity.
+- **Pool, literal restart:** T-real `1-web-served.test.ts`, last case: wait until `pg_stat_activity` shows `poly_app`, `poly_auth` **and** `poly_worker` at once (ask health and auth to make them; mail drain runs every 30 s, idle clients live 10 s; fail after 90 s, never skip), `docker restart` the Postgres container, then health is 200 within 60 s and `State.StartedAt` and `RestartCount` of the three are unchanged 15 s later; the worker's next `job.run` is `ok`. (That T-real's worker has a mailer: unmeasured.)
+- **T-real, C28:** `2-rollback.test.ts`, before the rollback poll, on release 2: `deploy staging` SIGKILLed after its `up` line, the installed bundle's `compose-version` edited, `deploy staging` again: release 1's digests healthy, `render-env`, exit 1, no mark. The file is put back and `interrupted` removed. SIGINT stays on the harness.
+- **Provision:** in the dry-run box `bash provision.sh`, `./provision.sh`, `infra/provision.sh`, each also with `CDPATH` set and a planted `/deploy/compose-version`, reach their first file reads from the real directory; the fake `docker`'s argv for R7 with no render home, a good one, a link, one holding `.env`.
 
 ## V. Assertions that would pass a wrong build
 
 | Test | Mutation that must turn it red |
 |---|---|
-| R1 and R2 (Compose, token) | Compose check, then token, moved back above `recover` (one mutant each) |
-| ENOSPC on every write, mark present: the old release's `up` happened | alert moved above the restore |
+| Mark with wrong Compose, missing token, malformed `previous`, malformed `transient-since`, unreadable `edge.env` | each check moved back above `recover` (one mutant each) |
+| Unpinned Compose whose render **differs**: old release up from its saved pair, pair bytes unchanged, then `render-env`, no candidate `up` | `keep=True` dropped; the strict check dropped after a recovery |
+| Saved pair tampered under that Compose; tree of `current` tampered: not upped, stood down, mark kept | `_saved_pair`'s hash check dropped; the tree hash skipped |
+| ENOSPC on each write in turn and on all, mark present: the old release's `up` happened | alert moved above the restore |
 | `mkdtemp` ENOSPC, mark present | work directory made before `recover` |
-| Ctrl-C keeps the mark, staging and edge; the next run restores | `finally: unlink` put back, in each module (two mutants) |
-| Ctrl-C **inside the unwind's restore** keeps the mark and alerts | the wrapper placed inside `_deploy` beside the handlers |
-| Edge: the rerun's first `up` is the old render, before any `gh` or `git` call | `recover` after `_release` |
-| Empty, garbage and unreadable mark: restored, then `state`, mark kept | `Refusal` before the restore |
-| Record not on disk: mark kept, the candidate is not upped in that run or the next | unlink the mark regardless |
-| Restore failed: mark kept, no candidate `up` | unlink before checking `ok` |
+| Ctrl-C in `up`, the health wait, the unwind's restore and the recovery keeps the mark, staging and edge; the next run restores | `finally: unlink` put back, each module; the wrapper placed beside the handlers |
+| SIGHUP and SIGTERM: as Ctrl-C | the handlers not installed |
+| Edge: old render first, before any `gh` or `git`, with the same tag, a lower one, an absent Release | `recover` after the tag rules or `_release` |
+| Empty, truncated, junk, unreadable mark: restored, then `state`, mark kept | `Refusal` before the restore |
+| Restore failed, interrupted run and unwind both: mark kept, the candidate's three stopped, Postgres not, no `down` or `rm` | `stand_down` skipped, each; `keep_ref` ignored (an unhealthy **current** container is stopped too) |
+| Ten polls of a failing restore: no quarantine line; then it works: mark gone, the digest tried once | the record moved above the restore |
+| Stuck: same digest and no candidate → `rollback-unhealthy`, exit 1; another digest deploys; a later refusal does not hide it | the stuck check dropped; `_Stop` in 3c; the last alert dropped |
+| First deploy cut by Ctrl-C, SIGHUP and a planted mark: stopped; the rerun of `first-deploy` ends healthy | `stand_down` missing in each; mark kept in 3f |
+| `docker stop` fails: `not-stopped`, RED, mark kept | its answer ignored |
+| Record not on disk: mark kept, candidate not upped in that run or the next | unlink regardless |
 | Unmounted data volume with a mark: zero `up`, mark kept | `recover` above `require_data_mount` |
-| Mark == `current`, twice: not quarantined; link and alert settled | the e-branch deleted |
-| `fsync` called on the temp file before `os.replace` | `fsync` removed; a directory `fsync` that raises must not fail the write (second mutant: not ignored) |
-| `link_current` fails: the new release stays up, `current` new, not quarantined, exit 1, RED; the next run settles and clears | `committed` not set; and settle clearing the mark on failure |
-| Saving `current` raises **before** and **after** writing | the re-read removed; `previous` not put back |
-| A `Refusal` after commit (unreadable `interrupted`) does not unwind | the `Refusal` handler's `committed` check dropped |
+| Mark == `current`, twice: not quarantined, link settled; the same when it is now unhealthy: mark kept | 3e deleted; 3e without the health wait |
+| `current` quarantined with a mark: no `up`, named RED | the check dropped |
+| `rollback` by hand with a mark: good restore → nothing quarantined; failed → `previous` up, mark gone (project, edge) | the recover call dropped, each |
+| `fsync` file, replace, `fsync` directory, before `up` | either `fsync` removed |
+| Quarantine twice, same reason: one line | idempotence dropped |
+| `link_current` fails: new release stays up, `current` new, not quarantined, exit 1, RED; the next run settles and clears | `committed` not set; settle clearing the mark on failure |
+| Saving `current` raises **before** and **after** writing; put-back fails too: a later run never ups the refused digest | the re-read removed; `previous` not put back |
+| An unreadable `interrupted` after the commit does not unwind | the `Refusal` handler's `committed` check dropped |
 | `previous == current` → rollback exit 4, no `up` (project, edge) | the check dropped, each |
-| `unjudged` after `up`: second poll makes 0 ups | quarantine only when the flag is set |
-| `check-config` client timeout: no quarantine; exit 124: quarantined | told apart by the code |
-| Transient and `busy` with `log` raising: exit 0, `transient-since` written | `rel.log` put back |
-| Finished unwind with an unhealthy restore clears the mark; the next **new** digest is tried | mark kept there |
-| status: mark, no alert, edge and no-`current` RED; with a `current` unchanged | the condition dropped either way |
-| Pool unit, per pool | `survive` removed from one pool; `on('connect')` line removed; `on('error')` line removed |
-| Web restart case | `on('error')` removed |
-| T-real restart | the `pg_stat_activity` precondition removed is **not** caught by product mutants: qa shows it red once with `survive` removed |
-| Relative provision path | `here=` below `cd /` |
-| R7 absent home | the fallback removed |
+| `unjudged` after `up`: polls two and three 0 ups; a new digest deploys; another bundle lifts it | held only when the flag is set; `held-` not lifted |
+| `check-config` client timeout, each service: no quarantine; exit 124 and exit 1: quarantined | told apart by the code |
+| Transient and `busy` with `log` raising: exit 0, `transient-since` written, a stderr line | `rel.log` put back |
+| Unwind with **no** `current` clears the mark after the stand-down | mark kept there |
+| status: mark, no alert: edge and no-`current` RED; with a `current` unchanged | the condition dropped either way |
+| Pool unit, per pool | `survive` removed from one pool; either `on(…)` line removed; the error object passed on; the 10 s bound removed |
+| Web down and up | `on('error')` removed; a cached health answer |
+| T-real restart | shown red once with `survive` removed |
+| Relative provision path, `CDPATH` | `here=` below `cd /`; `unset CDPATH` removed |
+| R7's four homes | the fallback removed; the link check removed |
 
-Traps: "exit is 1" passes every wrong build; assert the last `up`'s render, the mark, `current`, the quarantine line and the alert, all five. A planted mark with no prior `up` of the candidate cannot show a restore *replaced* anything: the R4 cases must go through a real interrupted run.
+Traps: "exit is 1" passes every wrong build; assert the last `up`'s render, the mark, `current`, the quarantine line and the alert, all five. A planted mark with no prior `up` of the candidate cannot show that a restore replaced anything: the R4 cases go through a real interrupted run.
 
 ## G. Standing guards this trips (seceng rules up front)
 
 | Guard | What happens |
 |---|---|
-| `packages/db/src/pg-seam-scan.test.ts` | four literal `new pg.Pool({… Client: ExtendedClient` kept: **green as ruled**. A factory would break it: not allowed. Adding "each is wrapped in `survive(`" to it is qa's |
-| `layers.json`, `tests/layers`, eslint | no import added, no new module or subpath: green |
-| `tests/ci/db-areas`, `changes.mjs` | no new `tests/db` file; `pool.ts` is already in the `deploy` and `db` keys: green. `tests/db/helpers` turns on `e2e` and all db areas |
-| `tests/infra/ops/test_lint.py` (argv, `shell=`), `release.EVENTS` | no new child, no new event: green |
-| `tests/infra/ops/test_deploy_budget.py`, `test_deploy_oneoff.py` | pin migrate's 30 minutes, not `check-config`'s 600 s (searched by name): green |
-| `test_deploy_unwind.py` (S32, G6), `test_deploy_hang.py` F2/S33, `test_deploy_compose_version.py` | by reading they hold as ruled; any edit to an existing assertion is listed at red for seceng |
-| `tests/infra/deploy-wiring`, `provision-wiring`, shellcheck, `edge-net`/`host` box tests | read text in `provision.sh` that stays: green (unmeasured) |
-| `deploy-real-sweep` | the restart case must print no environment or container logs into the step |
-| gitleaks | no secret-shaped fixture is needed anywhere here |
+| `packages/db/src/pg-seam-scan.test.ts` | four literal `new pg.Pool({… Client: ExtendedClient` kept: green. A factory would break it: not allowed. "Each is wrapped in `survive(`" is qa's addition |
+| `layers.json`, `tests/layers`, eslint | `db/startup` is already importable by the three apps; no new module or subpath: green. `onConnectionLost` must not join `db`'s index |
+| `tests/ci/db-areas`, `changes.mjs` | no new `tests/db` file; `pool.ts` and `startup.ts` already in `deploy` and `db`: green. `tests/db/helpers` turns on `e2e` and all db areas |
+| `packages/config` log schema tests | event name fits the pattern, `err` is declared: green (unmeasured) |
+| `test_lint.py` (argv, `shell=`), `release.EVENTS` | new children are list argv; no new event: green |
+| `test_deploy_oneoff.py`, `test_deploy_budget.py` | pin migrate's 30 minutes, not `check-config`'s 600 s (searched by name): green |
+| `test_deploy_unwind.py`, `test_deploy_hang.py`, `test_deploy_edge.py` | **some change**: an unwind whose restore fails with a `current` keeps the mark and stops services; a `docker stop` the fake does not know. Every edit to an existing assertion is listed at red for seceng |
+| `deploy-wiring`, `provision-wiring`, shellcheck, box tests | the text they read in `provision.sh` stays: green (unmeasured) |
+| `deploy-real-sweep` | the new cases print no environment and no container logs |
+| gitleaks | no secret-shaped fixture is needed; the pool canaries are plain words, never `NAME=value` |
 
-**Exemptions asked for: none.** New exposure for seceng to judge: two swallowed `error` events (R5, nothing logged); restoring before the Compose version is checked (R1.3; the guard still judges, as in a rollback); a malformed mark restoring `current` (R1.2d).
+**Exemptions asked for: none.** New exposure for seceng to judge: `docker stop` as root on this project's labelled containers; restoring before the Compose check (R1.5, R1.6); a malformed mark restoring `current`; a different digest deploying while stuck (R1.4).
+
+## A. seceng's conditions, each answered
+
+| Cond. | Where |
+|---|---|
+| C1, C2 | R1.3, R1.5; residue closed by D2 (R1.3c) |
+| C3 | R1.3b, R1.3g, R1.7 |
+| C4 | R1.1, R1.8 |
+| C5 | R1.10 |
+| C6 | R1.3a, R1.3d |
+| C7 | R1.3c, R1.11, R1.13 |
+| C8 | R1.3e |
+| C9 | D1: R1.3f, R1.8; prod's Caddy on a failed prod restore is POLY-165 |
+| C10, C-a to C-d | R1.6; V's Compose rows |
+| C11 | R1.5, R1.3b's line, R1.4 |
+| C12 | R1.9 |
+| C13, C14 | R2; a re-read that also fails leaves `current` new **and quarantined**, which R1.3b refuses, so it is not read as C8's crash |
+| C15 | R1.3b |
+| C16 | R3 |
+| C17 | R4.1 |
+| C18 | R4.2, R1.3g |
+| C19 | C7, C8 |
+| C20, C21, C22 | R5, S |
+| C23, C24 | R5, S; the worker's schedule already records a failed run and goes on (`schedule.ts`) |
+| C25, C26 | R6, R7 |
+| C27, C28 | R8, S |
 
 ## C. Verdict checklist (pre-registered)
 
-1. M1–M12 each reversed, from the committed tests, red-first at a named sha. 2. Every mutant in V recorded red, or equivalent with the reason. 3. `grep`: `in-progress` is unlinked in exactly `unwind`, `settle`, `recover`; no write or child before the restore in `recover`. 4. `rel.log` after the first `up` and in the transient and busy paths: none raw. 5. `BASH_SOURCE` once in `provision.sh`; every compose call in both scripts names `rh` and `/dev/null`. 6. Four `survive(new pg.Pool(`; no logging in `pool.ts`. 7. T-real green with the restart case, precondition shown; `deploy-real` wall time recorded against 15 minutes and a same-day control (M17: 7 min 38 s); provision job too. 8. INFRA §4.4–4.6, the runbook lines, ARCH §8.1, SECURITY C-83 and R-32 match the code; no history in them. 9. seceng's verdict at the exact sha; its conditions each answered. 10. CI's exact commands green; `tests/ci` run.
+1. M1–M12 each reversed, by committed tests, red-first at a named sha. 2. Every mutant in V recorded red, or equivalent with the reason. 3. By grep: the mark is unlinked in exactly `unwind`, `settle`, `recover` and R1.9; nothing but the listed reads precedes the restore. 4. No raw `rel.log` after the first `up` or in the transient and busy paths. 5. `BASH_SOURCE` once in `provision.sh`; every compose call in both scripts names `rh` and `/dev/null`. 6. Four `survive('<name>', new pg.Pool(`; no logger or `console` in `packages/db`; no raw error reaches a callback. 7. T-real green with the restart and SIGKILL cases; `deploy-real` wall time against 15 minutes and a same-day control (M17); the provision job too. 8. INFRA §4.4–4.6, the runbook lines, ARCH §8.1, SECURITY C-83 and R-32 match the code; no history in them. 9. seceng's verdict at the exact sha, C1–C28 each answered. 10. CI's exact commands green; `tests/ci` run.
 
 ## O. Owners
 
-devops-engineer: `infra/ops/**`, `infra/provision.sh`, `infra/provision-check.sh`, `docs/INFRA/**`. backend-lead: `packages/db/src/pool.ts`. qa-engineer: every test file, `tests/db/helpers/web-server.ts`, T-real. seceng: `docs/SECURITY/**`. architect: `docs/ARCH/**`. **No file is shared** between builders; the two builds can run in parallel.
+devops-engineer: `infra/ops/**`, `infra/provision.sh`, `infra/provision-check.sh`, `docs/INFRA/**`. backend-lead: `packages/db/src/pool.ts`, `startup.ts`, `apps/{web,auth,worker}/src/main.ts`. qa-engineer: every test file, `tests/db/helpers/web-server.ts`, T-real. seceng: `docs/SECURITY/**`. architect: `docs/ARCH/**`. **No file is shared** between builders; the two builds can run in parallel.
 
 ## L. For the lead
 
-1. **H4 quarantines even a box fault** (`unjudged`), and there is no clear command: the next build replaces it. Recommend yes; the alternative is up and rollback every five minutes.
-2. **`recover` blocks new deploys while the old release cannot be restored** (mark kept, RED every poll); the way out is `rollback`. An ordinary unhealthy unwind does not block. Recommend keeping both, as today.
-3. **`check-config-timeout` at 120 s is retried without limit**, holding the shared lock up to about 3 minutes per poll, RED. Recommend yes.
-4. **status's extra RED line (R1.7)** is not in the gate text; a dropped SSH session during `edge-deploy` is otherwise silent. Recommend yes, four lines.
-5. **The literal restart test sits in T-real** (about a minute, unmeasured). Recommend yes: it is the only place auth and the worker run for real.
-6. **Criterion 2 names the image job's 20 minutes;** T-real is its own job with 15. Amended in place, with 1 and 3, to the Principal's cut.
+1. **Paths:** R5 touches `apps/{web,auth,worker}/src/main.ts` (C22): add them to POLY-160 and POLY-160e, or guard-push refuses. The alternative is `pool.ts` alone, silent. Recommend C22.
+2. **One residue:** SIGKILL or a power cut during `first-deploy` or `edge-deploy` leaves the release running until the command is rerun, `status` RED: nothing polls those two. Closing it needs a boot-time unit. Recommend accepting it as a row in SECURITY, with you as approver on record; seceng must agree before R-32 closes.
+3. **Edge:** Caddy of an edge release whose restore fails, or that never had a `current`, is stopped. Your lines name `web`, `auth`, `worker`; I read the gate's words as covering it. Recommend yes: only staging is behind it before prod.
+4. **A different digest may deploy while stuck (R1.4).** Recommend yes; it narrows POLY-100 G6's "stops the run".
+5. **`check-config-timeout` is retried without limit**, RED, holding the shared lock up to about 3 minutes a poll. Recommend yes.
+6. **T-real gains two cases** (about 4 minutes together, unmeasured). If the job passes 13 of its 15 minutes, raise the limit rather than drop a case.
+7. Criteria 1 to 3 are amended in place to the Principal's cut; criterion 2 names `deploy-real`'s 15 minutes.
