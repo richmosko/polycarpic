@@ -1,6 +1,6 @@
 # POLY-161b: security review of the ruling (seceng)
 
-## Verdict on `ruling.md` @ `e9547701`: **CHANGES REQUIRED. 2 BLOCKS, 10 CONDITIONS, 3 FOLLOW-UPS, 4 items for the Principal**
+## Verdict on `ruling.md` @ `e6628fa0` (addendum 1 included): **CHANGES REQUIRED. 1 BLOCK open (B2; B1 closed by R13), 10 CONDITIONS, 3 FOLLOW-UPS, 4 items for the Principal**
 
 Judged against a list written before the ruling. Read: ruling, checklist, the app's hooks, routes, pool, probe and logger, compose, Caddyfile, adapter-node 6.0.1 and Kit 3.1.1 source. Run by me: only the `safeNext` inputs, in Node's URL parser (not a browser). Everything else here is by reading. No container.
 
@@ -10,14 +10,14 @@ R2, R3, R5's `handleError`, the Host pin (it also fixes Kit's form-origin check 
 
 | # | Finding | The ruling must say |
 |---|---|---|
-| B1 | **Open redirect; `safeNext` is not touched by the ruling.** It checks the second character only. `"/\t/evil.example"`, `"/\n/evil.example"` and `"/\r\\evil.example"` pass and resolve to `https://evil.example` (measured). `/sign-in` and `/sign-in/second-step` pass the result to `location.assign`. Anyone who gets a member to open `/sign-in?next=%2F%09%2Fevil.example` sends them, after a real sign-in, to a page of theirs that can ask for the password or a code again. No session leaks by itself. On `main` already; this issue is the first to put it on the internet | `safeNext` resolves the value against a fixed dummy origin, requires the same origin, and refuses any control character or backslash. Frontend: `lib/safe-next.ts`. qa: rows for tab, LF, CR, NUL, backslash after each, with a positive case (`/dashboard?entity=x`); one case that drives the sign-in page itself, not only the function |
+| B1 | **CLOSED by R13.** Open redirect: `safeNext` passed `/` + tab, LF or CR + `/evil.example`, and the sign-in pages hand it to `location.assign`. Anyone who got a member to open a crafted sign-in link could send them, after a real sign-in, to a page of theirs. R13's rules are enough (control characters, origin, resolved `//` path), and it found a form I did not (`/x/..//evil.example`). Its fixed-origin rule also covers the backslash, so my separate backslash ban is withdrawn | R13 as written, its Chromium cases included |
 | B2 | **The dependency gate's exemption loses its ground.** The audit ignores one picomatch advisory because picomatch is in dev tools only, and the test proves that on the **production install**. R1 starts shipping code from dev dependencies inside a bundle that test never looks at | The bundle's package list is taken from the build (module ids or source maps, before the maps are deleted), is asserted against a committed list, and picomatch is not in it; red on a planted import. `audit-exemption.test.ts` covers the bundle as well as the install. The same list answers R1's Trivy/SBOM limit: it is kept as a build artefact |
 
 ## CONDITIONS (the build must meet; the test that shows each)
 
 | # | Condition | Shown by |
 |---|---|---|
-| S1 | **No remote functions.** On `/_app/remote/…` Kit takes `event.url.pathname` from the client's `x-sveltekit-pathname`, which the guard trusts: the first remote function would be callable signed out by naming `/sign-in` | the built manifest's remotes are empty; red on a planted remote function; crawl sends the header on a remote path and gets no data |
+| S1 | **Ruled in addendum 1 (R6, B34).** Remote functions stay empty, because Kit takes `event.url.pathname` from the client's header there | as ruled, and the test is red on a planted remote function |
 | S2 | **The crawl covers what Kit answers before `handle`**: `__route.js`, `/_app/routes/…`, `/_app/env.js`, 308s, static files. The static set is listed from the built client and asserted exactly; `env.js` carries no value | crawl on the built server; red on a file planted in `static/` |
 | S3 | **CSP exactly C-07's directives**, every one, on the 200 page, the 404 page and the 500 page of the built app; not "a CSP header" (R9.2). No `unsafe-inline` or `unsafe-eval` in `script-src` | header compared by value; red with `csp` removed and with one directive widened |
 | S4 | **Form-origin check (C-06) on the built server**: form POST with a foreign `Origin` and with none is 403 with Kit's fixed message; positive case with our `Origin` reaches the guard's 303 | crawl, over sockets; red with the check off |
