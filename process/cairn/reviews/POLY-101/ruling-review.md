@@ -10,11 +10,12 @@ So `app` is the gate. Output keys below come from `printf '%s\0' <path> | node i
 
 ### Conditions
 
-1. **LINT runs by name whenever the row fires.** Today `boundaries.test.ts` runs only in `unit`, through `turbo run test --affected`,
-   and nothing ties it to the row. Measured: `scripts/layers/generate.mjs` (which holds the drizzleAdapter rule, line 90) and
-   `layers.json` set `layers` alone. `unit` is skipped and the ESLint step is off (it needs `node` or `image`). No `tests/layers` file
-   mentions the adapter rule (grep). A PR can delete the rule and `app` is green. `eslint.config.js` sets `node`, but whether turbo
-   then counts `packages/auth` as affected is (unmeasured). Required: a step naming the LINT files, without `--affected`.
+1. **LINT runs by name whenever the row fires.** It runs today, but indirectly: the `lint` job's "Layer map checks" step (on `layers` or `node`) runs
+   `tests/layers/structure.test.ts`, whose "auth: its vitest tests run alone" spawns the package's own suite. Measured: with the
+   `better-auth/adapters/drizzle` lines removed from `scripts/layers/generate.mjs`, `vitest run tests/layers` exits 1 on that one test (568 pass
+   on the unedited tree). `unit` is skipped for that path (only `layers` is set), so this is the only run. `node` covers the lockfile, root manifests,
+   `eslint.config.js` and packages, so LINT has no path hole found. Required: name it. Either a step running the LINT files, or a `tests/ci` pin
+   that the Layer map step keeps its `layers || node` condition and that structure.test.ts runs `auth`. Nothing should rest on it by accident.
 2. **The row's trigger set, pinned in `tests/ci`:** `packages/auth/**`, `apps/auth/**`, `packages/tenancy/**`, `pnpm-lock.yaml`, root
    `package.json`, `pnpm-workspace.yaml`, `.npmrc`, `scripts/layers/**`, `layers.json`, `eslint.config.js`. One case per path, each
    red when dropped. A bump only in the lockfile, a root override or a catalog already sets `db_auth` (DB_SHARED): pin it.
@@ -48,7 +49,7 @@ So `app` is the gate. Output keys below come from `printf '%s\0' <path> | node i
    assertion that `ci.yml` has no `github.actor` condition is enough.
 
 ### Must be shown red
-1 (drop the rule, by way of `generate.mjs` alone), 2 and 3 (each path dropped), 5 (a skipped RP test), 6, 7, 10.
+1 (drop the rule in `generate.mjs`: red already today, record it; and drop the named run or pin), 2 and 3 (each path dropped), 5 (a skipped RP test), 6, 7, 10.
 
 ### Left out (for the lead; not conditions)
 - INFRA §4.3 says a "dependency bot's bump" cannot merge; no such bot exists for npm. Wording, devops-101's to judge.
