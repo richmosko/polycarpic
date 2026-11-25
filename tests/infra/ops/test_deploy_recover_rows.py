@@ -263,7 +263,7 @@ class EdgeRows(EdgeBase):
         self.assertEqual([c for c in r.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git")], [], "no network call")
 
     def allowlist_changed(self):
-        self.world.render_hooks[("edge", None)] = lambda doc: doc["services"]["caddy"]["environment"].update(POLY_DOMAIN="example.org") or doc
+        self.world.render_hooks[("edge", False)] = lambda doc: doc["services"]["caddy"]["environment"].update(POLY_DOMAIN="example.org") or doc
 
     def test_an_allowlist_changed_since_under_the_pinned_compose_comes_up_with_the_new_value(self):
         """mutant: the saved pair used under a pinned Compose (the old value comes up)"""
