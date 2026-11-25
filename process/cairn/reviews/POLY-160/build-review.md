@@ -107,3 +107,7 @@ R-35 (the residue, as `process/DECISIONS.md` words it) is in this commit, 1.21.2
 They are tests of code that reads right, on paths that fail closed or that only root can reach. They must be written into POLY-165 as listed; I have not checked that they are.
 
 **SECURITY 1.21.3:** C-83 states the recovery as built; R-32 is gone, its gap closed here; R-35 stays.
+
+### Architect's D1 (`verdict.md` @ `591533fa`): **FOLLOW-UP, POLY-165**
+
+By reading `on_interrupt`, the finding is right, and I missed it: with no `current`, a stop that cannot be shown writes `not-stopped`, then `interrupted` overwrites it. R1.4's order is not kept on this path. It does not block: the stop was tried, RED and the mark stay, stderr prints `not-stopped` to the operator at the keyboard, and the rerun stops first. What is lost is the name of the worse state in `status`. Fix: write `interrupted` only when `stand_down` answered True (or was not called); red on the stop failing under Ctrl-C, staging and edge.
