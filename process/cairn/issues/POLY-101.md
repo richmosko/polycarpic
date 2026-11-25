@@ -18,8 +18,8 @@ ARCH §8 / SECURITY A-34: the CI row that runs on packages/auth/**, packages/ten
 
 ## Acceptance criteria
 
-- [ ] A PR that bumps better-auth and adds an unclassified route fails; the same PR with the route classified passes.
-- [ ] The job is part of the app aggregate check.
+- [x] A PR that bumps better-auth and adds an unclassified route fails; the same PR with the route classified passes. Proof: `tests/db/auth-route-policy.test.ts`, control "the predicate names both synthetic routes against AUTH_ROUTES, and nothing once both are listed"; no newer version was installed (reviews/POLY-101/gate.md).
+- [x] The job is part of the app aggregate check. Proof: `tests/ci/aggregate.test.ts`, "the auth row cannot be skipped" (`lint` or `db` skipped with its key true is red); the PR's own `app` run is still to come.
 
 ## Comments
 
