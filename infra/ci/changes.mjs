@@ -34,7 +34,7 @@ export const DB_AREAS = {
     paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
-    tests: T(['ops-status', 'ops-hardening', 'web-server']),
+    tests: T(['ops-status', 'ops-hardening', 'web-server', 'web-server-start']),
     paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/(?!.*\.test\.ts$)/, /^apps\/web\/(static\/|vite\.config\.ts$|bundle-packages\.(ts|txt)$|svelte\.config\.js$)/, /^infra\/ci\/bundle-packages\.mjs$/, /^apps\/web\/tests\/helpers\/fake-dns\.ts$/, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
   },
 };
