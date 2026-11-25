@@ -105,6 +105,10 @@ async function enrolTotp(email: string): Promise<{ secret: string; backupCodes: 
 addManager('Tess Totp', 'tess@e2e.test');
 const tess = await enrolTotp('tess@e2e.test');
 writeSecret('tess.json', { email: 'tess@e2e.test', password: PASSWORD, secret: tess.secret, backupCodes: tess.backupCodes });
+// Sven: a manager with TOTP for the safeNext spec (POLY-161 R13), so no other spec's wrong-code count or replay window is shared with it.
+addManager('Sven Safenext', 'safe@e2e.test');
+const sven = await enrolTotp('safe@e2e.test');
+writeSecret('safe.json', { email: 'safe@e2e.test', password: PASSWORD, secret: sven.secret, backupCodes: sven.backupCodes });
 // Kay: a manager with a passkey only (spec 5). The credential is made by the software authenticator for THIS origin; its key goes to .auth/
 // so the spec can load the same credential into Chromium's virtual authenticator.
 const kayId = addManager('Kay Passkey', 'kay@e2e.test');
