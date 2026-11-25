@@ -94,6 +94,20 @@ class EdgeRecover(EdgeBase):
         self.assertEqual([e[1] for e in self.world.stop_log if e[0] == "stop"], ["cid-%s-caddy-1" % EDGE])
         self.assertEqual((self.state("edge", "in-progress") or "").strip(), x2)
 
+    def test_an_edge_run_that_started_stuck_and_whose_unwind_cannot_stop_ends_not_stopped(self):
+        """mutant: edge's `stuck_end` writes `rollback-unhealthy` over `not-stopped`"""
+        x1, x2 = self.interrupted_edge()
+        fail_up_of(self.world, x1)
+        x3, _ = self.edge_release(3)
+        self.world.bad_caddy.add(self.last_sibs["caddy"])
+        self.world.hang_from = len(self.world.up_marks)
+        self.world.stop_fail.add("stop")
+        r = self.edge("edge-3")
+        self.assertEqual(r.rc, 1, r.err)
+        self.assertTrue([c for c in edge_ups(self.world) if "render-%s.json" % x3.split(":")[1][:12] in " ".join(c["argv"])], "edge-3 was deployed: " + r.err)
+        self.assertEqual((self.state("edge", "alert") or "x x").split()[1], "not-stopped")
+        self.assertIn("rollback-unhealthy", " ".join((self.state("edge", "deploy.log") or "").split()))
+
     def test_an_edge_rollback_with_a_mark_recovers_first(self):
         """mutant: the `recover` call dropped from edge.rollback"""
         x1, _ = self.edge_release(1)

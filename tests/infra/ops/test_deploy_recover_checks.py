@@ -85,7 +85,7 @@ class Checks(rc.RecoverBase):
         """mutant: the quarantine check dropped"""
         x1, _ = self.first()
         x2 = self.staging_candidate()
-        self.host.write("%s/staging/quarantine" % SDIR, "%s unhealthy 2026-01-01T00:00:00Z\n" % x1)
+        self.host.write("%s/staging/quarantine" % SDIR, "%s 2026-01-01T00:00:00Z unhealthy\n" % x1)
         self.plant_mark(x2)
         before = len(staging_ups(self.world))
         self.deploy("staging")
@@ -97,12 +97,12 @@ class Checks(rc.RecoverBase):
         """seceng, R1.3b: held by quarantined()'s rule, lift included. mutant: a plain search of the file"""
         x1, _ = self.first()
         x2 = self.staging_candidate()
-        self.host.write("%s/staging/quarantine" % SDIR, "%s held-render-env 2026-01-01T00:00:00Z oldbundle0000\n" % x1)
+        self.host.write("%s/staging/quarantine" % SDIR, "%s 2026-01-01T00:00:00Z held-render-env sha256-aaaaaaaaaaaa\n" % x1)  # the installed bundle is not aaaa…: the line has lifted
         self.plant_mark(x2)
         before = len(staging_ups(self.world))
-        self.deploy("staging")
+        r = self.deploy("staging")
         ups = staging_ups(self.world)[before:]
-        self.assertTrue(ups and render_tag(x1) in " ".join(ups[0]["argv"]), "the first `up` is the restore of current")
+        self.assertTrue(ups and render_tag(x1) in " ".join(ups[0]["argv"]), "the first `up` is the restore of current: %s" % r.err)
         self.assertNotEqual(self.alert_name("staging"), "current-quarantined")
 
     def test_a_ctrl_c_in_the_health_wait_keeps_the_mark_and_the_next_run_restores(self):

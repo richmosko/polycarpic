@@ -119,7 +119,8 @@ class FirstDeployCut(Base):
         shutil.rmtree(str(self.sdir("staging")), ignore_errors=True)
         x = self.staging_candidate()
         self.host.mkdir("%s/staging" % SDIR)
-        self.world.hang_from = len(self.world.up_marks)
+        self._base = len(self.world.up_marks)
+        self.world.hang_from = self._base + 1  # Postgres's own `up` is the first of the run; the cut is after the app `up`
         self.world.raise_cmd = {"exec": how}
         return x
 
@@ -144,7 +145,7 @@ class FirstDeployCut(Base):
         self.staging_candidate()
         self.host.mkdir("%s/staging" % SDIR)
         self.world.hang = {"exec"}
-        self.world.hang_from = len(self.world.up_marks)
+        self.world.hang_from = len(self.world.up_marks) + 1  # after Postgres's `up`
         self.deploy("staging", cmd="first-deploy")
         self.assertEqual(stopped_services(self.world), ["auth", "web", "worker"])
 
@@ -163,7 +164,7 @@ class FirstDeployCut(Base):
             orig = self.world._compose
 
             def kill(argv, stdin=None, sig=sig):
-                if "ps" in argv and len(self.world.up_marks) > 0 and not getattr(self, "_sent", False):
+                if "ps" in argv and len(self.world.up_marks) >= self._base + 2 and not getattr(self, "_sent", False):  # after the app `up`, not Postgres's health wait
                     self._sent = True
                     os.kill(os.getpid(), sig)
                 return orig(argv, stdin)
@@ -178,3 +179,46 @@ class FirstDeployCut(Base):
             self.assertEqual((signal.getsignal(signal.SIGHUP), signal.getsignal(signal.SIGTERM)), before, "%s: handlers put back" % sig.name)
             self.assertEqual(stopped_services(self.world), ["auth", "web", "worker"], "%s: stopped" % sig.name)
             self.assertEqual(self.alert_name("staging"), "interrupted", sig.name)
+
+
+class FinalAlert(Base):
+    """ruling.md 26945e68 R1.4: the final alert order is `not-stopped`, else `current-quarantined`, else `rollback-unhealthy`; deploy.log always carries `rollback-unhealthy`."""
+
+    def log_text(self):
+        return " ".join((self.state("staging", "deploy.log") or "").split())
+
+    def test_a_failed_stop_inside_an_unwind_later_in_the_run_ends_not_stopped(self):
+        """mutant: the unwind's alert is written after the stop's, or the stand-down's answer ignored in the unwind"""
+        x1, x2 = self.bad_second_deploy()
+        self.world.hang = {"exec"}
+        fail_up_of(self.world, x1)
+        self.world.stop_fail.add("stop")
+        r = self.deploy("staging")
+        self.assertEqual(r.rc, 1, r.err)
+        self.assertEqual(self.alert_name("staging"), "not-stopped")
+        self.assertEqual((self.state("staging", "in-progress") or "").strip(), x2, "the mark is kept")
+        self.assertIn("rollback-unhealthy", self.log_text(), "the log still carries it")
+
+    def test_a_run_that_started_stuck_and_whose_unwind_cannot_stop_ends_not_stopped(self):
+        """mutant: `stuck_end` writes `rollback-unhealthy` over `not-stopped` (the run began stuck; a different digest then failed and its stop failed)"""
+        x1, x2 = self.interrupted_second()
+        fail_up_of(self.world, x1)
+        x3 = self.staging_candidate()  # x3, a different digest from the mark's
+        self.world.hang = {"exec"}
+        self.world.hang_from = len(self.world.up_marks)
+        self.world.stop_fail.add("stop")
+        r = self.deploy("staging")
+        self.assertEqual(r.rc, 1, r.err)
+        self.assertTrue([c for c in staging_ups(self.world) if render_tag(x3) in " ".join(c["argv"])], "the different digest was deployed: " + r.err)
+        self.assertEqual(self.alert_name("staging"), "not-stopped")
+        self.assertIn("rollback-unhealthy", self.log_text())
+
+    def test_a_stuck_run_does_not_overwrite_current_quarantined(self):
+        """mutant: `stuck_end` writes `rollback-unhealthy` over `current-quarantined`"""
+        x1, _ = self.first()
+        x2 = self.staging_candidate()
+        self.host.write("%s/staging/quarantine" % SDIR, "%s 2026-01-01T00:00:00Z unhealthy\n" % x1)
+        self.plant_mark(x2)
+        self.deploy("staging")
+        self.assertEqual(self.alert_name("staging"), "current-quarantined")
+        self.assertIn("rollback-unhealthy", self.log_text(), "the log always carries rollback-unhealthy")

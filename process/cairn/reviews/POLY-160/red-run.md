@@ -61,3 +61,11 @@ Run in the dry-run box twice: with `provision.sh` and `provision-check.sh` as th
 | R7 a link; a home holding `.env`: never handed to compose, H24 FAIL names it, D1 FAIL (not WAIT) | red, red | green, green |
 
 The R6 test reaches the first file read through `install_units` as well as `install_compose`: the box already has Docker, so `install_compose` is not reached by the host stage on its own; the script dies on a resolved-to-`/` read either way. `provision.sh --stage database` stopping on `render-path` is not tested here (it needs the Postgres derivative: `tests/infra/provision/pg.ts`); it is left for the database-stage run at the gate.
+
+## On devops-160's build (ddf0cc61 + tests at 8f07d932), `tests/infra/ops`
+
+Counts (three discover patterns because the host hook blocks one un-tiered run): `test_deploy*.py` 358 tests, 3 red; `test_[a-ce-z]*.py` 229 OK; `test_dispatcher.py` 19 OK. The 3 red are build faults, tests right (ruling.md @ 26945e68, R1.4's last alert):
+- `test_deploy_recover_checks…current_listed_in_the_quarantine…` and `test_deploy_standdown.FinalAlert…stuck_run_does_not_overwrite_current_quarantined`: `stuck_end` writes `rollback-unhealthy` over `current-quarantined`.
+- `test_deploy_recover_edge…edge_run_that_started_stuck…not_stopped`: edge's form of the same: `rollback-unhealthy` over `not-stopped`. The staging form (`FinalAlert…started_stuck…not_stopped`) is green.
+
+Test faults fixed (mine): the first-deploy cuts hung from `len(up_marks)`, which lands at Postgres's own `up` (now `+1`, and the SIGHUP hook waits for the app `up`); two quarantine fixtures had time and reason swapped (now `<digest> <time> <reason> [bundle]`); the lifted-line test now uses a stored bundle id that is not the installed one, shown red on its mutant (`_held` as a plain search of the file, reverted).
