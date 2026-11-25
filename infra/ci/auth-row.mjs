@@ -20,13 +20,13 @@ export const ROWS = {
   db: [
     {
       file: 'tests/db/auth-route-policy.test.ts',
-      floor: 26,
+      floor: 43,
       required: [
         ...['real-domain', 'private-ca'].map((mode) => ({ describe: `route policy, ${mode} mode`, title: LIVE })),
         ...CONTROL_TITLES.map((title) => ({ describe: CONTROL, title })),
       ],
     },
-    { file: 'tests/db/auth-routing-pool.test.ts', floor: 19, required: [] },
+    { file: 'tests/db/auth-routing-pool.test.ts', floor: 40, required: [] },
   ],
 };
 
