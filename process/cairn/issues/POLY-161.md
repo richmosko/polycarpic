@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
 assignee: frontend-lead
-paths: [process/cairn/issues/POLY-161.md, process/cairn/issues/POLY-88.md, process/cairn/reviews/POLY-161/**, apps/web/**, infra/**, .github/workflows/**, Dockerfile, .dockerignore, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, package.json, pnpm-lock.yaml, packages/*/package.json, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, process/STATE.md, process/DECISIONS.md]
+paths: [process/cairn/issues/POLY-161.md, process/cairn/issues/POLY-88.md, process/cairn/reviews/POLY-161/**, apps/web/**, packages/config/**, infra/**, .github/workflows/**, Dockerfile, .dockerignore, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, package.json, pnpm-lock.yaml, packages/*/package.json, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, process/STATE.md, process/DECISIONS.md]
 labels: [app, deploy]
 priority: null
 pr: null
