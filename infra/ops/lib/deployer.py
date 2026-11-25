@@ -557,7 +557,7 @@ def _deploy_checked(project, ctx, first, existing_data, seen, run):
         raise Refusal("not-first-deployed", code=4)
     fresh = _first_preconditions(project, ctx, existing_data) if first else False
     try:
-        digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen, run)
+        digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen, run, first)
     except _Skip:
         clear_transient(ctx, project)
         return 0
@@ -622,7 +622,7 @@ def _first_preconditions(project, ctx, existing_data):
     return empty and not existing_data
 
 
-def _candidate(project, ctx, tok, work, cur, seen, run):
+def _candidate(project, ctx, tok, work, cur, seen, run, first=False):
     """R2: -> (digest, commit, tag). Raises _Skip when there is nothing new, or the candidate is quarantined."""
     if project == "staging":
         digest, commit, _ = rel.staging_candidate(ctx, tok, work)
@@ -641,6 +641,8 @@ def _candidate(project, ctx, tok, work, cur, seen, run):
         raise _Skip()
     if digest in rel.quarantined(ctx, project):
         rel.log(ctx, project, "quarantined", digest)
+        if first:  # a foreground first deploy says why it did nothing
+            ctx.err("deploy: the candidate %s is quarantined; nothing was started" % digest)
         raise _Skip()
     if project == "prod":
         commit = rel.tag_commit(ctx, tag)
