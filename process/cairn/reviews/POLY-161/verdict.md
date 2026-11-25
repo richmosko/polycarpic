@@ -64,3 +64,10 @@ Each is settled in the first tests or the first build. Open at the gate: CHANGES
 | B35 | bundle list | server only, or an empty list equal to an empty list | floors per side; a client-only plant is red; `svelte` and `pg` are in it | qa, devops |
 | B36 | CSP | "has a CSP header" passes a widened one; the 500 page is never reached | by value, on 200, 404 and a real 500 | qa |
 | B37 | S7 | 512 sockets that never reach web (the client's own limit) | the server counts 512; peak memory read under the 384m limit | qa |
+
+## Deltas against the ruling
+
+| # | Delta | Reading |
+|---|---|---|
+| D1 | R2 step 8: a literal `await import(...)` of `../build/handler.js`, not a computed URL | Objection from frontend, upheld: `poly/no-computed-import` is part of the layer and confinement enforcement and gets **no exemption**. The purpose stands: typecheck green both with and without `build/`, unit suites need no build (they do not import `main.ts`). Form: a wildcard ambient declaration (`*/build/handler.js`) in a `.d.ts` beside `main.ts`, exporting `handler` as `WebHandler` `(unmeasured)`. Both lint and typecheck are run in both states. If it fails, the measured error comes back here before any exemption |
+| D2 | addendum 2 names POLY-156 as the prod gate | it is POLY-163 (the lead) |
