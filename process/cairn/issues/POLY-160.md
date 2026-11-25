@@ -1,7 +1,7 @@
 ---
 id: POLY-160
 title: Deploy follow-ups
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
@@ -83,3 +83,7 @@ Feature started. Branch: `feature/poly-160-deploy-follow-ups`. Scope is the Prin
 ### @team-lead — 2026-11-24
 
 Verified at `655fb279`: CI run 45565943755 green on all ten jobs (`deploy-real` 631 s of its 900 s limit); architect's verdict `37600cff` and seceng's delta read `bb1d06ff` with `26579880`, both pass with follow-ups. Follow-ups are on POLY-165 (before prod) and POLY-104 (first box). Decisions: `process/DECISIONS.md`, 2026-11-25. PR opening; awaiting merge under the Principal's delegation.
+
+### @team-lead — 2026-11-24
+
+Validate passed (qa's gate, seceng and the architect: pass with follow-ups; CI green on the PR head); merging via PR #157 under the Principal's delegation of 2026-11-25. Closing.
