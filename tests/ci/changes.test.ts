@@ -23,7 +23,7 @@ const CASES: [string[], string[], string][] = [
   [['docs/ARCH/index.html', 'docs/PRD/index.html'], ['layers'], 'docs-only PR that touches ARCH must still run the layer checks'],
   [['packages/db/src/x.ts'], ['node', 'db'], '`db` dropped, or `layers` keyed to all of packages/**'],
   [['packages/db/package.json'], ['node', 'db', 'layers'], 'package.json files dropped from `layers`'],
-  [['apps/web/src/a.ts'], ['node'], 'apps/** dropped from `node`'],
+  [['apps/web/src/a.ts'], ['node', 'db'], 'apps/** dropped from `node`, or the app\'s source dropped from `db` (the web-server suite builds and serves it, POLY-161)'],
   [['apps/web/package.json'], ['node', 'layers', 'db'], 'apps/*/package.json dropped from `layers`'],
   [['tests/db/a.test.ts'], ['db'], '`db` widened to node, or tests/db dropped from `db`'],
   [['pnpm-lock.yaml'], ['node', 'db'], 'pnpm-lock.yaml dropped from `db` (POLY-102 R5 closes POLY-96 O2) or from `node`'],
@@ -56,7 +56,8 @@ const CASES: [string[], string[], string][] = [
   [['apps/migrate/src/cli.ts'], ['node', 'db', 'e2e'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
   [['apps/web/src/ops/status.ts', 'apps/web/src/ops/health.ts'], ['node', 'db'], 'apps/web/src/ops dropped from `db` (ops-status and ops-hardening import them)'],
   [['apps/web/src/main.ts'], ['node', 'db'], 'apps/web/src/main.ts dropped from `db` (ops-hardening crash handler)'],
-  [['apps/web/src/routes/+page.svelte'], ['node'], '`db` widened to all of apps/web'],
+  [['apps/web/src/routes/+page.svelte'], ['node', 'db'], 'the app\'s routes dropped from `db` (the built app is what the web-server suite serves, POLY-161)'],
+  [['apps/web/src/lib/safe-next.test.ts'], ['node'], '`db` widened to the web unit tests (they need no database or build)'],
   [['tests/log/canary.ts'], ['node', 'db'], 'tests/log dropped from `db` (the canaries are imported by two db files)'],
   // POLY-95 R3: the infra suite and the Postgres FROM line are inputs of the jobs that read them.
   [['tests/infra/lint.test.ts'], ['image'], 'tests/infra dropped from `image` (the lint job and the container tests both read it)'],

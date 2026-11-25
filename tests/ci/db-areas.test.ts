@@ -32,7 +32,7 @@ const TABLE: Record<(typeof AREAS)[number], string[]> = {
   auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard', 'auth-method-hold', 'auth-mail-flows', 'auth-notice-triggers', 'worker-mail-jobs'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'gate-check-role-setting', 'migration-0017', 'runner', 'template-clone'],
-  ops: ['ops-status', 'ops-hardening'],
+  ops: ['ops-status', 'ops-hardening', 'web-server', 'web-server-start'],
 };
 const tf = (names: string[]) => names.map((n) => `tests/db/${n}.test.ts`).sort();
 
@@ -76,6 +76,11 @@ describe('C8 classify', () => {
     [['tests/db/pgtap/02_rls_catalog.sql'], ['tenancy'], 'tests/db/pgtap dropped from tenancy'],
     [['apps/web/src/ops/status.ts'], ['ops'], 'apps/web/src/ops dropped from ops'],
     [['apps/web/src/main.ts'], ['ops'], 'main.ts dropped from ops'],
+    // POLY-161: the built app is what the web-server suites serve
+    [['apps/web/src/routes/+page.svelte'], ['ops'], 'the app\'s source dropped from ops'],
+    [['apps/web/vite.config.ts'], ['ops'], 'the build configuration dropped from ops'],
+    [['tests/db/web-server.test.ts'], ['ops'], 'the web-server suite is in no area, or in two'],
+    [['tests/db/web-server-start.test.ts'], ['ops'], 'the web-server start-up suite is in no area, or in two'],
     [['apps/web/src/startup.ts'], ['ops'], 'startup.ts dropped from ops'],
     [['tests/log/canary.ts'], ['ops'], 'tests/log dropped from ops'],
     [['tests/db/runner.test.ts'], ['migrate'], 'runner moved'],
@@ -114,7 +119,7 @@ describe('C8 classify', () => {
   for (const p of ['tests/db/new.test.ts', 'tests/db/x.sql', 'tests/db/helpers/new-helper.ts', 'tests/db/pgtap-new/x.sql']) {
     it(`a db path in no area (${p}) -> all four (fail closed)`, async () => { expect(await on([p])).toEqual(ALL); });
   }
-  for (const p of ['docs/PRD/index.html', 'process/STATE.md', 'apps/web/src/routes/+page.svelte', 'infra/ci/anchor.mjs', 'Dockerfile']) {
+  for (const p of ['docs/PRD/index.html', 'process/STATE.md', 'apps/web/src/lib/safe-next.test.ts', 'infra/ci/anchor.mjs', 'Dockerfile']) {
     it(`a non-db path (${p}) -> none  [red if: db_* keys widened beyond TABLE.db]`, async () => { expect(await on([p])).toEqual([]); });
   }
   it('db equals the OR of the four area keys for every fixture above and for the empty list', async () => {
