@@ -18,11 +18,11 @@ The release image serves no web app today: it never runs `vite build`, and `apps
 
 ## Acceptance criteria
 
-- [ ] The image build runs `vite build`, and the production web server is mounted on 3000 serving the SvelteKit app.
-- [ ] `/api/v1/health` is served by the real server; POLY-100's minimal listener is removed, with a test that only one listener answers on 3000.
-- [ ] The startup zone check moved here from POLY-88 runs before the server listens.
-- [ ] T-real (the end-to-end deploy test) passes against the new image, and its trigger covers the files this issue adds.
-- [ ] POLY-88's criteria that describe this work are removed there and point here.
+- [x] The image build runs `vite build`, and the production web server is mounted on 3000 serving the SvelteKit app. — tests/infra/web-stage.test.ts: "the real file breaks no rule" (vite build once, in the web stage, under `--network=none`); tests/infra/deploy-real/1-web-served.test.ts: "B22: /sign-in is the app's HTML page"
+- [x] `/api/v1/health` is served by the real server; POLY-100's minimal listener is removed, with a test that only one listener answers on 3000. — tests/infra/deploy-real/1-web-served.test.ts: "B5, B6: web's listening sockets ... are exactly 0.0.0.0:3000 and 127.0.0.1:8081"; tests/db/web-server.test.ts: "GET is 200 with byte-equal body"; tests/ci/one-listener.test.ts: "the stand-in listener and its test are gone"
+- [x] The startup zone check moved here from POLY-88 runs before the server listens. — tests/db/web-server-start.test.ts: "while the resolvers are held silent, 3000 refuses connections" and "both resolvers say NXDOMAIN: exit 1, one zone.refused"; apps/web/src/ops/zone.test.ts: "the answer table"
+- [x] T-real (the end-to-end deploy test) passes against the new image, and its trigger covers the files this issue adds. — tests/infra/deploy-real/1-web-served.test.ts (24 of 24 in the container at 35908f5b); tests/ci/deploy-key.test.ts: one row per added path
+- [x] POLY-88's criteria that describe this work are removed there and point here. — process/cairn/issues/POLY-88.md (commit 3eb1a089)
 
 ## Comments
 
