@@ -292,7 +292,9 @@ def recover(project, ctx, cur, run):
     if res is not True:
         stopped = stand_down(project, ctx, _keep_ref(project, ctx, cur))
         _stuck_records(project, ctx, res if isinstance(res, str) else "rollback-unhealthy", digest, stopped)
-        run["stuck"], run["stuck_digest"], run["not_stopped"] = True, digest, not stopped
+        run["stuck"], run["stuck_digest"] = True, digest
+        run["stuck_name"] = res if isinstance(res, str) else "rollback-unhealthy"
+        run["not_stopped"] = run.get("not_stopped") or not stopped
         return "stuck"
     if digest is None:
         err = Refusal("state")
@@ -373,7 +375,7 @@ def on_interrupt(project, ctx, run):
 def stuck_end(project, ctx, run=None):
     """A run that started stuck and did not end healthy: `rollback-unhealthy` is its last alert and its last stderr line, so nothing hides it;
     a candidate that could not be shown stopped is `not-stopped`, which is worse and stays."""
-    name = "not-stopped" if run and run.get("not_stopped") else "rollback-unhealthy"
+    name = "not-stopped" if run and run.get("not_stopped") else ((run or {}).get("stuck_name") or "rollback-unhealthy")
     try:
         rel.alert(ctx, project, name)
     except Exception:
@@ -1030,6 +1032,8 @@ def unwind(project, ctx, digest, restore_fn, reason=None, why=None, run=None):
     stopped = True
     if not ok:
         stopped = stand_down(project, ctx, _keep_ref(project, ctx, cur))
+        if not stopped and run is not None:
+            run["not_stopped"] = True  # a stop that could not be shown outranks every other final alert of the run
     name = "rolled-back" if ok else "rollback-unhealthy"
     q_ok = True
     if reason:
