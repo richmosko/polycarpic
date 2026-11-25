@@ -4,11 +4,13 @@ export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci:
 import { ALL_KEYS, AREA_KEYS } from './changes.mjs';
 const OK = new Set(['success', 'skipped']);
 
-export function evaluate(raw) {
+export function evaluate(raw, dispatchBase) {
   let needs;
   try { needs = JSON.parse(raw ?? ''); } catch { return ['NEEDS is not JSON']; }
   if (!needs || typeof needs !== 'object') return ['NEEDS is not an object'];
   const bad = [];
+  // POLY-101 B6: a dispatch with a base filters a range the caller chose, so its `app` is never green.
+  if (dispatchBase) bad.push('dispatched with a base: jobs outside the chosen range were skipped; only a full dispatch (empty base) or a pull_request run can be green');
   for (const j of ['changes', 'guard', 'lint', 'unit', 'db', 'image', 'provision', 'deploy-real']) {
     const r = needs[j]?.result;
     if (r === undefined) bad.push(`${j}: missing`);
@@ -27,7 +29,7 @@ export function evaluate(raw) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const bad = evaluate(process.env.NEEDS);
+  const bad = evaluate(process.env.NEEDS, process.env.DISPATCH_BASE);
   if (bad.length) { console.error(`app: red\n  ${bad.join('\n  ')}`); process.exit(1); }
   console.log('app: green');
 }
