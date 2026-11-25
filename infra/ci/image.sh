@@ -84,8 +84,11 @@ case "$cmd" in
       done
       found="$(find $web \( -name "*.map" -o -name .svelte-kit -o -name tests -o -name ".env*" \) 2>/dev/null; find /app -name ".env*" 2>/dev/null)"
       [ -z "$found" ] || { echo "image check: files that must not ship:" >&2; echo "$found" >&2; bad=1; }
-      tools="$(find /app -path "*/node_modules/*" \( -name vite -o -name rolldown -o -name "rolldown-*" -o -name svelte-check -o -name playwright -o -name playwright-core -o -path "*/@sveltejs/kit" -o -path "*/@sveltejs/adapter-node" -o -path "*/@sveltejs/vite-plugin-svelte" -o -name "@playwright" \) -prune -print 2>/dev/null; find /app/node_modules/.pnpm -maxdepth 1 \( -name "@sveltejs+kit@*" -o -name "@sveltejs+adapter-node@*" -o -name "@sveltejs+vite-plugin-svelte@*" -o -name "rolldown@*" -o -name "svelte-check@*" -o -name "playwright*" \) 2>/dev/null)"
+      tools="$(find /app -path "*/node_modules/*" \( -name vite -o -name rolldown -o -name "rolldown-*" -o -name svelte-check -o -name playwright -o -name playwright-core -o -path "*/@sveltejs/kit" -o -path "*/@sveltejs/adapter-node" -o -path "*/@sveltejs/vite-plugin-svelte" -o -name "@playwright" -o -name "@rolldown" \) -prune -print 2>/dev/null; find /app/node_modules/.pnpm -maxdepth 1 \( -name "@sveltejs+kit@*" -o -name "@sveltejs+adapter-node@*" -o -name "@sveltejs+vite-plugin-svelte@*" -o -name "rolldown@*" -o -name "@rolldown+*" -o -name "svelte-check@*" -o -name "playwright*" \) 2>/dev/null)"
       [ -z "$tools" ] || { echo "image check: build tooling in the image:" >&2; echo "$tools" >&2; bad=1; }
+      # S9 (seceng, POLY-161): the @sveltejs packages in the image are exactly {acorn-typescript}. An empty set fails too: it is the control that this find sees anything.
+      sv="$({ find /app -path "*/node_modules/@sveltejs/*" -prune -print 2>/dev/null | sed "s#.*/@sveltejs/##"; find /app/node_modules/.pnpm -maxdepth 1 -name "@sveltejs+*" 2>/dev/null | sed "s#.*/@sveltejs+##; s#@.*##"; } | sort -u)"
+      [ "$sv" = "acorn-typescript" ] || { echo "image check: @sveltejs packages in the image are not exactly acorn-typescript:" >&2; echo "$sv" >&2; bad=1; }
       exit $bad' || { echo "image check: web build contents" >&2; exit 1; }
     for uid in 1000 10101; do
       w="$(docker run --rm --network none --cap-drop ALL --user "$uid" --entrypoint sh "$ref" -c 'find /app/apps/web/build -writable 2>/dev/null; test -n "$(find /app/apps/web/build -name handler.js)" || echo CONTROL-FAILED')"
