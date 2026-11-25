@@ -317,9 +317,11 @@ describe('B15, A8, B21: the database failing under a running web (last: the faul
     const csp = r.rawHeaders.flatMap((h, i) => (i % 2 === 0 && h.toLowerCase() === 'content-security-policy' ? [r.rawHeaders[i + 1]!] : []));
     expect(csp).toHaveLength(1);
     const dirs = Object.fromEntries(csp[0]!.split(/;\s*/).map((d) => { const [n, ...v] = d.split(/\s+/); return [n, v]; }));
-    expect(dirs['script-src']).toEqual(["'self'"]);
-    expect(dirs['default-src']).toEqual(["'self'"]);
-    expect(dirs['frame-ancestors']).toEqual(["'none'"]);
+    // by value, every directive: the static 500 page does not go through Kit's policy, so this is the default header's own text
+    expect(dirs).toEqual({
+      'default-src': ["'self'"], 'script-src': ["'self'"], 'style-src': ["'self'", "'unsafe-inline'"], 'img-src': ["'self'", 'data:'], 'font-src': ["'self'"],
+      'connect-src': ["'self'"], 'object-src': ["'none'"], 'base-uri': ["'self'"], 'form-action': ["'self'"], 'frame-ancestors': ["'none'"],
+    });
     expect(r.body).not.toContain(CANARY_QUERY);
     expect(r.body).not.toMatch(/enter_session|does not exist|at .*\.js:\d+/);
     await new Promise((res) => setTimeout(res, 200));
