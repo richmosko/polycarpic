@@ -169,9 +169,7 @@ suite('T-real 1b: the running web container serves the real app', () => {
       { path: '/dashboard', host: 'evil.example', headers: { cookie: `__Host-poly_handle=${handle.value}` } },
     ]);
     expect([r!.status, r!.headers.location]).toEqual([303, '/sign-in?next=%2Fdashboard']);
-    const sc = ([] as string[]).concat(r!.headers['set-cookie'] ?? []).join('\n');
-    expect(sc).toMatch(/^__Host-poly_handle=;/m);
-    expect(sc).toMatch(/Max-Age=0/i);
+    expect(([] as string[]).concat(r!.headers['set-cookie'] ?? []), 'F1: exactly the one clearing line').toEqual(['__Host-poly_handle=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax']);
     expect(wrongHost!.status).toBe(421);
   });
 

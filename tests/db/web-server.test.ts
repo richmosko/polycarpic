@@ -70,11 +70,13 @@ describe('the route crawl on the built server (S2; B1 to B3, B34)', () => {
         const withBody = ['POST', 'PUT', 'PATCH'].includes(method);
         const r = await ask(path, { method, headers: { origin: OURS, ...(withBody ? FORM : {}) }, ...(withBody ? { body: 'a=b' } : {}) });
         const guarded = r.status === 303 && r.headers.location === next;
+        if (r.headers['set-cookie']) bad.push(`${method} ${path}: a signed-out answer sets a cookie (${String(r.headers['set-cookie'])})`);
         if (isPublic && guarded) bad.push(`${method} ${path}: public but guarded`);
         if (!isPublic && !guarded) bad.push(`${method} ${path}: expected guard ${next}, got ${r.status} ${r.headers.location ?? ''}`);
         if (!isPublic && r.body.includes('<form')) bad.push(`${method} ${path}: a page body behind the guard`);
       }
       const d = await ask(dataOf(path));
+      if (d.headers['set-cookie']) bad.push(`__data ${path}: a signed-out answer sets a cookie`);
       if (isPublic && id !== '/api/v1/health') {
         if (!(d.status === 200 && /"type":"data"/.test(d.body))) bad.push(`__data ${path}: public page has no data node (${d.status})`);
       } else if (!isPublic) {
@@ -162,9 +164,8 @@ describe('B4: the guard\'s positive case, with a live handle', () => {
   it('a random handle is the 303 to sign-in and the cookie is cleared  [red if: a dead handle leaves the cookie, or is let in]', async () => {
     const r = await ask('/dashboard', { headers: { cookie: `${HANDLE_COOKIE}=${'a'.repeat(43)}` } });
     expect([r.status, r.headers.location]).toEqual([303, '/sign-in?next=%2Fdashboard']);
-    const sc = ([] as string[]).concat(r.headers['set-cookie'] ?? []).join('\n');
-    expect(sc).toMatch(new RegExp(`^${HANDLE_COOKIE}=;`, 'm'));
-    expect(sc).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+    // F1: exactly one Set-Cookie, the clearing of web's own handle, every attribute
+    expect(([] as string[]).concat(r.headers['set-cookie'] ?? [])).toEqual([`${HANDLE_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`]);
   });
 });
 

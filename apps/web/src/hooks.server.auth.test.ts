@@ -28,9 +28,10 @@ function run(path: string, init: RequestInit & { method?: string; cookies?: Reco
   const request = new Request(url, rest);
   const locals: Record<string, unknown> = {};
   const deleted: [string, unknown][] = [];
-  const event = { url, request, locals, cookies: { get: (n: string) => jar[n], set: vi.fn(), delete: (n: string, o: unknown) => { deleted.push([n, o]); } }, getClientAddress: () => '127.0.0.1' };
+  const set = vi.fn();
+  const event = { url, request, locals, cookies: { get: (n: string) => jar[n], set, delete: (n: string, o: unknown) => { deleted.push([n, o]); } }, getClientAddress: () => '127.0.0.1' };
   const resolve = vi.fn(async () => new Response('<html class="%poly.theme%">ok</html>', { headers: { 'content-type': 'text/html' } }));
-  return { locals, resolve, deleted, res: (handle as any)({ event, resolve }) as Promise<Response> };
+  return { locals, resolve, deleted, set, res: (handle as any)({ event, resolve }) as Promise<Response> };
 }
 /** The handle cookie is cleared on the response or through event.cookies.delete. */
 const clearsHandle = (r: Response, deleted: [string, unknown][]) => deleted.some(([n]) => n === '__Host-poly_handle') || r.headers.getSetCookie().some((c) => /^__Host-poly_handle=;/.test(c) && /Max-Age=0/i.test(c));
@@ -78,6 +79,29 @@ describe('page requests (criterion 14, POLY-153 R7.2)', () => {
       expect(resolve).toHaveBeenCalled();
       expect(m.withSession).not.toHaveBeenCalled();
     });
+  // build-review F1: web writes exactly one cookie, ever: the clearing of its own handle on a dead handle. Nothing else, anywhere.
+  const CLEAR = '__Host-poly_handle=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax';
+  it('F1: a dead handle gives exactly the one clearing line on the 303, nothing else, and event.cookies.set is never used  [red if: a second Set-Cookie is appended, or any cookie is set through event.cookies]', async () => {
+    const { res, set } = run('/dashboard', { cookies: { '__Host-poly_handle': 'z'.repeat(43) } });
+    const r = await res;
+    expect(r.status).toBe(303);
+    expect(r.headers.getSetCookie()).toEqual([CLEAR]);
+    expect(set).not.toHaveBeenCalled();
+  });
+  for (const p of ['/sign-in', '/sign-up', '/api/v1/health', '/sign-in/forgot', '/dashboard', '/nowhere']) {
+    it(`F1: signed out on ${p} (no cookie): no Set-Cookie at all and no cookie set  [red if: a cookie is written on a signed-out answer]`, async () => {
+      const { res, set } = run(p);
+      const r = await res;
+      expect(r.headers.getSetCookie()).toEqual([]);
+      expect(set).not.toHaveBeenCalled();
+    });
+  }
+  it('F1: a live handle on a signed-in page: no Set-Cookie and no cookie set  [red if: a signed-in page writes a cookie]', async () => {
+    const { res, set } = run('/dashboard', { cookies: { '__Host-poly_handle': HANDLE } });
+    const r = await res;
+    expect(r.headers.getSetCookie()).toEqual([]);
+    expect(set).not.toHaveBeenCalled();
+  });
   for (const p of ['/sign-in/anything', '/sign-in/reset/x', '/sign-in/', '/healthz', '/api/v1/health/__data.json', '/sign-up/x', '/sign-in/anything/__data.json'])
     it(`signed out on ${p}: not public; the guard redirects  [red if: isPublic is a prefix test, or /healthz survived]`, async () => {
       const { res, resolve } = run(p);

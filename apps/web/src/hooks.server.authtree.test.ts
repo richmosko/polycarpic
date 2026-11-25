@@ -35,6 +35,9 @@ describe('R7 web relays no cookie', () => {
     // POLY-161: the one Set-Cookie web writes is the clearing of its own handle cookie (R9.3); nothing relays BetterAuth's
     const writes = src.split('\n').filter((l) => /set-cookie/i.test(l));
     expect(writes).toHaveLength(1);
+    expect(src.match(/set-cookie/gi), 'a second append on the same line').toHaveLength(1);
+    expect(src.match(/\.append\s*\(/g) ?? [], 'one header append in the whole file').toHaveLength(1);
+    expect(src, 'cookies.set (any cookie web writes through Kit)').not.toMatch(/\bcookies\s*\.\s*set\s*\(/);
     expect(writes[0]).toMatch(/\$\{HANDLE_COOKIE\}=; .*Max-Age=0/);
   });
 });

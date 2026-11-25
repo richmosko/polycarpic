@@ -96,3 +96,31 @@ describe('the Dockerfile\'s web stage (B27)', () => {
     expect(v.join('\n')).toMatch(re);
   });
 });
+
+// build-review F2: Vite reads an `.env` at build and public-prefixed values go into served code. A bare `.env*` pattern matches only the context's root,
+// so an apps/web/.env would reach the web stage. The pins read the file as patterns, never as text.
+const dockerignore = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter((l) => l !== '' && !l.startsWith('#'));
+export function ignoreViolations(text: string): string[] {
+  const p = dockerignore(text);
+  const v: string[] = [];
+  for (const need of ['**/.env*', '**/.svelte-kit', 'apps/web/build', 'apps/web/tests']) if (!p.includes(need)) v.push(`.dockerignore lacks ${need}`);
+  if (p.includes('.env*')) v.push('.dockerignore has the root-only `.env*`');
+  if (p.some((l) => l.startsWith('!') && /\.env/.test(l))) v.push('.dockerignore re-includes an .env file');
+  return v;
+}
+describe('the build context excludes .env files at any depth (F2)', () => {
+  const realIgnore = readFileSync(join(ROOT, '.dockerignore'), 'utf8');
+  it('the real .dockerignore breaks no rule  [red if: .env* stays root-only]', () => {
+    expect(ignoreViolations(realIgnore)).toEqual([]);
+  });
+  it.each([
+    ['the root-only pattern', realIgnore.replace('**/.env*', '.env*'), /root-only|lacks \*\*\/\.env/],
+    ['no .env pattern', realIgnore.replace('**/.env*\n', ''), /lacks \*\*\/\.env\*/],
+    ['an .env file re-included', `${realIgnore}\n!apps/web/.env.public\n`, /re-includes/],
+    ['.svelte-kit dropped', realIgnore.replace('**/.svelte-kit\n', ''), /lacks \*\*\/\.svelte-kit/],
+    ['a comment standing in for the pattern', realIgnore.replace('**/.env*', '# **/.env*'), /lacks \*\*\/\.env\*/],
+  ])('%s  [red if: the pin lets it through]', (_n, text, re) => {
+    expect(text).not.toBe(realIgnore);
+    expect(ignoreViolations(text).join('\n')).toMatch(re);
+  });
+});
