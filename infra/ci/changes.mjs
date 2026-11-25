@@ -34,7 +34,7 @@ export const DB_AREAS = {
     paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
-    tests: T(['ops-status', 'ops-hardening']),
+    tests: T(['ops-status', 'ops-hardening', 'web-server']),
     paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
   },
 };

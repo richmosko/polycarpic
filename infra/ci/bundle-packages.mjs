@@ -10,8 +10,8 @@ import { dirname, join, resolve } from 'node:path';
 
 const REFUSED = ['picomatch'];
 
-/** `.pnpm/<name>@<ver>[_peers]/node_modules/<name>/...` -> {name, version}; a path outside node_modules is a workspace file -> its package.json. */
-export function packageOf(raw, base) {
+/** `.pnpm/<name>@<ver>[_peers]/node_modules/<name>/...` -> {name, version}; a path outside node_modules is our own code -> null. */
+export function packageOf(raw) {
   const id = raw.replace(/^\0/, '').replace(/[?#].*$/, '');
   if (!/[\\/]/.test(id) || id.startsWith('node:')) return null;
   const norm = id.replaceAll('\\', '/');
@@ -29,16 +29,7 @@ export function packageOf(raw, base) {
     }
     return { name, version };
   }
-  let dir = dirname(resolve(base ?? '/', norm));
-  for (let n = 0; n < 12; n++) {
-    const pj = join(dir, 'package.json');
-    if (existsSync(pj)) {
-      const p = JSON.parse(readFileSync(pj, 'utf8'));
-      if (p.name) return { name: p.name, version: p.version ?? 'workspace' };
-    }
-    if (dirname(dir) === dir) break;
-    dir = dirname(dir);
-  }
+  // outside node_modules is our own code (the workspace packages and apps/web); the list is of third-party packages
   return null;
 }
 
