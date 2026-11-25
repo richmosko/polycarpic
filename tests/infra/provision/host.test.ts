@@ -211,6 +211,22 @@ describe('provision.sh host stage (R5)', () => {
     }
   });
 
+  // POLY-104 F6: edge.yml bind-mounts both into Caddy, which runs as 10010; nothing created them, so Docker would make them root-owned.
+  const CADDY_STAT = `stat -c '%n %a %u:%g %F' /srv/polycarpic/caddy /srv/polycarpic/caddy-config`;
+  const CADDY_WANT = ['/srv/polycarpic/caddy 700 10010:10010 directory', '/srv/polycarpic/caddy-config 700 10010:10010 directory'];
+
+  it('F6: creates Caddy\'s two data directories, 10010:10010 mode 0700, and Caddy\'s user can write in both', () => {
+    const r = run(`${CADDY_STAT}; for d in caddy caddy-config; do setpriv --reuid=10010 --regid=10010 --clear-groups touch /srv/polycarpic/$d/probe && echo "wrote $d"; done`, { image: HOST });
+    expect(r.out.trim().split('\n'), r.err).toEqual([...CADDY_WANT, 'wrote caddy', 'wrote caddy-config']);
+  });
+
+  it('F6: Caddy directories that exist root-owned and open (as Docker makes a missing bind source) are repaired by a rerun, with their contents kept', () => {
+    const r = run(`mkdir -p /srv/polycarpic/caddy /srv/polycarpic/caddy-config; chown 0:0 /srv/polycarpic/caddy /srv/polycarpic/caddy-config; chmod 0755 /srv/polycarpic/caddy /srv/polycarpic/caddy-config; echo kept > /srv/polycarpic/caddy/cert; ${HOSTRUN} > /tmp/o 2>&1${rc}; ${CADDY_STAT}; cat /srv/polycarpic/caddy/cert; grep -c '^change: .*caddy' /tmp/o`, { image: HOST });
+    const out = r.out.trim().split('\n');
+    expect(out.slice(0, 4), r.out + r.err).toEqual(['rc=0', ...CADDY_WANT, 'kept']);
+    expect(Number(out[4]), 'the repair is reported as a change').toBeGreaterThan(0);
+  });
+
   it('M1 (POLY-99 R10): files written by 999 (WAL) and 10004 (dump) under umask 077 stay READABLE by 10005, who can neither add a sibling nor delete (root deletes); a chmod 0600 removes the read', () => {
     const as = (uid: number, cmd: string) => `setpriv --reuid=${uid} --regid=${uid} --clear-groups bash -c '${cmd}'`;
     const r = run([

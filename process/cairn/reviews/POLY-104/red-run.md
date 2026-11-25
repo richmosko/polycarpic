@@ -43,4 +43,12 @@ A pipe whose reader can leave before the writer is done, in a script with `pipef
 | `infra/backup/restore-lib.sh:196` | `sed` on a short Dockerfile → `head -1`. |
 | `.github/workflows/*.yml` (`echo`/`printf` → `grep -Eq`; `build.yml:332` → `head -n1`) | One short write. |
 
-No standing lint added: a text rule would flag all of the low rows and need an allowlist about as long as the list. The fixes that remove the shape: capture the writer's output first and then match it (`out=$(cmd) …; grep -q x <<< "$out"`), or a reader that reads to the end (`awk` without `exit`, `grep … > /dev/null` in place of `-q`).
+No standing lint added: a text rule would flag all of the low rows and need an allowlist about as long as the list. The fixes that remove the shape: capture the writer's output first and then match it (`out=$(cmd) …; grep -q x <<< "$out"`), or a reader that reads to the end (`awk` without `exit`; `grep -c … > /dev/null`). `grep … > /dev/null` alone is not one: GNU grep sees `/dev/null` and leaves at the first match, as with `-q` (devops-104).
+
+## F4, F6 and the drill (DR3)
+
+- **F4** (`test_provision.py`, 24 run): `polycarpic-ops provision` refuses `--bind-addr`, `--staging-allow`, `--acme-email`. Red: the forwarding test (1) and the bad-value test (22 subtests), which wants exit 2 with `provision: bad --<flag>` and nothing run. The signal test (4) is still red.
+- **F6** (`host.test.ts`): nothing creates `/srv/polycarpic/caddy` or `caddy-config`. Two tests: created 10010:10010 0700 and writable by 10010; root-owned 0755 ones repaired by a rerun with contents kept and a `change:` line.
+- **DR3** (`tests/infra/drill-dr3.test.ts`, no container; `vitest run -c tests/infra/vitest.config.ts tests/infra/drill-dr3.test.ts`): 9 run, 5 failed, each `PASS DR3` where `FAIL DR3` is due: a password early in a large file (gzip and plain), a missing file, a corrupt gzip, a truncated gzip. The last three need no particular size.
+
+F3 hides F6 and H25, so both were also run with a one-line local `awk` fix in `provision.sh`, then reverted and not committed: `host.test.ts` 91 run, 84 passed, 7 failed: the two F6 tests, `F3 same shape`, and four existing provision-check tests on the same false H25. `F3` itself passed with that fix.
