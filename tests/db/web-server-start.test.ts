@@ -178,3 +178,37 @@ describe('SIGTERM', () => {
     s.destroy();
   }, 60_000);
 });
+
+// seceng's S3 addition (ruling-review @ addendum 2): the CSP replacement is unmeasured, so a header check is not enough. Chromium loads the page from the
+// real main.ts and its own script must run: Kit's inline bootstrap (carries the nonce) and start.js (script-src 'self'), with no violation reported.
+describe('S3: the page\'s own script runs under the policy, in a browser', () => {
+  it('/sign-in loads in Chromium with exactly one CSP header, no violation event or console report, and the SvelteKit bootstrap and entry script have run  [red if: two policies are in force, the nonce does not match, or a script is blocked]', async () => {
+    const { createRequire } = await import('node:module');
+    const { chromium } = createRequire(join(ROOT, 'apps/web/package.json'))('@playwright/test') as typeof import('@playwright/test');
+    const w = await run({});
+    expect(w.proc.exitCode).toBeNull();
+    const browser = await chromium.launch({ args: ['--host-resolver-rules=MAP localhost:5173 127.0.0.1:3000'] });
+    try {
+      const page = await browser.newPage();
+      const reports: string[] = [];
+      page.on('console', (m) => { if (/content security policy|refused to (execute|load|apply)/i.test(m.text())) reports.push(m.text()); });
+      page.on('pageerror', (e) => reports.push(String(e)));
+      await page.addInitScript(() => { (window as unknown as { __v: string[] }).__v = []; document.addEventListener('securitypolicyviolation', (e) => (window as unknown as { __v: string[] }).__v.push(`${e.violatedDirective} ${e.blockedURI}`)); });
+      const res = await page.goto('http://localhost:5173/sign-in', { waitUntil: 'networkidle' });
+      expect(res!.status()).toBe(200);
+      const csp = Object.entries(await res!.allHeaders()).filter(([k]) => k === 'content-security-policy');
+      expect(csp, 'exactly one policy header').toHaveLength(1);
+      const state = await page.evaluate(() => ({
+        v: (window as unknown as { __v: string[] }).__v,
+        boot: Object.keys(window).filter((k) => k.startsWith('__sveltekit_')),
+        scripts: performance.getEntriesByType('resource').map((e) => e.name).filter((n) => /\/_app\/immutable\/entry\/(start|app)\./.test(n)),
+        nonceScripts: [...document.querySelectorAll('script')].filter((s) => s.nonce || s.getAttribute('nonce')).length + [...document.querySelectorAll('script:not([src])')].length,
+      }));
+      expect(state.v, 'violation events').toEqual([]);
+      expect(reports, 'console reports').toEqual([]);
+      expect(state.boot.length, 'the inline bootstrap ran').toBeGreaterThan(0);
+      expect(state.scripts.length, 'start and app entry scripts were fetched').toBeGreaterThanOrEqual(2);
+      expect(state.nonceScripts).toBeGreaterThan(0);
+    } finally { await browser.close(); }
+  }, 120_000);
+});
