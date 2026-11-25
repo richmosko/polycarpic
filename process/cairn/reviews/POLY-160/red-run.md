@@ -105,7 +105,7 @@ Each mutant is one text edit of `infra/ops/**`, made on a scratch copy in this w
 | rel.write: directory fsync removed | RED | test_release_records:write_fsyncs_the_file_then_replaces_then_fsyn |
 | quarantine not idempotent | RED | test_release_records:quarantine_twice_for_the_same_digest_and_reas |
 | held- does not lift (LIFTING guard only) | RED | test_release_records:a_held_line_lifts_with_another_bundle_and_nev; recover_checks:a_lifted_line_on_current_does_not_stop_the_re |
-| saved pair: hash check dropped | RED | recover_rows:an_allowlist_changed_since_under_the_pinned_c |
+| saved pair: hash check dropped | GREEN (survived), equivalent at the outcome, accepted by seceng-160 | the only red the harness saw was the edge allowlist test, whose raw-render hook was my test fault (fixed at `6bc343e9`); `canonical(corrected) != data` and `verify` refuse the same inputs |
 | saved pair: environment comparison dropped | RED | recover_rows:a_mismatched_compose_whose_environment_differ; recover_rows:an_allowlist_changed_since_under_the_pinned_c; s36_env:a_changed_environment_value_since_is_not_uppe …+1 |
 | restore: tree hash of current skipped (deployer) | RED | recover_rows:a_tampered_tree_of_current_is_not_upped_and_t; recover_rows:an_allowlist_changed_since_under_the_pinned_c |
 | mark names current: no settle (3e deleted) | RED | recover_checks:a_mark_that_names_current_is_settled_never_qu; recover_rows:an_allowlist_changed_since_under_the_pinned_c |

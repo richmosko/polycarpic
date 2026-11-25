@@ -23,7 +23,7 @@ Control 45538719357 (03:15 UTC, POLY-161's PR run) against 45559878210 (`88482c3
 
 | Job | Control | Tip runs | Reading |
 |---|---|---|---|
-| deploy-real | 458 s | 558 s, 573 s | +100 to +115 s: the C28, restart and (later) B7 cases; 15-minute limit: 62–64 % used before B7; the local container adds 90 s for B7, so expect about 11 minutes in CI: **re-measure** |
+| deploy-real | 458 s | 558 s, 573 s; **631 s at `655fb279` (CI 45565943755, with B7): 70 % of 900 s** | +100 to +115 s: the C28, restart and (later) B7 cases; 15-minute limit: 62–64 % used before B7; the local container adds 90 s for B7, so expect about 11 minutes in CI: **re-measure** |
 | db | 306 s | 359 s | +53 s: web down/up (a 5.5 s memo wait and the restart wait), outage and wrapper cases; one run |
 | unit | 439 s | 442 s | none |
 | provision | 245 s | 211 s | none |

@@ -18,9 +18,9 @@ The lesser findings from POLY-100's third build review, and other deploy items P
 
 ## Acceptance criteria
 
-- [ ] Every item of the Principal's scope cut (last scope comment) is fixed as `process/cairn/reviews/POLY-160/ruling.md` rules, each with a test shown red on the fault.
-- [ ] The end-to-end deploy test (T-real) passes, and the `deploy-real` job's measured CI time is recorded against its 15-minute limit.
-- [ ] Postgres restarted under the running services: web, auth and the worker stay up, and health recovers.
+- [x] Every item of the Principal's scope cut (last scope comment) is fixed as `process/cairn/reviews/POLY-160/ruling.md` rules, each with a test shown red on the fault. — `tests/infra/ops/test_deploy_recover.py`, `test_deploy_recover_checks.py`, `test_deploy_recover_rows.py`, `test_deploy_recover_edge.py`, `test_deploy_standdown.py`, `test_deploy_commit.py`, `test_deploy_retry.py`, `test_deploy_build_review.py`, `test_deploy_unwind_more.py` (a)/(b), `test_deploy_hang.py` leftover-mark case, `test_release_records.py`, `test_status.py` (R1.12), `tests/infra/provision-render-home.test.ts` and `tests/infra/provision/host.test.ts` (POLY-160 R6, R7), `packages/db/src/pool-errors.test.ts`, `tests/db/{wrappers,web-server,auth-service-main,worker-mail-jobs}.test.ts`; each red on the fault or its mutant: `process/cairn/reviews/POLY-160/red-run.md`
+- [x] The end-to-end deploy test (T-real) passes, and the `deploy-real` job's measured CI time is recorded against its 15-minute limit. — `tests/infra/deploy-real/2-rollback.test.ts` (C28, B7), `1-web-served.test.ts` (T-real 1c): CI run 45565943755, `deploy-real` 631 s of 900 s (70 %); local container 27 / 27, 502 s; `process/cairn/reviews/POLY-160/gate.md` §2
+- [x] Postgres restarted under the running services: web, auth and the worker stay up, and health recovers. — `tests/infra/deploy-real/1-web-served.test.ts`: "T-real 1c: Postgres restarts under the running services" (StartedAt and RestartCount unchanged, health 200, the worker's next `job.run` ok, each service's `db.connection_lost.<pool>` line); `tests/db/web-server.test.ts`: "the database restarted under a running web"
 
 ## Comments
 
