@@ -1,4 +1,4 @@
-// POLY-161c R5 / S5 (verdict B13, B14): `guardConsole` replaces every output method of `console`, logs `console.suppressed` for an Error and
+// POLY-161c R5 / S5 (verdict B13, B14): `guardConsole` replaces every output method of `console`, logs `web.console_suppressed` for an Error and
 // nothing else of the arguments, and Node's process warnings print nothing of their text. Run in a child process: a spy on
 // `process.stdout.write` misses vitest's own console (POLY-162 C1), and a child's real stdout and stderr are what the container logs show.
 // Each case has an un-guarded control that shows the canary, so an empty output cannot pass. Red today: src/ops/console.ts does not exist.
@@ -59,13 +59,13 @@ describe('guardConsole: every output method', () => {
 });
 
 describe('guardConsole: what is logged', () => {
-  it('an Error argument gives one console.suppressed at warn with err type and code only; message, stack and every other argument stay out  [red if: the message or stack is logged, or nothing is]', () => {
+  it('an Error argument gives one web.console_suppressed at warn with err type and code only; message, stack and every other argument stay out  [red if: the message or stack is logged, or nothing is]', () => {
     const r = child(`
       const e = new TypeError(${JSON.stringify(CANARY + '-message')});
       e.code = 'EZQ';
       console.error('prefix-' + ${JSON.stringify(CANARY)}, { deep: ${JSON.stringify(CANARY)} }, e);
     `, true);
-    const hits = r.json.filter((l) => l.event === 'console.suppressed');
+    const hits = r.json.filter((l) => l.event === 'web.console_suppressed');
     expect(hits).toHaveLength(1);
     expect(hits[0]!.level).toBe('warn');
     expect(hits[0]!.err).toEqual({ type: 'TypeError', code: 'EZQ' });
@@ -80,7 +80,7 @@ describe('guardConsole: what is logged', () => {
       console.error({ message: ${JSON.stringify(CANARY)}, stack: ${JSON.stringify(CANARY)} });
     `, true);
     expect(r.stdout + r.stderr).not.toContain(CANARY);
-    expect(r.json.every((l) => l.event === 'test.control' || l.event === 'console.suppressed')).toBe(true);
+    expect(r.json.every((l) => l.event === 'test.control' || l.event === 'web.console_suppressed')).toBe(true);
   });
 
   it('a planted logged object (`console.log(req.headers)`) is seen un-guarded and not guarded  [red if: an object slips through]', () => {
