@@ -4,14 +4,14 @@ title: Home box first deploy
 status: backlog
 milestone: POLY-1.2
 parent: null
-blocked_by: [POLY-97, POLY-98]
+blocked_by: [POLY-97, POLY-98, POLY-92]
 assignee: devops-engineer
 paths: [infra/home/**, infra/ca/**, process/cairn/reviews/**]
 labels: [ops, security, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-24
 ---
 
 Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. GA runs on the Hetzner VPS (lead ruling, 2026-11-08). INFRA §3.5, §7.2, §7.3: the home-box scripts and the proofs needed before any real data there: OQ-INFRA-10 (TPM-unlocked encrypted root on Ubuntu 24.04, candidate A then B; SECURITY H1), OQ-INFRA-2 (signed PCR policies), and in private-CA mode OQ-INFRA-3 / R-20 (browser name-constraint enforcement).

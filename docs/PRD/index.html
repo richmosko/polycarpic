@@ -18,8 +18,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>product-manager</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.5.0</span>
-    <span><strong>Last updated:</strong> 2026-11-19</span>
+    <span><strong>Version:</strong> 1.5.1</span>
+    <span><strong>Last updated:</strong> 2026-11-25</span>
   </div>
 </header>
 
@@ -241,7 +241,8 @@
       <tr><td>POLY-B — Research</td><td class="tbd">in progress</td><td>This PRD approved; user stories seeded to the tracker backlog.</td></tr>
       <tr><td>POLY-C — Plan</td><td class="tbd">TBD</td><td>Design system built, throwaway UX prototype at <code>prototype/</code>, ARCH doc (layers, GL build-vs-adopt decision, migration tool), SECURITY doc, INFRA doc — all as living artifacts.</td></tr>
       <tr><td>Development milestones <code>POLY-M1</code>, <code>POLY-M2</code>, … under the <code>POLY-V1</code> major</td><td>open by decision, not omission</td><td>Defined by the architect in Plan, ordered by scope not release order (entity/membership model, GL + journal entries, provider-agnostic import with draft→confirm, transfer matching, reconciliation, securities lot sub-ledger, seeded reports, per-entity dashboard). A milestone is renamed to a version (<code>POLY-0.x</code>/<code>POLY-1.0</code>) only when designated to cut a release, preserving the tracker's 1:1 milestone↔tag rule.</td></tr>
-      <tr><td>POLY-1.0 — GA</td><td class="tbd">TBD</td><td>The v1 scope above on staging data, with the files path working and direct and Plaid adapters for the Principal's custodials. A backup restore drill passes — a GA gate, in place of early real data.</td></tr>
+      <tr><td>POLY-M6 — Production readiness</td><td class="tbd">TBD</td><td>Every condition on opening prod to the internet and on holding real household data is met and shown on staging or a test box: edge limits, maintenance page and monitoring hold under abuse and failure; a bad migration is rolled back by copying a pre-migration backup into prod; the off-box bucket check runs daily; the auth gates for a second person are in. Prod is not deployed here: it accepts only a <code>v1.*</code> tag, and no real data is loaded before the restore drill passes.</td></tr>
+      <tr><td>POLY-1.0 — GA</td><td class="tbd">TBD</td><td>The v1 scope above on staging data, with the files path working and direct and Plaid adapters for the Principal's custodials. The first prod deploy, the in-app instance invite, trusted devices and the sign-in and sessions screens ship here. A backup restore drill passes — a GA gate, in place of early real data.</td></tr>
       <tr><td>POLY-1.1</td><td class="tbd">TBD</td><td>The economic view beside the gross parent roll-up (cap-table-weighted figures and economic net worth), scoped to the selected parent's roll-up set.</td></tr>
     </tbody>
   </table>

@@ -2,7 +2,7 @@
 id: POLY-103
 title: Monitoring, heartbeat, alerts
 status: backlog
-milestone: POLY-M1
+milestone: POLY-M6
 parent: null
 blocked_by: [POLY-98, POLY-99]
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [ops, observability]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-22
+updated: 2026-11-24
 ---
 
 INFRA §6.5: the 5-minute self-check against the public name (issuer matches TLS_MODE), backup and deploy pings, the Resend path for host alerts, the alert list (spool, backup age from last-upload, certificate, disk, slots and WAL, unaccounted poly_backup connections, B2 cap, GitHub token, pending reboot), and the Healthchecks setup checklist. The ledger-chain SEV1 email is POLY-109's.

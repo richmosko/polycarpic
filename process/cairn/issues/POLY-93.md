@@ -2,7 +2,7 @@
 id: POLY-93
 title: Cap table
 status: backlog
-milestone: POLY-M1
+milestone: POLY-1.0
 parent: null
 blocked_by: [POLY-90]
 assignee: null
@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-24
 ---
 
 Every entity carries a total unit count and effective-dated, append-only holder rows (ARCH §3.1a; Principal 2026-11-07; SECURITY A-18, C-27). Holders are Persons, Trusts or Businesses, never users; units sum to at most the total and the remainder reads as outside owners. Equity is independent of access. Placed in M1 with the membership schema (PM recommendation, adopted). On a multi-owner entity the M1 gate refuses edits until co-owner approvals ship in POLY-1.0. Former-holder behaviour is in POLY-114.
@@ -29,3 +29,9 @@ Every entity carries a total unit count and effective-dated, append-only holder 
 - [ ] poly_stake definers app.my_stakes, app.cap_table_candidates, app.held_entities and one split function on the allowlist; equity_* SELECT not widened.
 - [ ] The M1 multi-owner gate covers equity_total and equity_holding.
 - [ ] Tests: ARCH §3.1a Tests.
+
+## Comments
+
+### @team-lead — 2026-11-24
+
+Moved from POLY-M1 to POLY-1.0 at the regroup of 2026-11-25 (Principal's approval; architect and product-manager agree). Build it first in POLY-1.0: POLY-66, 112, 113 and 114 need it, and it must precede POLY-112, since the founder (POLY-90) identifies the creator only until transfer is allowed. No `equity_*` table exists yet; the later migration adds the tables and backfills one default row pair per non-Person entity, with no rewrite.

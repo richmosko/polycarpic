@@ -2,7 +2,7 @@
 id: POLY-156
 title: Edge follow-ups 2
 status: backlog
-milestone: POLY-M1
+milestone: POLY-M6
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [ops, security]
 priority: null
 pr: null
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-24
 ---
 
 Umbrella for what the POLY-138 loop left open (`process/cairn/reviews/POLY-138/verdict.md`, `build-review.md`). Add later Caddy, edge and Renovate nits here.

@@ -2,7 +2,7 @@
 id: POLY-143
 title: CI and test-time follow-ups
 status: backlog
-milestone: POLY-M1
+milestone: POLY-D
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-21
+updated: 2026-11-24
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").

@@ -2,7 +2,7 @@
 id: POLY-94
 title: Parent placement consent
 status: backlog
-milestone: POLY-M1
+milestone: POLY-1.1
 parent: null
 blocked_by: [POLY-62, POLY-89]
 assignee: null
@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-24
 ---
 
 Placing an entity under a parent needs no approval from its owners; the placement step and the notices state the C-25 consent wording. When an invitation to a parent goes live, every owner beneath at any depth gets one notice per new member with a pull-out link. Nesting is any depth, acyclic, with a sanity limit (ARCH §3.1 entity_rollup, §3.3b; SECURITY A-16, A-17, A-21, A-28). The roll-up view ships in POLY-1.1.
@@ -26,3 +26,9 @@ Placing an entity under a parent needs no approval from its owners; the placemen
 - [ ] A parent can hold its own accounts; a base entity may sit in several parents.
 - [ ] app.check_rollup_edge() (poly_graph) under a fixed advisory lock; refuses an own-Person child whose user has no second step (A-28).
 - [ ] Tests: ARCH §3.3b Tests, except the roll-up totals items (POLY-118).
+
+## Comments
+
+### @team-lead — 2026-11-24
+
+Moved from POLY-M1 to POLY-1.1 at the regroup of 2026-11-25. Build it first in POLY-1.1: only POLY-118 is blocked by it. The A-28 edge clause in `own_person_exempt` lands in the same migration as the junction table; POLY-91 is built without it. Until then parents exist with nothing nestable beneath them.

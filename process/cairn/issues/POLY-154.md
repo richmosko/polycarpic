@@ -2,7 +2,7 @@
 id: POLY-154
 title: Trust this device
 status: backlog
-milestone: POLY-M1
+milestone: POLY-1.0
 parent: null
 blocked_by: []
 assignee: backend-lead
@@ -10,7 +10,7 @@ labels: [security, auth]
 priority: null
 pr: null
 created: 2026-11-19
-updated: 2026-11-20
+updated: 2026-11-24
 ---
 
 The Principal chose to offer "trust this device" at the second sign-in step (2026-11-19; `process/DECISIONS.md`), unticked by default. BetterAuth 1.7.18's own version renews on every use, survives a password change and has no list, so it is not used as it stands. Until this issue ships, the sign-in service keeps refusing `trustDevice` (POLY-150 ruling R7). Design sources: POLY-150's ruling, Addendum 2 (`process/cairn/reviews/POLY-150/ruling.md` at faa43102), and seceng's assessment in `process/cairn/reviews/POLY-150/ruling-review.md`. Needs its own ruling and seceng review before any test is written.
