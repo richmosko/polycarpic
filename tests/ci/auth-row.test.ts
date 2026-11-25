@@ -13,8 +13,8 @@ const LINT = 'packages/auth/src/boundaries.test.ts';
 const RP = 'tests/db/auth-route-policy.test.ts';
 const POOL = 'tests/db/auth-routing-pool.test.ts';
 const SOURCES = [LINT, RP, POOL];
-// Floors are measured counts (vitest, tests-red). Raising a suite does not need an edit here; lowering a floor does.
-const FLOOR: Record<string, number> = { [LINT]: 9, [RP]: 26, [POOL]: 19 };
+// Floors are the counts a real run reports (the db battery's and the lint row's JSON; `vitest list` does not expand describe.each). Raising a suite does not need an edit here; lowering a floor does.
+const FLOOR: Record<string, number> = { [LINT]: 9, [RP]: 43, [POOL]: 40 };
 
 const LIVE = 'every HTTP route of the instance is in AUTH_ROUTES and every entry is live, naming the path  [red if: a plugin or version adds a route unclassified, or the map keeps a dead entry]';
 const MODES = ['route policy, real-domain mode', 'route policy, private-ca mode'];
@@ -81,10 +81,10 @@ describe('auth-row.mjs: green on a good report', () => {
   it('db: RP and POOL passed at their floors -> 0, a line each; a skip in another battery file is not this row\'s business', () => {
     const r = run('db', good('db'));
     green(r);
-    expect(r.stdout).toContain(`auth-row: ${RP} 26 passed (floor 26)`);
-    expect(r.stdout).toContain(`auth-row: ${POOL} 19 passed (floor 19)`);
+    expect(r.stdout).toContain(`auth-row: ${RP} 43 passed (floor 43)`);
+    expect(r.stdout).toContain(`auth-row: ${POOL} 40 passed (floor 40)`);
   });
-  it('above the floor stays green', () => { green(run('db', { ...good('db'), [POOL]: passing(POOL, 30) })); });
+  it('above the floor stays green', () => { green(run('db', { ...good('db'), [POOL]: passing(POOL, 50) })); });
   it('DB_AUTH=false -> 0 and the report is not read', () => {
     const r = run('db', {}, { env: { DB_AUTH: 'false' }, raw: null });
     green(r);
@@ -204,7 +204,7 @@ describe('auth-row.mjs: fails closed', () => {
 describe('auth-row.mjs: its table', () => {
   it('ROWS names the three files by exact path, with the measured floors  [red if: a floor is lowered or a file dropped]', async () => {
     const m = (await import(ci('auth-row.mjs'))) as { ROWS: Record<string, { file: string; floor: number }[]> };
-    expect(Object.fromEntries(Object.entries(m.ROWS).map(([k, v]) => [k, v.map((x) => [x.file, x.floor])]))).toEqual({ lint: [[LINT, 9]], db: [[RP, 26], [POOL, 19]] });
+    expect(Object.fromEntries(Object.entries(m.ROWS).map(([k, v]) => [k, v.map((x) => [x.file, x.floor])]))).toEqual({ lint: [[LINT, 9]], db: [[RP, 43], [POOL, 40]] });
   });
   it('imports node built-ins only', () => {
     const src = readFileSync(ci('auth-row.mjs'), 'utf8');
