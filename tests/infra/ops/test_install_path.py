@@ -99,6 +99,15 @@ class ByPath(unittest.TestCase):
         self.assertIn("is not a commit here", err)
         self.assertEqual(self.ssh_calls(), [])
 
+    def test_an_upper_case_commit_is_a_bad_commit_in_the_operators_locale_too(self):
+        # under en_US.UTF-8, macOS bash reads `[a-f]` as also holding B to F's lower-case neighbours A to E; test_install_commit's upper-case case
+        # then passed or failed with the letters of that run's random commit id
+        env = dict(os.environ, **ti.ENV_GIT, PATH="%s:%s" % (self.bin, os.environ["PATH"]), LOG=str(self.log), LANG="en_US.UTF-8")
+        env.pop("LC_ALL", None)
+        p = subprocess.run(["bash", str(self.repo / "infra" / "ops" / "install.sh"), "polyops@box.example", "--commit", "ABCDE" * 8], cwd=str(self.repo), env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual((p.returncode, p.stderr), (2, "install.sh: bad --commit\n"))
+        self.assertEqual(self.ssh_calls(), [])
+
     def test_a_relative_ssh_key_is_still_the_file_where_the_operator_stands(self):
         (self.other / "keys").mkdir()
         (self.other / "keys" / "k").write_text("key\n")
@@ -110,6 +119,62 @@ class ByPath(unittest.TestCase):
             where = (self.log / ("ssh-%d.pwd" % n)).read_text().strip()
             got = os.path.realpath(os.path.join(where, args[args.index("-i") + 1]))
             self.assertEqual(got, os.path.realpath(str(self.other / "keys" / "k")), "ssh call %d" % n)
+
+
+class GitFailure(unittest.TestCase):
+    """POLY-104: install.sh is sh, so a pipe's status is the last command's: a `git show` or `git archive` that failed was hidden behind ssh's 0, and
+    the install reported success after shipping nothing, or part of a tree. Its exit code must be the script's, a line must say what failed, and the box
+    command that changes the installed version (the install_box.py run, the second ssh) must never start: the box cannot tell a cut stream that ends
+    on a member boundary from a whole one, so the laptop knows git succeeded before it runs it."""
+
+    git = ti.Install.git
+    ssh_calls = ti.Install.ssh_calls
+    install = ti.Install.install
+    CODE = 42  # no tool on this path exits 42 by itself
+
+    def setUp(self):
+        ti.Install.setUp(self)
+
+    def fail_git(self, verb, keep):
+        """`git <verb>` writes the first `keep` bytes of its real output (all of it when None), then exits CODE; every other git call is real."""
+        cut = "cat" if keep is None else "head -c %d" % keep
+        (self.bin / "git").write_text(
+            '#!/bin/sh\nif [ "$1" = %s ]; then echo "fatal: planted %s failure" >&2; %s "$@" | %s; exit %d; fi\nexec %s "$@"\n'
+            % (verb, verb, ti.REAL_GIT, cut, self.CODE, ti.REAL_GIT))
+
+    def check(self, verb, keep):
+        self.fail_git(verb, keep)
+        rc, out, err = self.install()
+        self.assertEqual(rc, self.CODE, "install.sh must exit with git's code; got %d\n%s%s" % (rc, out, err))
+        self.assertTrue([l for l in err.splitlines() if l.startswith("install.sh: ") and "git %s" % verb in l], "no install.sh line naming git %s:\n%s" % (verb, err))
+        ran = [args[-1] for args, _ in self.ssh_calls() if "/usr/bin/python3" in args[-1]]
+        self.assertEqual(ran, [], "install_box.py was run on the box although git %s failed" % verb)
+
+    def test_git_show_that_writes_nothing_and_fails(self):
+        self.check("show", 0)
+
+    def test_git_show_that_fails_partway_through_the_file(self):
+        self.check("show", 200)
+
+    def test_git_archive_that_writes_nothing_and_fails(self):
+        self.check("archive", 0)
+
+    def test_git_archive_that_fails_partway_through_the_tree(self):
+        self.check("archive", 10240)  # whole tar records: a valid beginning of the tree
+
+    def test_git_archive_that_fails_after_writing_everything(self):
+        self.check("archive", None)
+
+    def test_with_git_working_the_archive_sent_is_git_archives_whole_output(self):  # positive twin
+        rc, out, err = self.install()
+        self.assertEqual(rc, 0, out + err)
+        calls = self.ssh_calls()
+        self.assertEqual(len(calls), 2)
+        sha = self.git("rev-parse", "HEAD")
+        sent = tarfile.open(fileobj=io.BytesIO(calls[1][1]))
+        paths = [x for x in ti.BUNDLE_PATHS]
+        want = subprocess.run([ti.REAL_GIT, "archive", "--format=tar", sha, "--"] + paths, cwd=str(self.repo), capture_output=True, check=True).stdout
+        self.assertEqual(sorted(sent.getnames()), sorted(tarfile.open(fileobj=io.BytesIO(want)).getnames()))
 
 
 if __name__ == "__main__":

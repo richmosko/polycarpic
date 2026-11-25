@@ -59,6 +59,13 @@ No standing lint added: a text rule would flag all of the low rows and need an a
 
 Red at `ebceb70b` (`tests/infra/ops/test_install_path.py`, 8 of 9 new cases failed). Build-green at `c1aaa6e3`: `test_install*.py` 24 run, all passed; box `ops.test.ts` (the real `install.sh` to `install_box.py`) 23 of 23; `shellcheck -x` on `install.sh` exit 0.
 
+## `install.sh`: a failed git is hidden, and a locale-dependent check
+
+`test_install_path.py` / `test_install*.py`: 31 run, 6 failed.
+
+- **Hidden failure** (5 cases): `git show` or `git archive` writes nothing, part, or everything and exits 42; `install.sh` exits 0. Pinned: the script exits 42, an `install.sh:` line names `git show` or `git archive`, and the ssh command that runs `install_box.py` never starts. The last is a design constraint: a stream cut on a tar record boundary can look whole to the box, so the laptop has to know git succeeded first. A positive twin (the archive sent is git's whole output) passes.
+- **Upper-case `--commit`** (1 case, older than this loop): in `en_US.UTF-8`, macOS bash 3.2 matches `A` to `E` with `[a-f]`, so an upper-case commit with no `F` passes the check. `test_install_commit.py::test_bad_hosts_and_commits…` therefore failed or passed with the letters of each run's random sha (it failed once in this loop). Pinned: `ABCDE`×8 gets `install.sh: bad --commit`. `LC_ALL=C bash` refuses it. On the Linux CI runner the old case is not expected to fail (unmeasured).
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
