@@ -125,6 +125,7 @@ export function operatorPool(): pg.Pool {
 export async function close(): Promise<void> {
   const open = [app, auth, worker, operator].filter((p): p is pg.Pool => p !== undefined);
   app = auth = worker = operator = undefined;
+  lastTold.clear();
   config = {};
   await Promise.all(open.map((p) => p.end()));
 }
