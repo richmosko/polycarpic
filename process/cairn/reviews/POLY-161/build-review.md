@@ -1,6 +1,6 @@
 # POLY-161b: security build review (seceng)
 
-## Verdict @ `577be1de`: **CHANGES REQUIRED. 1 BLOCKS, 5 FIX HERE, 2 FOLLOW-UP**
+## Verdict @ `577be1de`: **CHANGES REQUIRED. 1 BLOCKS, 6 FIX HERE, 2 FOLLOW-UP**
 
 **Read:** `git diff origin/main...577be1de`: product, Dockerfile, `image.sh`, the workflow and trigger diffs, the new tests. `server.test.ts`, `zone.test.ts`, `console.test.ts`, `web-server-start.test.ts` and `web-stage.test.ts` mostly by case title. **Run by me: nothing.** "Red on" is what a test names or is written to show; I have seen no mutant record for this loop (no qa gate file at this tip). The pass, when given, is conditional on qa's gate, its mutant record, and a full green CI run at the final product sha. Run 45527250708 was still in progress when I read it.
 
@@ -21,6 +21,7 @@
 | F3 | devops, or a delta by architect | R14's last clause ("a server file that has no map and no plugin record fails") is **not built**: `collect()` unions and never asks per file | Build it, or architect drops it. I accept dropping it: the plugin sees every chunk of both builds, and a plant on each side is written to go red |
 | F4 | lead | POLY-163 lost three of the four required items' detail: IPv6 counted by /64, `__data.json` inside the cookie bucket, prod and staging apart with bounded limiter state, the second-address control; and S6's measurement is not in it | Add them; state that a write timeout must bound the slow reader (S6) |
 | F5 | qa | S6 and S7's numbers go to `temp/`, which is not kept | The measured numbers in the gate record |
+| F6 | frontend, then qa | **S-7(c) is red on `ops/console.ts` (CI, lead's reading) and needs no exemption.** The file has no `console` method access: every match is the event name `console.suppressed` (two in code, one in a comment). The static test is not touched | Rename the event to `web.console_suppressed` (valid under the log schema's event pattern) in the file, its comment and the tests that name it; architect's R12 row follows. S-7(c) stays true for every file, this one included. A later `console.` member access in it still goes red |
 
 ## Conditions
 
