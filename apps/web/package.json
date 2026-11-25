@@ -6,6 +6,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "imports": {
+    "#web-build": {
+      "types": "./src/build-handler.d.ts",
+      "default": "./build/handler.js"
+    }
+  },
   "scripts": {
     "test": "svelte-kit sync && vitest run",
     "typecheck": "svelte-kit sync && svelte-check --fail-on-warnings",

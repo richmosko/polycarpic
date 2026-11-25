@@ -2,7 +2,6 @@
 // Order matters: crash handlers (S-7b), check-config, the console guard, the configuration (refuse before any pool exists), the schema
 // guard, the zone check, the status listener, then the built app mounted on 3000. The import of the build comes after the zone check
 // because importing it runs Kit's server init.
-import { pathToFileURL } from 'node:url';
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
 import { init } from './startup.ts';
@@ -44,11 +43,10 @@ async function main(): Promise<void> {
   if ((await verifyZone(config.zone, { log })) === 'refused') process.exit(1);
   await startStatusServer({ port: config.statusPort });
 
-  // A computed URL: typecheck and the unit suites need no build.
+  // After the zone check: importing the build runs Kit's server init. Typecheck needs no build (build-handler.d.ts).
   let handler: WebHandler;
   try {
-    const url = pathToFileURL(new URL('../build/handler.js', import.meta.url).pathname).href;
-    handler = ((await import(/* @vite-ignore */ url)) as { handler: WebHandler }).handler;
+    handler = (await import('#web-build')).handler;
   } catch (e) {
     log.fatal('web.build_missing', { outcome: 'error', err: e });
     process.exit(1);
