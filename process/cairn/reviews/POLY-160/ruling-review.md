@@ -112,3 +112,29 @@ No exemption to rule. Any edit to an existing assertion named there still comes 
 ### A residue for an approver
 
 After a power cut, a kill or a dropped session in a **first** deploy or in `edge-deploy`, no poll exists, so the never-healthy release runs, also after a reboot, until the operator runs the command again; `status` is RED (R1.7). Ctrl-C may try #1's stop on its way out when there is no `current`; I ask for that, best effort. Reach: none from outside; it takes an interruption while an operator is at the keyboard. The gate's text allows it for `edge-deploy` ("the mark is kept"), not for the first deploy.
+
+---
+
+## Delta read @ `7449f3df`: **CHANGES 2**
+
+The whole amended ruling read; nothing run. The 13 are met but for #4 (change 1) and #5 (change 2). Nothing else must move before tests are written.
+
+1. **R1.6: the saved pair must not bring old box settings back.** The ruling uses the saved pair whenever a recovery's fresh bytes differ, pinned Compose or not. Saved bytes hold the interpolated `environment` of the day they were made: `POLY_STAGING_ALLOW`, `POLY_TLS`, `POLY_DOMAIN` from `edge.env`, and the values of the listed env files. The guard checks their keys and the bind address, never the values (`check`, `_env_keys`, read). So: the operator removes an address from staging's allowlist, an `edge-deploy` is cut, and the recovery ups Caddy with the **old** allowlist. *Required:* with the pinned Compose, a recovery is an ordinary restore (fresh render, judged, saved when different). The saved pair serves only on a Compose mismatch, and only if every `environment` value in it is what the box's files give now; else not ok (R1.3c). The version may be asked before the restore to decide this (warn only; a failed or unreadable version is a mismatch). *Tests:* `edge.env` changed since the save, Compose pinned: Caddy comes up with the new value; mismatched: not upped with the old one. *Mutants:* saved pair used under the pinned version; value comparison dropped. An exact list of the environment sources the comparison reads goes in the ruling.
+2. **R1.9: exit 1, not 0**, when `rollback` only recovered. A caller reads 0 as "rolled back", and the release the operator wanted gone is the one running. Test and mutant.
+
+### Asked to look at
+
+- **`docker stop` (D1, D2): accepted.** It renders nothing, and the label filter reaches only this project. Same app image means same digest; Caddy's file is inside its image, so an equal Caddy image is `current`'s own configuration. *At build:* "shown stopped" is a second listing after the stop, not the exit code; a restarting container is covered; another project's containers are untouched, shown by test.
+- **R3 `held-`: accepted**, better than L1's form.
+- **R1.8 signals: accepted.** *At build:* the handlers are on the main thread only, put back on every path, and a second signal in the stop keeps the mark.
+- **R5: accepted.** *At build:* (a) `auth` and the worker each shown to write the line, not web alone; (b) web's built bundle: if it carries its own copy of `pool.ts`, `main.ts` registers on another copy, so show the line fires for a page's query, not only for health's; (c) the canaries go through the real logger.
+- **R1.4, a different digest while stuck: accepted.** It passes every check, and the alert stays.
+- **Restore before the Compose check: accepted with change 1.** **Malformed mark: accepted;** *at build* the runbook has the exact command to remove it (R8 does not name it yet).
+
+### At build, also
+
+- `rollback` run twice makes a quarantined digest `current`; a later failed deploy then refuses to restore it (`current-quarantined`) and stops the candidate. Fail closed and RED; INFRA §4.6 says so.
+- A first deploy cut twice bans its digest and the rerun exits 1 saying nothing new to run: stderr must name the quarantine.
+- POLY-165 holds by name: prod's Caddy on a failed prod restore, the backup set per `check-config-timeout` retry, the boot-time recovery.
+
+Section L: no objection to 1, 3, 4, 5 (staging), 6, 7. Item 2 has its approver (`process/DECISIONS.md` @ `7f13c96f`, staging only). The first sentence's difference (held, not banned for good): I support R3.
