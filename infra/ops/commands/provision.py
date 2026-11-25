@@ -1,6 +1,7 @@
 """provision: the host or database stage of provision.sh from the installed bundle (R3). Only listed flags are forwarded (K2)."""
 import os
 import re
+import signal
 
 HELP = "provision the host (--stage host) or re-apply the database roles (--stage database --project prod|staging)"
 DOMAIN = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+")
@@ -60,9 +61,19 @@ def run(args, ctx):
         if value is not None:
             argv += [flag, value]
     code = ctx.run_inherit(argv)
+    number = _signal_of(code)
+    if number:  # a killed stage prints no reason of its own, so the tool says it (POLY-104 F3)
+        ctx.err("provision: the %s stage was stopped by %s (exit %d) and did not finish" % (args.stage, signal.Signals(number).name, 128 + number))
+        return 128 + number
     if code == 0 and args.b2_bucket is not None:
         _write_conf(ctx, args.b2_bucket)
     return code
+
+
+def _signal_of(code):
+    """-> the signal number behind an exit status, or None. Negative: bash itself was killed. 128+n: a command in it was."""
+    number = -code if code < 0 else code - 128
+    return number if number in set(signal.Signals) else None
 
 
 def _write_conf(ctx, bucket):

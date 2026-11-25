@@ -397,8 +397,9 @@ else
   rm -rf "$rhome"
   [ "$root25" = "$want25" ] || h25="$h25 root's Compose is '${root25:-none}' (want $want25);"
   [ "$user25" = "$want25" ] || h25="$h25 the render user's Compose is '${user25:-none}' (want $want25);"
-  apt-cache policy docker-compose-plugin 2> /dev/null | grep -q 'download.docker.com' || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
-  apt-mark showhold 2> /dev/null | grep -qx docker-compose-plugin || h25="$h25 docker-compose-plugin is not held;"
+  # read to the end, then match: `producer | grep -q` under pipefail can fail a check that holds (POLY-104)
+  grep -q 'download.docker.com' <<< "$(apt-cache policy docker-compose-plugin 2> /dev/null)" || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
+  grep -qx docker-compose-plugin <<< "$(apt-mark showhold 2> /dev/null)" || h25="$h25 docker-compose-plugin is not held;"
 fi
 [ -z "$(ls -A /root/.docker/cli-plugins 2> /dev/null)" ] || h25="$h25 /root/.docker/cli-plugins holds a plugin;"
 report H25 "compose version" "$h25" "sudo bash provision.sh --stage host ... installs and holds it; remove /root/.docker/cli-plugins by hand"
@@ -564,7 +565,7 @@ report H15 "operator access" "$h15" "remove the extra account or its authorized_
 
 # ------------------------------------------------------------------ database checks
 dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory "$rh" --env-file /dev/null "$@"; }
-running() { dc "$1" ps --status running --services < /dev/null 2> /dev/null | grep -qx postgres; }
+running() { local up; up=$(dc "$1" ps --status running --services < /dev/null 2> /dev/null) && grep -qx postgres <<< "$up"; }
 q() { local proj=$1; shift; dc "$proj" exec -T postgres psql -X -tA -U postgres -d polycarpic -c "$1" < /dev/null 2>&1; }
 up_prod=0 up_staging=0
 if [ -z "$rh_bad" ]; then

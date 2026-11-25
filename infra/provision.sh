@@ -140,7 +140,8 @@ install_docker() {
     local tmp fpr
     tmp=$(mktemp)
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp"
-    fpr=$(gpg --show-keys --with-colons "$tmp" | awk -F: '$1 == "fpr" { print $10; exit }')
+    # no pipeline here may stop reading early: under pipefail the producer dies of SIGPIPE and the script ends with 141 (POLY-104 F3)
+    fpr=$(gpg --show-keys --with-colons "$tmp" | awk -F: '$1 == "fpr" && !n++ { print $10 }')
     if [ "$fpr" != "$DOCKER_KEY_FPR" ]; then
       rm -f "$tmp"
       die "Docker's apt key fingerprint is $fpr, expected $DOCKER_KEY_FPR; nothing installed"
@@ -170,7 +171,8 @@ install_compose() {
     apt-mark hold docker-compose-plugin > /dev/null
     return 0
   fi
-  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2); if (index($2, w "-") == 1) { print $2; exit } }')
+  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2) } index($2, w "-") == 1 && !n++ { print $2 }') \
+    || die "apt-cache madison docker-compose-plugin failed; nothing installed"
   [ -n "$cand" ] || die "Docker's repository does not list docker-compose-plugin $want; nothing installed"
   apt-mark unhold docker-compose-plugin > /dev/null 2>&1 || true
   apt-get install -y --no-install-recommends --allow-downgrades --allow-change-held-packages "docker-compose-plugin=$cand" > /dev/null
@@ -444,7 +446,7 @@ effective_mail_from() {
   local cur='' f
   for f in "$ETC/mail.env" "$ETC/host.env"; do # an old host.env still carries the key until the rerun drops it
     if [ -f "$f" ]; then
-      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | head -1 | sed -e 's/^"//' -e 's/"$//')
+      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | sed -n -e '1{s/^"//' -e 's/"$//' -e 'p' -e '}')
       [ -z "$cur" ] || break
     fi
   done
@@ -554,7 +556,9 @@ stage_database() {
 
   render_home || die "render-path: $STATE/deploy/render-home is not a real directory owned by root, mode 0755 and empty; nothing changed"
   local dc=(docker compose -p "polycarpic-$project" --project-directory "$rh" --env-file /dev/null)
-  "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
+  local running
+  running=$("${dc[@]}" ps --status running --services < /dev/null) || running=''
+  grep -qx postgres <<< "$running" \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 
   # G13: the database itself, before roles.sql (POSTGRES_DB acts only on an empty data directory, never on one already initialised). Both statements are
