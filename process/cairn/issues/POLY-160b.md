@@ -10,11 +10,11 @@ paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, pro
 stage: review
 estimate.cost_usd: "10.00"
 estimate.gate_cycles: 3
-actual.cost_usd: "5.1474"
-actual.tokens: 7875330
-actual.gate_cycles: 5
-actual.wall_clock: 70
-ratio: "0.51"
+actual.cost_usd: "6.8732"
+actual.tokens: 12804140
+actual.gate_cycles: 6
+actual.wall_clock: 115
+ratio: "0.69"
 labels: [bloat]
 priority: null
 pr: null

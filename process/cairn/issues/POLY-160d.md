@@ -1,7 +1,7 @@
 ---
 id: POLY-160d
 title: Deploy follow-ups ops build
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, pro
 stage: execute
 estimate.cost_usd: "12.00"
 estimate.gate_cycles: 3
-labels: []
+actual.cost_usd: "5.5905"
+actual.tokens: 35134009
+actual.gate_cycles: 4
+actual.wall_clock: 74
+ratio: "0.47"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-24

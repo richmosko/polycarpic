@@ -1,7 +1,7 @@
 ---
 id: POLY-160e
 title: Pool error listener
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, pro
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "0.5643"
+actual.tokens: 1926928
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.14"
 labels: []
 priority: null
 pr: null
