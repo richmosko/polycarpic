@@ -1,17 +1,17 @@
 ---
 id: POLY-104
 title: First staging deploy
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
 assignee: devops-engineer
-paths: [process/cairn/reviews/**, docs/INFRA/index.html]
+paths: [process/cairn/reviews/**, docs/INFRA/**, docs/SECURITY/**, docs/ARCH/**, infra/**, tests/infra/**, process/cairn/issues/POLY-104.md]
 labels: [ops, verification]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-24
+updated: 2026-11-25
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -69,3 +69,7 @@ From the POLY-161 loop (2026-11-25, `process/cairn/reviews/POLY-161/verdict.md` 
 ### @team-lead — 2026-11-24
 
 From the POLY-160 loop (2026-11-25; `process/cairn/reviews/POLY-160/verdict.md`, "For filing"), three checks for the first real box: the runbook's Ctrl-C line run once on a real `edge-deploy`; a reboot after a stand-down, to see that the stopped containers stay stopped (unmeasured); `docker compose --project-directory` on the box's Compose 5.7.1 with no render home (measured only on 5.7.0 on the Mac).
+
+### @team-lead — 2026-11-25
+
+Feature started. Branch: `feature/poly-104-first-staging-deploy`. The lead decides and merges under the Principal's delegation of 2026-11-25 ("approved to go with your rec's. drive to completion and merge"). State at start, measured: no git tags, no `RELEASE_SIGNERS` variable, no `app` or `staging` DNS records, `main` build 45668115611 green on 4b186404. Decided (POLY-100 ruling §L6): Caddy comes up from a signed `edge-1` tag, not from a prod deploy. The lead runs the box commands with the Principal's loaded SSH key; teammates touch no real credential.
