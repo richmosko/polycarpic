@@ -55,6 +55,10 @@ A pipe whose reader can leave before the writer is done, in a script with `pipef
 
 No standing lint added: a text rule would flag all of the low rows and need an allowlist about as long as the list. The fixes that remove the shape: capture the writer's output first and then match it (`out=$(cmd) …; grep -q x <<< "$out"`), or a reader that reads to the end (`awk` without `exit`; `grep -c … > /dev/null`). `grep … > /dev/null` alone is not one: GNU grep sees `/dev/null` and leaves at the first match, as with `-q` (devops-104).
 
+## F2: `install.sh` run by path
+
+Red at `ebceb70b` (`tests/infra/ops/test_install_path.py`, 8 of 9 new cases failed). Build-green at `c1aaa6e3`: `test_install*.py` 24 run, all passed; box `ops.test.ts` (the real `install.sh` to `install_box.py`) 23 of 23; `shellcheck -x` on `install.sh` exit 0.
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
