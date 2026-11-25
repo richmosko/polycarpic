@@ -1,6 +1,6 @@
 // POLY-161c seam pins: ruling.md R12 (with addenda 1 and 2 @ 075e4e0e). File names, exported names, the fixed bodies and the
 // zone skip answer, as small failing tests, so frontend-161 and devops-161 build to one seam. The behavioural suites follow
-// the thin slice. Red today: none of these modules exists, and public-health.ts still does.
+// the thin slice. The stand-in listener's absence is pinned in tests/ci/one-listener.test.ts.
 import { existsSync, readFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -12,7 +12,7 @@ const WEB = join(HERE, '..');
 const has = (rel: string) => existsSync(join(WEB, rel));
 
 describe('R12 seam: files and exports', () => {
-  it('the modules the ruling names exist, and the stand-in listener and its test are gone  [red if: any is missing, or public-health stays]', () => {
+  it('the modules the ruling names exist  [red if: any is missing]', () => {
     for (const f of [
       'src/ops/server.ts',
       'src/ops/zone.ts',
@@ -23,8 +23,6 @@ describe('R12 seam: files and exports', () => {
       'bundle-packages.ts',
       'bundle-packages.txt',
     ]) expect(has(f), f).toBe(true);
-    expect(has('src/ops/public-health.ts')).toBe(false);
-    expect(has('src/ops/public-health.test.ts')).toBe(false);
   });
 
   it('server.ts exports startWebServer; zone.ts verifyZone; console.ts guardConsole  [red if: names differ]', async () => {
