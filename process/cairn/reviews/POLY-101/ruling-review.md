@@ -54,3 +54,30 @@ So `app` is the gate. Output keys below come from `printf '%s\0' <path> | node i
 ### Left out (for the lead; not conditions)
 - INFRA §4.3 says a "dependency bot's bump" cannot merge; no such bot exists for npm. Wording, devops-101's to judge.
 - A plugin's `onRequest` hook can answer before the router, so its path is in no endpoint list. The exact plugin-id pin in `dist-enumeration` covers new plugins, not new behaviour in the five.
+
+## Part 2: verdict on `ruling.md` @ 45556d16: CHANGES (3, all small; the shape is right)
+
+1. **G1, the §1 table row for `scripts/layers`, and V1's premise are false.** They copy my condition 1 at 1d76e58f, which I corrected at 53991f7e: with the rule deleted,
+   `vitest run tests/layers` exits 1, because structure.test.ts runs the package's own suite, and the `lint` job runs it on `layers` or `node`. Restate G1 as "LINT runs
+   only through structure.test.ts; nothing names it". §9's last bullet falls for the same reason, and so does "only if turbo calls the package affected" in §1.
+   B1 stays worthwhile (named, unconditional, reported) at about 1 s.
+2. **B2 must refuse `it.fails`.** Measured (vitest JSON): a failing `it.fails` is `"status":"passed"`, `describe.skip` is `skipped`, `todo` is `todo`. So
+   `it.fails` on the live-route test hides an unclassified route and passes every B2 rule. `auth-row.mjs` also reads the three source files and exits 1 on
+   `.fails` applied to `it`, `test` or `describe`, or a `fails:` option. None is present today (grep). This is a mistake guard; deliberate edits are condition 11.
+3. **V7 is a standing test.** "Both steps have no `if:`, no `--affected`, no `continue-on-error`; the `db` step directly follows the battery; `DB_AUTH` comes from
+   `needs.changes.outputs.db_auth`" goes in `ci-workflow.test.ts`, not only in the verdict. The same suite asserts that the two `VITEST_JSON` paths differ.
+
+Accepted as ruled: conditions 2 to 4, 6, 7, 9 to 12. Condition 8: the pin normalises an absent, single and array `method`, so a widening cannot hide in the form.
+Residue 11 carries mechanism, reach, stronger option and cost; not accepted as closed (lead files it). SECURITY A-34 needs no edit: its text already says
+the test lists the instance's endpoints and fails on a missing path. ARCH 1.31.1's gate rows match the ruling.
+
+## Build conditions
+
+**qa-101:** (a) RP's live-route test and the control call one predicate. (b) The control is red when `isAction` filtering returns and when the predicate returns nothing.
+(c) `METHOD path` literal, normalised, in both modes. (d) A path case per entry of conditions 2 and 3. (e) `auth-row.mjs` cases: V3 plus `it.fails`. (f) V6 and the skipped-job cases.
+(g) Floors are measured counts, not guesses. (h) One-offs of §5 in the single container run, with output kept.
+**devops-101:** (a) B1 to B6 as ruled; `auth-row.mjs` matches each file by exact path relative to the repo root, not by suffix. (b) No `${{ }}` in `run:`. (c) No new secret, token or permission.
+(d) `auth-row.mjs` is in DB_SHARED, with its OWN entry.
+
+**Must be shown red:** rule deleted in `generate.mjs` (B1's step by itself); each path of 2 and 3 dropped; skip, todo, `fails`, missing file, below floor, one TLS mode; the two control
+faults; `lint` or `db` skipped with its key true; based dispatch.
