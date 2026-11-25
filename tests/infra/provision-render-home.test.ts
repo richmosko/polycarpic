@@ -44,8 +44,12 @@ describe('R7: every compose call names the render home variable and no env file'
     });
   }
   it('both scripts choose `rh` from the render home only when it is a real, empty, root-owned 0755 directory, else `/` or a stop', () => {
-    expect(provision.join('\n')).toMatch(/rh=\$\(render_home\)/);
-    expect(provision.join('\n')).toMatch(/render_home\(\) \{/);
+    const src = provision.join('\n');
+    expect(src).toMatch(/render_home\(\) \{/);
+    expect(src).toMatch(/^\s*rh=\/\s*$/m); // no render home: `/`
+    expect(src).toMatch(/^\s*rh=\$d\s*$/m); // a good one is used
+    expect(src).toMatch(/\[ -L "\$d" \]/); // a link is not
+    expect(src).toMatch(/render_home \|\| die "render-path/); // anything else stops the stage
     expect(check.join('\n')).toMatch(/rh=\//);
     expect(provision.join('\n')).toContain('render-path');
     expect(check.join('\n')).toContain('H24');
