@@ -1,7 +1,7 @@
 ---
 id: POLY-160e
 title: Pool error listener
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
