@@ -2,6 +2,8 @@ import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
+import { bundlePackages } from './bundle-packages.ts';
+import { CSP_DIRECTIVES } from './src/lib/csp.ts';
 
 // The sign-in service owns /api/auth/* (POLY-152 R1.7): dev and preview proxy it; in production Caddy routes it.
 // POLY-150 R8: the proxy plays Caddy: it sets the client address to the browser socket's and overwrites any x-forwarded-for the browser sent.
@@ -22,23 +24,11 @@ export default defineConfig({
   preview: { proxy: authProxy },
   plugins: [
     tailwindcss(),
+    bundlePackages(),
     sveltekit({
-      adapter: adapter(),
-      csp: {
-        mode: 'auto',
-        directives: {
-          'default-src': ['self'],
-          'script-src': ['self'],
-          'style-src': ['self', 'unsafe-inline'],
-          'img-src': ['self', 'data:'],
-          'font-src': ['self'],
-          'connect-src': ['self'],
-          'object-src': ['none'],
-          'base-uri': ['self'],
-          'form-action': ['self'],
-          'frame-ancestors': ['none'],
-        },
-      },
+      // The adapter's own variables are not read by name: POLY_ADAPTER_* is refused at start (POLY-161 R1, R2).
+      adapter: adapter({ envPrefix: 'POLY_ADAPTER_' }),
+      csp: { mode: 'auto', directives: Object.fromEntries(Object.entries(CSP_DIRECTIVES).map(([k, v]) => [k, [...v]])) },
     }),
   ],
 });

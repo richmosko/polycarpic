@@ -131,13 +131,18 @@ describe('no .cjs or .cts file under apps/*/src or packages/*/src (condition 15d
 
 describe('no package-level indirection (condition 16)', () => {
   type Pkg = { path: string; json: Record<string, any> };
+  /** Exactly today's entry, with its two conditions in their order: types first, then default. A deep equal on the entry and on the key order. */
+  const WEB_BUILD = { '#web-build': { types: './src/build-handler.d.ts', default: './build/handler.js' } };
+  const isWebBuildImport = (v: unknown): boolean =>
+    JSON.stringify(v) === JSON.stringify(WEB_BUILD) && Object.keys(v as object).length === 1 && Object.keys((v as typeof WEB_BUILD)['#web-build']).join() === 'types,default';
   const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
   const PLAIN_WORKSPACE = /^workspace:[\^~]?(\*|\d[\w.+-]*)?$/;
   function violations(pkgs: Pkg[], rootPkg: Record<string, any>, wsYaml: Record<string, any>): string[] {
     const out: string[] = [];
     const workspaceNames = new Set(pkgs.map((p) => p.json.name as string));
     for (const { path, json } of pkgs) {
-      if ('imports' in json) out.push(`${path}: imports field`);
+      // POLY-161 verdict D1a: the one exemption. apps/web names its own build output as '#web-build'; nothing else may use `imports`.
+      if ('imports' in json && !(path === 'apps/web/package.json' && isWebBuildImport(json.imports))) out.push(`${path}: imports field`);
       for (const f of DEP_FIELDS) {
         for (const [key, spec] of Object.entries<string>(json[f] ?? {})) {
           if (/^(link|file|npm):/.test(spec)) out.push(`${path}: ${f}.${key} = ${spec}`);
@@ -196,6 +201,36 @@ describe('no package-level indirection (condition 16)', () => {
       expect(mutate(f).length).toBeGreaterThan(0);
     });
   }
+  // D1a: red on a second key, a changed target, an added or changed condition, the same entry in another package, `imports` of another shape.
+  const web = (p: Pkg[]) => p.find((x) => x.path === 'apps/web/package.json')!.json;
+  const WEB_CASES: [string, Parameters<typeof mutate>[0]][] = [
+    ['a second key beside #web-build', (p) => (web(p).imports['#other'] = './x.js')],
+    ['a changed default target', (p) => (web(p).imports['#web-build'].default = './build/index.js')],
+    ['a changed types target', (p) => (web(p).imports['#web-build'].types = './src/other.d.ts')],
+    ['an added condition', (p) => (web(p).imports['#web-build'].node = './build/handler.js')],
+    ['a changed condition name', (p) => { const e = web(p).imports['#web-build']; web(p).imports['#web-build'] = { import: e.default, types: e.types }; }],
+    ['the two conditions in the other order', (p) => { const e = web(p).imports['#web-build']; web(p).imports['#web-build'] = { default: e.default, types: e.types }; }],
+    ['the same entry in another package', (p) => (auth(p).imports = structuredClone(web(p).imports))],
+    ['imports as a string', (p) => (web(p).imports = './x.js')],
+    ['imports as an array', (p) => (web(p).imports = [WEB_BUILD])],
+    ['the entry renamed', (p) => { web(p).imports = { '#web-bundle': web(p).imports['#web-build'] }; }],
+  ];
+  for (const [name, f] of WEB_CASES) {
+    it(`red on: ${name}  [red if: the exemption is wider than today's entry in apps/web]`, () => {
+      expect(mutate(f).length).toBeGreaterThan(0);
+    });
+  }
+  it('green on: the real apps/web entry, unchanged  [red if: the exemption is closed]', () => {
+    expect(mutate(() => {})).toEqual([]);
+    expect(web(realPkgs()).imports).toEqual(WEB_BUILD);
+  });
+  it("'#web-build' is named in code in apps/web/src/main.ts only, over every tracked source file of apps/ and packages/  [red if: a second file names it]", () => {
+    const hits = tracked('apps', 'packages')
+      .filter((f) => /\.(ts|js|mjs|svelte)$/.test(f))
+      .filter((f) => noComments(read(f)).includes('#web-build'))
+      .sort();
+    expect(hits).toEqual(['apps/web/src/main.ts']);
+  });
   it('green on: plain workspace specs ("workspace:*", "workspace:^") under their own @poly name', () => {
     expect(mutate((p) => ((auth(p).dependencies ??= {})['@poly/ledger'] = 'workspace:^'))).toEqual([]);
   });

@@ -56,3 +56,11 @@ Items placed here from the POLY-162 loop (2026-11-24). Sources: `process/cairn/r
 - **T-real's rollback lower bound** (poll ≥ 120 s) has no red of its own: shortening the tool's window fails on `rollback-unhealthy` first (`faulted-runs.md`).
 - **In CI the sweep's "absent input fails" never fires**, because the workflow creates both logs first; the missing-secret-list refusal does (seceng, accepted).
 - **For POLY-104:** T-real's fake `gh` attests; real attestation is first shown on staging (U5).
+
+### @team-lead — 2026-11-24
+
+Items placed here from the POLY-161 loop (2026-11-25). Sources: `process/cairn/reviews/POLY-161/ruling-review.md`, `build-review.md`, `gate.md`.
+- **Before the first staging deploy (backend-lead builds): no pool in `packages/db` has an `error` listener.** An idle pool client's 'error' is unhandled, so `web` exits 1 (`process.crash`) when Postgres drops its connections; by seceng's reading `auth` and the worker have the same fault. A database restart takes each service down until compose restarts it, and each restart of web runs the zone check again, so a Postgres restart during a zone outage keeps web down. Fix it in the pool, once, for a checked-out client's error as well as an idle one's. A test: restart Postgres under a running service; the process stays up and health recovers. Found by qa-161 on the built server. seceng found no request by which a stranger makes Postgres drop a `poly_app` connection.
+- **With U1:** unpinned environment keys now reach the whole web app, not a health path (`NODE_OPTIONS` in `environment`; it can also choose the `types` condition of web's `#web-build` import). Same attested commit; not new reach.
+- **The weekly re-scan of the published image cannot see bundled packages;** make it read the bundle's package list kept in the image (`build/packages.json`, POLY-161 R14). Until then the check after release is the lockfile audit, which runs on PRs only.
+- **Make bits-ui a dev dependency,** so `svelte` and `@sveltejs/acorn-typescript` leave the runtime install and the image check's `@sveltejs` allow-list becomes empty (seceng's S9 ruling).

@@ -2,7 +2,7 @@
 // release), through auditConfig.ignoreGhsas in pnpm-workspace.yaml. The exemption is true only while picomatch is absent from the
 // production install and only until the re-check date. Titles end with [red if: <mutation>].
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -76,5 +76,76 @@ describe('the audit exemption', () => {
     const installed = readdirSync(join(scratch, 'node_modules', '.pnpm'));
     expect(installed.length).toBeGreaterThan(50); // not vacuous
     expect(installed.filter((n) => n.startsWith('picomatch@'))).toEqual([]);
+  }, 300_000);
+});
+
+// POLY-161 R14 (seceng B2, verdict A13, B35): the exemption above is argued on the production install, but the web stage now ships code from dev
+// dependencies inside the bundle. The bundle's own package list is taken from the build (every module id of the client and the server build, and the
+// server maps), compared with apps/web/bundle-packages.txt by infra/ci/bundle-packages.mjs, and picomatch is refused by name. Each case builds a
+// COPY of apps/web (never the real tree) with `vite build`; the plants are real imports of packages that resolve from apps/web.
+describe('the bundle holds exactly the committed packages and never picomatch (R14)', () => {
+  const COPY = join(ROOT, 'temp', `bundle-${process.pid}`);
+  const web = join(COPY, 'apps', 'web');
+  const mjs = join(ROOT, 'infra', 'ci', 'bundle-packages.mjs');
+  const list = join(ROOT, 'apps', 'web', 'bundle-packages.txt');
+  afterAll(() => rmSync(COPY, { recursive: true, force: true }));
+
+  /** A fresh copy of the sources, an optional plant, one `vite build`, then the list check. */
+  function check(plant: (w: string) => void = () => {}, tag = 'x', copyList = false) {
+    rmSync(COPY, { recursive: true, force: true });
+    mkdirSync(web, { recursive: true });
+    copyFileSync(join(ROOT, 'tsconfig.base.json'), join(COPY, 'tsconfig.base.json'));
+    for (const f of ['package.json', 'vite.config.ts', 'bundle-packages.ts', 'bundle-packages.txt', 'tsconfig.json']) copyFileSync(join(ROOT, 'apps/web', f), join(web, f));
+    cpSync(join(ROOT, 'apps/web/src'), join(web, 'src'), { recursive: true, filter: (s) => !s.endsWith('.test.ts') });
+    cpSync(join(ROOT, 'apps/web/static'), join(web, 'static'), { recursive: true });
+    symlinkSync(join(ROOT, 'apps/web/node_modules'), join(web, 'node_modules'));
+    plant(web);
+    const b = spawnSync(join(web, 'node_modules/.bin/vite'), ['build'], { cwd: web, encoding: 'utf8', timeout: 240_000 });
+    expect(b.status, `${tag}: vite build\n${b.stdout}\n${b.stderr}`.slice(-1800)).toBe(0);
+    return spawnSync('node', [mjs, web, copyList ? join(web, 'bundle-packages.txt') : list], { encoding: 'utf8', timeout: 60_000 });
+  }
+  const PKG = 'tailwindcss/defaultTheme';
+
+  it('the real sources build to exactly the committed list, with a non-empty package record on both sides  [red if: the list rots, or the record is empty and equal to an empty list]', () => {
+    const r = check();
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    const pk: Array<{ name: string; version: string }> = JSON.parse(readFileSync(join(web, 'build/packages.json'), 'utf8'));
+    const names = new Set(pk.map((p) => p.name));
+    expect(names.size).toBeGreaterThan(30);
+    for (const must of ['svelte', 'pg', '@sveltejs/kit', 'bits-ui']) expect(names.has(must), must).toBe(true);
+    expect(names.has('picomatch')).toBe(false);
+    const rec: string[] = JSON.parse(readFileSync(join(web, '.svelte-kit/bundle-modules.json'), 'utf8'));
+    expect(rec.length).toBeGreaterThan(100);
+    expect(rec.some((id) => /node_modules\/\.pnpm\/svelte@/.test(id)), 'the client or server record names svelte').toBe(true);
+  }, 300_000);
+
+  it('a package imported by a server file only is refused as not in the committed list  [red if: the server side is not read]', () => {
+    const r = check((w) => {
+      writeFileSync(join(w, 'src/lib/plant-server.ts'), `import theme from '${PKG}'; export const planted = Object.keys(theme).length;\n`);
+      appendFileSync(join(w, 'src/hooks.server.ts'), `\nimport { planted } from './lib/plant-server'; export const plantedServer = planted;\n`);
+    }, 'server');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/not in the committed list: tailwindcss/);
+  }, 300_000);
+
+  it('a package imported by a client-only file (hooks.client.ts) is refused too  [red if: only the server build or its maps are read]', () => {
+    const r = check((w) => {
+      writeFileSync(join(w, 'src/hooks.client.ts'), `import theme from '${PKG}'; export const plantedClient = Object.keys(theme).length;\nconsole.debug(plantedClient);\n`);
+    }, 'client');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/not in the committed list: tailwindcss/);
+  }, 300_000);
+
+  it('picomatch in the bundle is refused by name even when the committed list names it  [red if: the refusal is only a list difference]', () => {
+    const pm = readdirSync(join(ROOT, 'node_modules/.pnpm')).find((n) => n.startsWith('picomatch@'));
+    expect(pm, 'picomatch is installed (the dev install)').toBeTruthy();
+    const r = check((w) => {
+      writeFileSync(join(w, 'src/lib/plant-pm.ts'), `import pm from '${join(ROOT, 'node_modules/.pnpm', pm!, 'node_modules/picomatch/index.js')}'; export const plantedPm = typeof pm;\n`);
+      appendFileSync(join(w, 'src/hooks.server.ts'), `\nimport { plantedPm } from './lib/plant-pm'; export const plantedPmUse = plantedPm;\n`);
+      appendFileSync(join(w, 'bundle-packages.txt'), 'picomatch\n');
+    }, 'picomatch', true);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/picomatch is in the bundle \(refused by name\)/);
+    expect(r.stderr, 'the list names it, so no list difference is the reason').not.toMatch(/in the committed list, not in the bundle: picomatch|not in the committed list: picomatch/);
   }, 300_000);
 });

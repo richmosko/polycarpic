@@ -31,6 +31,13 @@ describe('R7 web relays no cookie', () => {
   it('hooks.server.ts no longer sets BetterAuth\'s refreshed cookies (the setCookie relay is gone) [red if: the relay is still in the source]', () => {
     const src = readFileSync(new URL('./hooks.server.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     expect(src).not.toMatch(/setCookie/);
-    expect(src).not.toMatch(/getSetCookie|set-cookie/i);
+    expect(src).not.toMatch(/getSetCookie/);
+    // POLY-161: the one Set-Cookie web writes is the clearing of its own handle cookie (R9.3); nothing relays BetterAuth's
+    const writes = src.split('\n').filter((l) => /set-cookie/i.test(l));
+    expect(writes).toHaveLength(1);
+    expect(src.match(/set-cookie/gi), 'a second append on the same line').toHaveLength(1);
+    expect(src.match(/\.append\s*\(/g) ?? [], 'one header append in the whole file').toHaveLength(1);
+    expect(src, 'cookies.set (any cookie web writes through Kit)').not.toMatch(/\bcookies\s*\.\s*set\s*\(/);
+    expect(writes[0]).toMatch(/\$\{HANDLE_COOKIE\}=; .*Max-Age=0/);
   });
 });

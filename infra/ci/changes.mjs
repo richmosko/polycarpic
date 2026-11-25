@@ -34,8 +34,8 @@ export const DB_AREAS = {
     paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
-    tests: T(['ops-status', 'ops-hardening']),
-    paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
+    tests: T(['ops-status', 'ops-hardening', 'web-server', 'web-server-start', 'web-server-limits']),
+    paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/(?!.*\.test\.ts$)/, /^apps\/web\/(static\/|vite\.config\.ts$|bundle-packages\.(ts|txt)$|svelte\.config\.js$)/, /^infra\/ci\/bundle-packages\.mjs$/, /^apps\/web\/tests\/helpers\/fake-dns\.ts$/, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
   },
 };
 const areaMatches = (name, p) => DB_AREAS[name].tests.includes(p) || DB_AREAS[name].paths.some((re) => re.test(p));
@@ -56,7 +56,7 @@ export const TABLE = {
     /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/,
     /^apps\/worker\/src\/jobs\//, /^packages\/mail\//,
     /^infra\/postgres\/gate-check\.(sh|sql)$/,
-    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
+    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/(?!.*\.test\.ts$)/, /^apps\/web\/(static\/|vite\.config\.ts$|bundle-packages\.(ts|txt)$|svelte\.config\.js$)/, /^infra\/ci\/bundle-packages\.mjs$/, /^apps\/web\/tests\/helpers\/fake-dns\.ts$/, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
     ...DB_SHARED,
   ],
   // POLY-97: infra/hetzner/ and infra/operator/ and the dry-run test files belong to the `provision` job. infra/provision*.sh and the
@@ -83,7 +83,10 @@ export const TABLE = {
     /^packages\/config\/(src\/(?!.*\.test\.ts$)|package\.json$)/,
     /^packages\/db\/(migrations|sql)\//, /^packages\/db\/src\/(migrate|journal|connection|pool|startup|index)\.ts$/,
     /^apps\/migrate\/src\/(cli|run|index)\.ts$/, /^apps\/(web|worker)\/src\/(main|startup)\.ts$/, /^apps\/auth\/src\/(main|bind|http)\.ts$/,
-    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe|public-health)\.ts$/,
+    /^apps\/worker\/src\/jobs\/index\.ts$/, /^apps\/web\/src\/ops\/(health|probe|server|zone|console)\.ts$/,
+    // POLY-161 R9, R14, R15: the web server the image now runs: its hooks, the signed-out set, the redirect guard, the CSP, the page shell, the health route, the build's configuration and the bundle's package list
+    /^apps\/web\/src\/hooks\.server\.ts$/, /^apps\/web\/src\/lib\/(public-routes|safe-next|csp)\.ts$/, /^apps\/web\/src\/app\.html$/, /^apps\/web\/src\/routes\/api\/v1\/health\/\+server\.ts$/,
+    /^apps\/web\/(vite\.config|bundle-packages)\.ts$/, /^apps\/web\/package\.json$/, /^infra\/ci\/bundle-packages\.mjs$/,
     /^tests\/infra\/deploy-real\//, /^tests\/infra\/vitest\.deploy-real\.config\.ts$/, /^infra\/ci\/changes\.mjs$/, /^\.github\/workflows\/ci\.yml$/,
   ],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):

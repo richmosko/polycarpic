@@ -44,6 +44,8 @@ export interface Config {
   readonly imageRevision: string | undefined;
   /** auth and worker: the From of every mail; undefined where no mailer is configured (development only). */
   readonly mailFrom: string | undefined;
+  /** The registrable domain of PUBLIC_ORIGIN, set only in real-domain mode (POLY-161 R7); undefined where no public DNS zone exists. */
+  readonly zone: string | undefined;
   /** One Secret per registered *_FILE variable that is set, keyed by the variable name. */
   readonly secrets: Readonly<Record<string, Secret>>;
 }
@@ -138,9 +140,11 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
   }
 
   // TLS_MODE against PUBLIC_ORIGIN: offline only, from the public suffix list (R2). The zone test runs at web start.
+  let zone: string | undefined;
   if (tlsMode && host !== undefined) {
     const t = parseHost(host);
     const isPublic = !t.isIp && t.isIcann === true && t.domain !== null && !PRIVATE_SUFFIX.test(host);
+    if (isPublic && tlsMode === 'real-domain') zone = t.domain ?? undefined;
     if (isPublic && tlsMode !== 'real-domain') add('TLS_MODE', 'mismatch', 'TLS_MODE must be real-domain for a public domain in PUBLIC_ORIGIN');
     if (!isPublic && tlsMode !== 'private-ca') add('TLS_MODE', 'mismatch', 'TLS_MODE must be private-ca for a private or local host in PUBLIC_ORIGIN');
   }
@@ -228,7 +232,7 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
   }
 
   const config = problems.length === 0 && appEnv && tlsMode && originRaw !== undefined
-    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, imageRevision: set('POLY_IMAGE_REVISION'), mailFrom }
+    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, imageRevision: set('POLY_IMAGE_REVISION'), mailFrom, zone }
     : undefined;
   return { problems, secrets, config };
 }

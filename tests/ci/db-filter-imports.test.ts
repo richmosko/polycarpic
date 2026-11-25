@@ -89,6 +89,9 @@ function areaClosure(testFiles: string[]): Set<string> {
     for (const m of text.matchAll(joinEdge)) {
       const segs = [...m[2]!.matchAll(/'([^']*)'/g)].map((x) => x[1]!);
       const p = join(m[1] === 'ROOT' ? ROOT : join(ROOT, 'packages', 'db'), ...segs);
+      // POLY-161: apps/web/build is generated output (the web-server suites check it exists and serve it). Its inputs are the app's sources, which the area's
+      // paths cover; following the build's own chunks would make the closure depend on whether a build happens to be on disk.
+      if (/[\\/]apps[\\/]web[\\/]build([\\/]|$)/.test(p)) continue;
       if (existsSync(p) && statSync(p).isFile()) todo.push(p);
     }
     for (const m of text.matchAll(urlEdge)) { const p = resolve(dirname(f), m[1]!); if (existsSync(p) && statSync(p).isFile()) todo.push(p); }

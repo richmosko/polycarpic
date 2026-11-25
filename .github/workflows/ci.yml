@@ -549,6 +549,25 @@ jobs:
       - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
         run: pnpm --filter @poly/web exec svelte-kit sync
 
+      - name: Build the web app (POLY-161 R10, tests/db/web-server.test.ts spawns main.ts against build/handler.js, a missing build fails the suite and never skips)
+        run: pnpm --filter @poly/web build
+
+      - name: Cache Playwright browsers (tests/db/web-server-start.test.ts drives Chromium against the built server)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Chromium for the web-server db test (bounded; system libraries only when a launch probe fails)
+        run: |
+          timeout -k 10 180 pnpm --filter @poly/web exec playwright install chromium
+          probe='require("@playwright/test").chromium.launch().then((b) => b.close())'
+          if ! timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" >/dev/null 2>&1; then
+            timeout -k 10 120 pnpm --filter @poly/web exec playwright install-deps chromium \
+              || echo "::warning::playwright install-deps failed or timed out"
+            timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" || { echo "::error::Chromium cannot launch"; exit 1; }
+          fi
+
       - name: DB battery (one Postgres container, RLS battery included)
         env:
           DB_AUTH: ${{ needs.changes.outputs.db_auth }}
