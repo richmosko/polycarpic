@@ -1,11 +1,12 @@
 ---
 id: POLY-160
 title: Deploy follow-ups
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
 assignee: devops-engineer
+paths: [process/cairn/issues/POLY-160.md, process/cairn/issues/POLY-165.md, process/cairn/issues/POLY-104.md, process/cairn/reviews/POLY-160/**, infra/**, .github/workflows/**, Dockerfile, packages/db/**, packages/*/package.json, apps/*/package.json, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, .gitignore, process/STATE.md, process/DECISIONS.md]
 labels: [ops, deploy, security]
 priority: null
 pr: null
@@ -74,3 +75,7 @@ Items placed here from the POLY-161 loop (2026-11-25). Sources: `process/cairn/r
 - `provision.sh`'s relative path and H6's `--project-directory`, both exercised by POLY-104.
 - INFRA §4.4 to §4.6 and the Ctrl-C runbook line; the end-to-end deploy test green with its time recorded.
 Read the acceptance criteria above against this list: the third (`self-update`) and every "follow-up" finding that gates prod are no longer this issue's.
+
+### @team-lead — 2026-11-24
+
+Feature started. Branch: `feature/poly-160-deploy-follow-ups`. Scope is the Principal's cut of 2026-11-25 (the comment above): H1, the pool `error` listener, H2, H4, H5, `provision.sh`'s relative path, H6's `--project-directory`, INFRA §4.4 to §4.6 with the Ctrl-C runbook line, and T-real green with its time recorded. The Principal delegated this loop's decisions and the merge to the lead (2026-11-25); each decision is recorded in `process/DECISIONS.md` as taken.
