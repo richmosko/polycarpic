@@ -1,6 +1,6 @@
 # POLY-101 ruling (architect-101)
 
-Tree read: fb814595. Conditions: `ruling-review.md` @ 53991f7e. "Read" = code read; "run" = executed here. No container suite was run.
+Tree read: fb814595. Conditions: `ruling-review.md` @ 53991f7e; Part 2 @ 91c448af. "Read" = code read; "run" = executed here. No container suite was run.
 RP = `tests/db/auth-route-policy.test.ts`, POOL = `tests/db/auth-routing-pool.test.ts`, LINT = `packages/auth/src/boundaries.test.ts` plus ESLint over `packages/auth`.
 
 ## 1. What runs today
@@ -19,15 +19,15 @@ RP = `tests/db/auth-route-policy.test.ts`, POOL = `tests/db/auth-routing-pool.te
 - G1: LINT has no path hole, but it runs by accident of another suite's loop; nothing names it or keeps it (condition 1).
 - G2: nothing proves RP, POOL or LINT ran; a skip is green (5).
 - G3: criterion 1 has no test, and RP's predicate skips `isAction: false` endpoints, which the router does not skip (read: better-call 1.4.5 `router.mjs` skips only a missing `path` or `options`, and `SERVER_ONLY`). Run, no Postgres: an instance from `authOptions` plus a plugin with `/qa-bump` and an `isAction: false` `/qa-noaction` gives `/qa-bump` alone under RP's rule, both under the router's, and no dead entry either way.
-  **Does the hook 404 such a path today?** By reading, yes: `routePolicyHook` throws 404 for any path not in the map and never looks at `isAction`, and `refusedByHandle` refuses unlisted paths before it. Over HTTP it is (unmeasured): the probe needs the `poly_auth` pool. B3 measures it. Nothing in better-auth 1.7.18 uses `isAction` or of passkey 1.7.18 (grep of both dists). So this is a hole in the test, not a known hole in the control.
+  **Does the hook 404 such a path today?** By reading, yes: `routePolicyHook` throws 404 for any path not in the map and never looks at `isAction`, and `refusedByHandle` refuses unlisted paths before it. Over HTTP it is (unmeasured): the probe needs the `poly_auth` pool. B3 measures it. Neither better-auth 1.7.18 nor passkey 1.7.18 uses `isAction` (grep of both dists). So this is a hole in the test, not a known hole in the control.
 - G4: a dispatch with a `base` makes a green `app` (10).
 
 ## 3. The build: no new job, no new filter key
 
 - **B1 `lint` job, new step "Auth row: drizzleAdapter lint"**, no `if:`, after install: `pnpm exec eslint packages/auth`, then vitest on `packages/auth/src/boundaries.test.ts` by name with a JSON report, then `node infra/ci/auth-row.mjs lint`. No `--affected`. Every trigger of the row sets `node` or `layers`, and both start `lint`.
-- **B2 `infra/ci/auth-row.mjs db|lint`** (new, node built-ins only). Reads `VITEST_JSON`. `lint`: LINT's file. `db`: RP and POOL, when `DB_AUTH` is exactly `true`; exactly `false` exits 0; anything else exits 1. Exit 1 unless each file is present exactly once, every assertion is `passed` (none skipped, todo, pending or failed), and the passed count is at least that file's floor. A missing or unreadable report exits 1. It also requires RP's live-route test and the section-3 control (B3) by exact title, the live-route test once in each TLS mode. Floors are the counts measured at tests-red; LINT is 8 today (run), plus B4's case.
-- **B2 wiring:** a `db` step right after the battery, no `if:`, `DB_AUTH` and `VITEST_JSON` through `env:`. `auth-row.mjs` joins the `infra/ci` regex in DB_SHARED.
-- **B3 RP (tests, qa):** one predicate function in RP, matching the router: has `path` and `options`, not `SERVER_ONLY`. The live-route test calls it, and so does a control that builds from `authOptions` plus a synthetic plugin with two endpoints, one `isAction: false`. The predicate names both against AUTH_ROUTES, and returns nothing once both are added to a copy of the map. Over `auth.handler`, both answer 404 while unlisted. RP also pins the sorted `METHOD path` list of the instance as a literal (condition 8).
+- **B2 `infra/ci/auth-row.mjs db|lint`** (new, node built-ins only). Reads `VITEST_JSON`. `lint`: LINT's file. `db`: RP and POOL, when `DB_AUTH` is exactly `true`; exactly `false` exits 0; anything else exits 1. Exit 1 unless each file is present exactly once, every assertion is `passed` (none skipped, todo, pending or failed), and the passed count is at least that file's floor. A missing or unreadable report exits 1. It also reads the three source files and exits 1 on `.fails` applied to `it`, `test` or `describe`, or a `fails:` option, because vitest's JSON reports a failing `it.fails` as `passed` (seceng measured); a mistake guard, deliberate edits being condition 11. Files match by exact repo-relative path. It also requires RP's live-route test and the section-3 control (B3) by exact title, the live-route test once in each TLS mode. Floors are the counts measured at tests-red; LINT is 8 today (run), plus B4's case.
+- **B2 wiring** (standing in `ci-workflow.test.ts`: no `if:`, no `--affected`, no `continue-on-error` on either step; the `db` step directly follows the battery; `DB_AUTH` from `needs.changes.outputs.db_auth`; the two `VITEST_JSON` paths differ)**:** a `db` step right after the battery, no `if:`, `DB_AUTH` and `VITEST_JSON` through `env:`. `auth-row.mjs` joins the `infra/ci` regex in DB_SHARED.
+- **B3 RP (tests, qa):** one predicate function in RP, matching the router: has `path` and `options`, not `SERVER_ONLY`. The live-route test calls it, and so does a control that builds from `authOptions` plus a synthetic plugin with two endpoints, one `isAction: false`. The predicate names both against AUTH_ROUTES, and returns nothing once both are added to a copy of the map. Over `auth.handler`, both answer 404 while unlisted. RP also pins the sorted `METHOD path` list of the instance as a literal in both modes (condition 8), normalising an absent, single and array `method`.
 - **B4 `scripts/layers/generate.mjs`** (needs the path, §8; without it condition 9 becomes a stated residue)**:** the auth block also refuses `@better-auth/drizzle-adapter`, in `paths` and `banned`; one case in `boundaries.test.ts`.
 - **B5 `changes.mjs`:** `/^\.pnpmfile\./` and `/^patches\//` join `node` and DB_SHARED.
 - **B6 aggregate:** `app` passes `DISPATCH_BASE: ${{ inputs.base }}` to the step; `aggregate.mjs` is red when it is non-empty. No documented use of a based dispatch was found in `.github`, WORKFLOW, INFRA, skills or `tests/ci` (grep). A based dispatch still runs its jobs; only its `app` is red. A full dispatch (empty base) is unchanged.
@@ -60,11 +60,11 @@ Standing: B3's control, on the pinned better-auth, in the `db` job. One-off, by 
 |---|---|
 | V1 | Deleting the generate.mjs rule alone: the named step red (`tests/layers` is red already today); removing the named step: a `tests/ci` pin red |
 | V2 | Each path of conditions 2 and 3 dropped: its case red |
-| V3 | `auth-row.mjs` red on: skip, todo, failed, missing file, duplicate file, below floor, missing title, one TLS mode only, bad `DB_AUTH`, missing report; green on a good report and on `DB_AUTH=false` |
+| V3 | `auth-row.mjs` red on: skip, todo, `it.fails`, `fails:`, failed, missing file, duplicate file, below floor, missing title, one TLS mode only, bad `DB_AUTH`, missing report; green on a good report and on `DB_AUTH=false` |
 | V4 | Both synthetic routes 404 over the handler; B3 control red when `isAction` filtering returns, and when the predicate returns nothing |
 | V5 | One-off (a) and (b) shown, with output paths |
 | V6 | Based dispatch red, empty base and `pull_request` green, as aggregate tests |
-| V7 | Both steps have no `if:` and no `--affected`; `db` step follows the battery; `DB_AUTH` only through `env:` |
+| V7 | Standing test green, and red when broken: both steps have no `if:` and no `--affected`; `db` step follows the battery; `DB_AUTH` only through `env:` |
 | V8 | PR run: `lint`, `db`, `app` green, with the row's lines in both logs |
 | V9 | `lint` and `db` time against a same-day control (local LINT run: 1.1 s); diff inside the issue paths |
 
