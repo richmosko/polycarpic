@@ -72,3 +72,4 @@ By reading; nothing run by me. Red and green below are qa's record (`gate.md`).
 - One e2e failure in one run (`second-step-locked.spec.ts`), unexplained, in a spec this loop does not touch. Not counted as evidence either way.
 
 SECURITY 1.21.0: C-07, C-76, C-82 and TB-2 state this. **Not written:** risk rows for P2 (flooding, slow readers) and P3 (build tools). A row names the approver, and I have no record of the Principal's approval. I add both when the lead has it.
+- **qa's two stated gaps do not matter to security.** B38 not red: a missing `qrcode-generator` is a 500 on one page, a loss of function, and exposes nothing. One total floor for the bundle list: the exact comparison is the control, and a plant on the client side alone goes red, so an unread client side cannot pass; a per-side floor would add nothing.
