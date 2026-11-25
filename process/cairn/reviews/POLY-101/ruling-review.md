@@ -99,3 +99,8 @@ The ruling names `refusedByHandle` as the first refusal. Nothing in `packages/au
    template (for example `/callback/:id`'s shape), where only (b) can refuse. Name `handleAuthRequestInner`, not `refusedByHandle`.
 Condition 7: agreed, RP's predicate becomes the router's own rule. Build conditions and the red list stand as in Part 2; add a red for 4: with the hook removed from the control's options, the template-shaped
 synthetic route no longer answers the hook's 404.
+
+## Part 4: ruling @ d51c4d3a: PASS
+
+Part 2 items 1 to 3 are closed. Part 3 item 4 becomes **qa-101 build condition (i)** and needs no ruling edit; where the ruling says `refusedByHandle`, read `handleAuthRequestInner`.
+The build lists and the red list of Parts 2 and 3 are the ones I check at the build sha.
