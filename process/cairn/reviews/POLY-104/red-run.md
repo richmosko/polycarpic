@@ -15,7 +15,13 @@
 
 ### The fake
 
-`apt-cache madison` and `policy` now print the lines of interest and then 20000 older versions (about 2 MB). The test box's `awk` is mawk 1.3.4, which fills a large buffer before it runs a line: 220 KB after the match gave no SIGPIPE, 1.5 MB did. The real box's output is much smaller and still broke, so its `awk` reads differently or the timing of `apt-cache` does it (unmeasured; `readlink -f "$(command -v awk)"` on the box would tell).
+**The model now in use** copies what the lead measured on the box: `awk` is gawk 5.2.1 (`/usr/bin/gawk`), and `apt-cache madison docker-compose-plugin` prints 50 lines, 6130 bytes, with the wanted version third. So the test box installs `gawk`, and the fake prints the lines of interest, pauses 0.2 s, then writes 47 older versions one write per line (`policy`: 47 older entries). Size is not the cause; a write after the reader has left is. The pause makes that order certain in the test; on the box it is timing. With this model and the `infra/` scripts of `9027719c`, `F3` fails with `rc=141`, and with only the old `provision-check.sh`, `F3 same shape` fails on a false H25.
+
+The first red model, in `9027719c`, was wrong: the test box had mawk 1.3.4, which fills a large buffer before it runs a line, so it took 2 MB of output to get a 141 (220 KB gave none). The counts under Red above are from that model.
+
+### Build-green at `fb6dd1cb`
+
+Run on `2034dff2` (that fix plus the F4, F6 and DR3 red tests) with the gawk model. Box suite: 212 run, 210 passed, 2 failed, both F6. `test_provision.py`: 24 run; the F4 tests fail (1 test and 22 subtests), the rest pass, the signal tests among them. CI's `shellcheck -x` in the test box on `provision.sh`, `provision-check.sh` and `drill.sh`: exit 0. The whole ops unit directory was not run: `test_run_guard` refused it as an un-tiered full run.
 
 ### The same shape elsewhere
 

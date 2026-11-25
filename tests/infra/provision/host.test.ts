@@ -47,9 +47,9 @@ describe('provision.sh host stage (R5)', () => {
     expect(r.out).toContain(`docker-compose-plugin=${want}-`);
   });
 
-  it('F3 harness: the fake apt-cache dies of SIGPIPE (141) when its reader leaves early, for madison and for policy', () => {
-    const r = run(`for v in madison policy; do apt-cache $v docker-compose-plugin | head -n 1 > /dev/null; echo "$v \${PIPESTATUS[0]}"; done`);
-    expect(r.out.trim().split('\n')).toEqual(['madison 141', 'policy 141']);
+  it('F3 harness: awk is gawk as on the box, and the fake apt-cache dies of SIGPIPE (141) when awk or another reader leaves early', () => {
+    const r = run(`awk --version | head -n 1 | grep -o '^GNU Awk'; apt-cache madison docker-compose-plugin | wc -l; apt-cache madison docker-compose-plugin | awk '{ exit }'; echo "awk \${PIPESTATUS[0]}"; for v in madison policy; do apt-cache $v docker-compose-plugin | head -n 1 > /dev/null; echo "$v \${PIPESTATUS[0]}"; done`);
+    expect(r.out.trim().split('\n')).toEqual(['GNU Awk', '50', 'awk 141', 'madison 141', 'policy 141']);
   });
 
   // The complete box needs a finished host stage, so while F3 stands this one cannot reach H25; once madison is fixed it tests H25 itself.
