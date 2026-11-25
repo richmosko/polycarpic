@@ -18,6 +18,23 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     expect(first, 'no `current`: part 1 (first-deploy) did not leave a healthy release').toMatch(/^sha256:[0-9a-f]{64}$/);
   });
 
+  const upLines = (): number => ((readRoot(`${STATE}/deploy.log`) ?? '').match(new RegExp(`up ${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g')) ?? []).length;
+  /** `deploy staging` of release 2, SIGKILLed once a new `up` line of its digest is in deploy.log (the pkill matches the tool by its command line). */
+  async function cutDeploy(): Promise<void> {
+    const seen = upLines();
+    const argv = ['sh', '-c', 'cd "$1" && shift && umask 077 && exec "$@"', 'sh', CALLER, TOOL, 'deploy', 'staging'];
+    const child = spawn(isRoot ? argv[0]! : 'sudo', isRoot ? argv.slice(1) : ['-n', ...argv], { stdio: 'ignore' });
+    const exited = new Promise<number | null>((res) => child.once('exit', (c) => res(c)));
+    let cut = false;
+    for (let t = 0; t < 600 && !cut; t++) {
+      if (upLines() > seen) cut = true;
+      else await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(cut, 'release 2 reached its `up` within 5 minutes').toBe(true);
+    root(['pkill', '-KILL', '-f', 'polycarpic-ops deploy staging']);
+    await Promise.race([exited, new Promise((r) => setTimeout(r, 30_000))]);
+  }
+
   // POLY-160 C28 (ruling S): a `deploy staging` of release 2 is SIGKILLed after its `up` line, the installed bundle's compose-version is then wrong, and `deploy staging` runs again: the recovery restores release 1 first,
   // then the Compose check refuses (`render-env`, exit 1), no mark is left. Red on a build that refuses before it recovers (release 2's containers stay up, the mark is kept).
   it('C28: deploy cut by SIGKILL after its `up`, then a poll under a different Compose: release 1 is running and healthy, render-env, exit 1, no mark', async () => {
@@ -25,18 +42,7 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     rel2 = step('images of release 2', () => release(c2, true));
     second = rel2.app;
     offer(rel2, 102);
-    const argv = ['sh', '-c', 'cd "$1" && shift && umask 077 && exec "$@"', 'sh', CALLER, TOOL, 'deploy', 'staging'];
-    const child = spawn(isRoot ? argv[0]! : 'sudo', isRoot ? argv.slice(1) : ['-n', ...argv], { stdio: 'ignore' });
-    const exited = new Promise<number | null>((res) => child.once('exit', (c) => res(c)));
-    let cut = false;
-    for (let t = 0; t < 600 && !cut; t++) {
-      const dl = readRoot(`${STATE}/deploy.log`) ?? '';
-      if (new RegExp(`up ${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(dl)) cut = true;
-      else await new Promise((r) => setTimeout(r, 500));
-    }
-    expect(cut, 'release 2 reached its `up` within 5 minutes').toBe(true);
-    root(['pkill', '-KILL', '-f', 'polycarpic-ops deploy staging']);
-    await Promise.race([exited, new Promise((r) => setTimeout(r, 30_000))]);
+    await cutDeploy();
     expect(stateFile('in-progress') ?? '', 'the mark is there after a SIGKILL').toContain(second);
     const vfile = root(['sh', '-c', 'echo "$(readlink -f /opt/polycarpic/ops/current)/infra/deploy/compose-version"']).out.trim();
     const original = readRoot(vfile);
@@ -60,6 +66,35 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     }
   });
 
+  // POLY-160 B7 (build review): the stop on real Docker. A cut deploy of release 2 whose restore cannot start (release 1's tree altered): the next poll stops release 2's web, auth and worker by `docker ps`
+  // (Postgres keeps running), keeps the mark and is RED; with the tree put back the following poll (the rollback case below) recovers. Red on a build that does not stop, or stops with `down` or `rm`.
+  it('B7: a cut deploy whose restore fails: release 2\'s web, auth and worker are stopped, Postgres runs, the mark is kept and the alert is RED; the tree put back, a poll recovers', async () => {
+    await cutDeploy();
+    expect(stateFile('in-progress') ?? '', 'the mark is there after a SIGKILL').toContain(second);
+    const victim = `/opt/polycarpic/releases/sha256-${first.split(':')[1]}/infra/compose/staging.yml`;
+    const original = readRoot(victim);
+    expect(original, 'release 1\'s compose file is readable').toBeTruthy();
+    putRoot(victim, original + '\n# altered\n');
+    try {
+      const r = step('poll whose restore fails', () => ops(['deploy', 'staging'], 'deploy staging (restore fails)'));
+      expect(r.code, r.err).toBe(1);
+      expect(r.err.split('\n--- deploy.log ---')[0]!.trim().split('\n').pop(), r.err).toBe('deploy: rollback-unhealthy');
+      expect((stateFile('alert') ?? '').split(/\s+/)[1], 'RED').toBe('rollback-unhealthy');
+      expect(stateFile('in-progress') ?? '', 'the mark is kept').toContain(second);
+      expect(stateFile('quarantine') ?? '', 'a restore that failed bans nothing').not.toContain(second);
+      const all = projectContainers();
+      for (const svc of ['web', 'auth', 'worker']) {
+        const c = all.find((x) => x.service === svc);
+        expect(c, `${svc}'s container is left, with its logs`).toBeDefined();
+        expect(c!.status, `${svc} is stopped`).toMatch(/^Exited/);
+      }
+      expect(all.find((x) => x.service === 'postgres')?.status, 'Postgres keeps running').toMatch(/\(healthy\)/);
+      expect(root(['docker', 'ps', '-q', '--filter', 'label=com.docker.compose.project=polycarpic-staging', '--filter', 'label=com.docker.compose.service=web']).out.trim(), 'a second `docker ps` agrees: none running').toBe('');
+    } finally {
+      putRoot(victim, original!);
+    }
+  });
+
   it('the second release (web never answers) is offered and polled: exit 1, rolled back within the window, quarantined, an alert', () => {
     expect(rel2, 'the C28 case made release 2').toBeDefined();
     const r = step('rollback poll', () => ops(['deploy', 'staging'], 'deploy staging (release 2: web never answers)'));
@@ -72,6 +107,7 @@ suite('T-real part 2: a release whose web never answers is rolled back', () => {
     expect(dl, 'B6: refused for being unhealthy, not for another reason').toMatch(new RegExp(`refused unhealthy ${second}`));
     expect(stateFile('quarantine') ?? '', 'B6: quarantined with its reason').toMatch(new RegExp(`${second} \\S+ unhealthy`));
     expect(stateFile('alert') ?? '', 'B6: the alert says rolled-back').toMatch(/rolled-back/);
+    expect(stateFile('in-progress'), 'B7: the recovering poll cleared the mark').toBeNull();
     expect((stateFile('current') ?? '').split(' ')[0], 'the first release is current again').toBe(first);
     expect(stateFile('quarantine') ?? '', 'the second digest is quarantined').toContain(second);
     expect(stateFile('alert') ?? '', 'an alert says so').not.toBe('');
