@@ -170,5 +170,8 @@ export function generateConfig(layers, opts = {}) {
   if (layers.sessionSetExempt) {
     cfg.push({ name: 'poly/session-set-exempt', files: [layers.sessionSetExempt], plugins: { poly }, rules: { 'poly/no-session-set': 0 } });
   }
+  // POLY-161 R2: the one computed import() is web's mount of its own build artefact, a path inside apps/web and no package edge.
+  // Fixed here and not in layers.json: a second exemption key there would widen what the exemption test counts.
+  cfg.push({ name: 'poly/computed-import-web-main', files: ['apps/web/src/main.ts'], plugins: { poly }, rules: { 'poly/no-computed-import': 0 } });
   return cfg;
 }
