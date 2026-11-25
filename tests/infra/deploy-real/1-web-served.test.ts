@@ -152,6 +152,16 @@ suite('T-real 1b: the running web container serves the real app', () => {
     expect(String(page.headers['cache-control']), 'S10: no-store').toContain('no-store');
   });
 
+  it('B38: signed in, /settings/second-step is 200 with its own heading on the running image (the page that loads qrcode-generator from the production install)  [red if: the dependency is missing from the install and the page is a 500]', () => {
+    const r = one({ path: '/settings/second-step', headers: { cookie: `__Host-poly_handle=${handle.value}` } });
+    expect(r.status).toBe(200);
+    expect(r.body).toContain('Sign-in and second step');
+    expect(r.body).toContain(user.name);
+    // and the data route that carries the page's load
+    const d = one({ path: '/settings/second-step/__data.json', headers: { cookie: `__Host-poly_handle=${handle.value}` } });
+    expect([d.status, JSON.parse(d.body).type]).toEqual([200, 'data']);
+  });
+
   it('a random handle is 303 and the cookie is cleared; the dashboard asked with the real handle but a wrong Host is 421  [red if: a dead handle is let in or left in the browser]', () => {
     const fake = Buffer.from(mark('handle').padEnd(32, 'x')).toString('base64url').slice(0, 43);
     const [r, wrongHost] = webAsk([

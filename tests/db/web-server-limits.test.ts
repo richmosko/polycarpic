@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { connect, type Socket } from 'node:net';
 import { join } from 'node:path';
+import { Writable } from 'node:stream';
+import { createLogger } from '@poly/config/log';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ROOT } from './helpers/pg';
 import { ask, startWeb, type Web } from './helpers/web-server';
@@ -90,4 +92,50 @@ describe('S6: a slow reader (a measurement; run with POLY_MEASURE_S6=1)', () => 
     s.destroy();
     expect(w.proc.exitCode).toBeNull();
   }, 200_000);
+});
+
+// B16, moved here from apps/web/src/ops/server.test.ts: the timers are DRIVEN, not read, and the slowest takes 60 s, which would put the web package's
+// unit run over the layer suite's 60 s allowance. startWebServer is the product's; the handler is a fake that never answers (a hung database).
+describe('R4: the timers, driven (B16)', () => {
+  it('slow headers are closed near 10 s, a slow body near 30 s, a hung handler near 60 s, all three in parallel  [red if: a timer is missing, or the old 5 s values remain]', async () => {
+    const { startWebServer } = (await import(join(ROOT, 'apps/web/src/ops/server.ts'))) as { startWebServer: (o: { publicOrigin: string; handler: unknown; log: unknown; port: number }) => Promise<import('node:http').Server> };
+    const log = createLogger({ service: 'web', stream: new Writable({ write(_c, _e, cb) { cb(); } }) });
+    const handler = async (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+      if (req.url === '/hang') return new Promise(() => {});
+      for await (const _c of req) { /* drain */ }
+      res.writeHead(200);
+      res.end('ok');
+    };
+    const server = await startWebServer({ publicOrigin: 'https://staging.example.com', handler, log, port: 0 });
+    if (!server.listening) await new Promise<void>((r) => server.once('listening', () => r()));
+    const port = (server.address() as { port: number }).port;
+    const raw = (bytes: string, ms: number) => new Promise<{ closed: boolean; ms: number }>((resolve) => {
+      const t0 = Date.now();
+      const sock = connect(port, '127.0.0.1');
+      let closed = false;
+      sock.on('error', () => { closed = true; });
+      sock.on('close', () => { closed = true; resolve({ closed, ms: Date.now() - t0 }); });
+      sock.on('connect', () => sock.write(bytes));
+      setTimeout(() => { sock.destroy(); resolve({ closed, ms: Date.now() - t0 }); }, ms);
+    });
+    try {
+      const H = 'Host: staging.example.com';
+      const [h, b, g] = await Promise.all([
+        raw(`GET /ok HTTP/1.1\r\n${H}\r\nX-A: b`, 70_000),
+        raw(`POST /body HTTP/1.1\r\n${H}\r\nContent-Length: 100\r\n\r\nabc`, 70_000),
+        raw(`GET /hang HTTP/1.1\r\n${H}\r\n\r\n`, 75_000),
+      ]);
+      expect(h.closed, 'slow headers closed').toBe(true);
+      expect(h.ms).toBeGreaterThanOrEqual(9_000);
+      expect(h.ms).toBeLessThan(14_000);
+      expect(b.closed, 'slow body closed').toBe(true);
+      expect(b.ms).toBeGreaterThanOrEqual(28_000);
+      expect(b.ms).toBeLessThan(36_000);
+      expect(g.closed, 'hung handler closed').toBe(true);
+      expect(g.ms).toBeGreaterThanOrEqual(58_000);
+      expect(g.ms).toBeLessThan(68_000);
+    } finally {
+      await new Promise<void>((r) => { server.close(() => r()); server.closeAllConnections(); });
+    }
+  }, 100_000);
 });
