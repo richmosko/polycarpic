@@ -1,25 +1,44 @@
 # POLY-161f verdict: web server in the release image
 
-Architect. Checklist pre-registered with the ruling, before any test was written. Result and evidence are filled once, at the gate sha.
+Architect. Checklist pre-registered with the ruling, before any test was written. Judged once, at gate `e4451ac9` (product tip `35908f5b`).
+
+**Verdict: CHANGES REQUESTED, four items, all small and none in the product.** Re-judged for these alone: A1, A3, A5, A9, A10, S9 in A14.
+
+| # | Owner | Open | Closes when |
+|---|---|---|---|
+| C1 | qa | `web-server-start.test.ts:88` (B9) is red in CI (run 45533753986, `db`: 1 failed, 1467 passed, 1 skipped): a connect to 3000 succeeded while the test thought it held. By reading, the test can sample after the real listen and before it sees `web.started` (it polls at 50 ms, and samples at 300 ms). The log does not say when the connect succeeded, so the product is **not cleared by this run** | every successful connect is later than the log's own `zone.unverified` time; red on a listen moved before the zone check (no record of that mutant in `gate.md`); green in CI |
+| C2 | qa | `tests/image/dockerfile.test.ts:96` still asks for `.env*`; F2 made it `**/.env*` (run's `unit` job: 1 failed, 99 passed, 15 skipped). The gate did not run CI's `tests/config` step, which holds `tests/image` | the list says `**/.env*`; that step is run and recorded |
+| C3 | lead | Criterion 5: POLY-88 still holds both criteria | R11 done in `POLY-88.md` |
+| C4 | devops | `image.sh check`: R1 and B24 to B26 want each new assertion shown red; no tracked record shows one | a table in the gate record: plant, message, red. If the reds exist already, only the record is missing |
+
+Then one CI run, every job green, at the final sha, with the `image` and `deploy-real` seconds.
+
+**qa's two gaps, mine to judge: both accepted.** B38: the assertion is a plain 200 with the page's own heading on the running image, and a missing import is a 500, so it can go red by construction. `gate.md` says `image.sh check` would show the missing dependency: by reading it would not, since its smoke never opens that page; T-real is the only check. B35: the committed list is exact and the client-only plant is red, so a per-side floor adds nothing (seceng the same).
+
+**Read:** product diff, T-real 1b, `web-server*.test.ts` (start: to line 130), the audit, layers and trigger diffs, `image.sh`, the two failed jobs' logs and T-real's. Not read: `zone.test.ts`, `console.test.ts`, the Dockerfile tests, and most of `server.test.ts`. **Run by me:** nothing at this sha.
+
+**Follow-ups.** POLY-163, the gate before prod is opened (R4's residual, S6). POLY-160: the pool's missing `error` listener before the first staging deploy; unpinned environment keys; the re-scan reading `packages.json`; `bits-ui`. Watch: `second-step-locked.spec.ts:53`, one unexplained failure in one local run; e2e was 84 of 84 in CI.
+
+**Not proven here:** Caddy in front of web (Host pass-through, its idle time, `nosniff`, `no-store`): POLY-104. The 512 cap in a cgroup.
 
 ## Axes
 
 | # | Axis | Passes when | Result | Evidence |
 |---|---|---|---|---|
-| A1 | Criterion 1: built and mounted | R1 and R3 as ruled; `image.sh check`'s new assertions green on the CI image and each shown red; T-real 1 and 2 | | |
-| A2 | Criterion 2: health, one listener | health through the real server; `public-health.ts` and its test gone, no reference left in product, tests/ci or `changes.mjs`; the socket-list check red on a planted second listener | | |
-| A3 | Criterion 3: zone before listen | R7's table, each row driven; a spawned `main.ts` refuses with exit 1 and `zone.refused` and 3000 never opened; a silent resolver starts within 5 s plus margin | | |
-| A4 | Criterion 4: T-real | a CI run at the gate's product sha, counts read in the log, no skip; trigger rows pinned | | |
-| A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | | |
-| A6 | R6: what is served | crawl over the manifest red on an unguarded new route and on a prefix `isPublic`; seceng's review has no open item | | |
-| A12 | R13: `safeNext` | every row of addendum 1 red on today's module or on its mutant; the two Chromium cases green | | |
-| A13 | R14, B2: the bundle's packages | list exact in the stage and the final image, red on both plants and on picomatch | | |
-| A14 | seceng S1 to S10, R15 | each shown as its row says; S6 and S7 with their measured values | | |
-| A7 | R4: limits and Host | each limit driven, not read; 421 and 400 asserted with bodies; positive case through the public host | | |
-| A8 | R5: logging | a real 500 (database down) and a planted `console.error(object)` leave no request or error text; red without `handleError` and without the guard, separately | | |
-| A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | | |
-| A10 | qa gate, seceng build review | signed, no open blocker | | |
-| A11 | Documents | ARCH §7.4 and §7.8 (mine), INFRA, SECURITY C-76 say what is, with no history | | |
+| A1 | Criterion 1: built and mounted | R1 and R3 as ruled; `image.sh check`'s new assertions green on the CI image and each shown red; T-real 1 and 2 | **open: C4** | built, mounted and served as ruled (read; run 45533753986 T-real). No record of `image.sh check` turned red: `gate.md` has Dockerfile mutants only |
+| A2 | Criterion 2: health, one listener | health through the real server; `public-health.ts` and its test gone, no reference left in product, tests/ci or `changes.mjs`; the socket-list check red on a planted second listener | met | `public-health` gone (grep of apps, packages, infra, tests, docs: none); exact sockets in the container; red on a planted 3001 (`gate.md`) |
+| A3 | Criterion 3: zone before listen | R7's table, each row driven; a spawned `main.ts` refuses with exit 1 and `zone.refused` and 3000 never opened; a silent resolver starts within 5 s plus margin | **open: C1** | product order read: `verifyZone` is awaited before the import and the listen. The test of it is red in CI |
+| A4 | Criterion 4: T-real | a CI run at the gate's product sha, counts read in the log, no skip; trigger rows pinned | met | run 45533753986 @ `35908f5b`, log read: 4 files, 24 of 24, no skip; `ROWS` pinned |
+| A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | **open: C3** | both criteria are still in `POLY-88.md` at `e4451ac9` |
+| A6 | R6: what is served | crawl over the manifest red on an unguarded new route and on a prefix `isPublic`; seceng's review has no open item | met | crawl read; prefix and planted route 8 findings red; `build-review.md` @ `aaf80fbd` |
+| A12 | R13: `safeNext` | every row of addendum 1 red on today's module or on its mutant; the two Chromium cases green | met | 44 refused and 9 kept rows; 4 Chromium cases red on the old module; e2e 84 of 84 in the same CI run |
+| A13 | R14, B2: the bundle's packages | list exact in the stage and the final image, red on both plants and on picomatch | met | three plants red; list exact in the stage (T-real image) and in `image.sh check` (qa, local). B35: accepted, below |
+| A14 | seceng S1 to S10, R15 | each shown as its row says; S6 and S7 with their measured values | met, but S9 needs C4 | S7 at most 153 of 384 MiB, host reading; S6 not bounded (160 s): POLY-163. S1, S4, S10 not shown red, accepted by seceng; I agree |
+| A7 | R4: limits and Host | each limit driven, not read; 421 and 400 asserted with bodies; positive case through the public host | met | 10, 30, 60 s driven; 512 counted by the server; Host and probe read. The check interval and the 125 s are not driven |
+| A8 | R5: logging | a real 500 (database down) and a planted `console.error(object)` leave no request or error text; red without `handleError` and without the guard, separately | met | `handleError` away: red; guard away with a planted call: red (`gate.md`) |
+| A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | **not met** | run 45533753986: `db` and `unit` failed; `image` still running when read; `deploy-real` 456 s; no `image` time yet |
+| A10 | qa gate, seceng build review | signed, no open blocker | signed; seceng's CI condition open | `gate.md` @ `e4451ac9`; `build-review.md` @ `aaf80fbd` |
+| A11 | Documents | ARCH §7.4 and §7.8 (mine), INFRA, SECURITY C-76 say what is, with no history | ARCH met; INFRA diff read in part; SECURITY by seceng | `docs/` at `e4451ac9` |
 
 ## Assertions that would pass a wrong build
 
