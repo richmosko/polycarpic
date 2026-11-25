@@ -1,6 +1,6 @@
 # POLY-161b: security review of the ruling (seceng)
 
-## Verdict on `ruling.md` @ `e6628fa0` (addendum 1 included): **CHANGES REQUIRED. 1 BLOCK open (B2; B1 closed by R13), 10 CONDITIONS, 3 FOLLOW-UPS, 4 items for the Principal**
+## Verdict on `ruling.md` @ `54a25988` (addenda 1 and 2 included): **PASS. 0 BLOCKS open (B1 closed by R13, B2 by R14), 10 CONDITIONS adopted, 3 FOLLOW-UPS, 4 items for the Principal.** Tests may be written
 
 Judged against a list written before the ruling. Read: ruling, checklist, the app's hooks, routes, pool, probe and logger, compose, Caddyfile, adapter-node 6.0.1 and Kit 3.1.1 source. Run by me: only the `safeNext` inputs, in Node's URL parser (not a browser). Everything else here is by reading. No container.
 
@@ -70,3 +70,8 @@ It does not stop a distributed flood. That stays accepted (loss of service only)
 - M3, the statuses in M4 and R6, M5 to M11 and R13's values are single scratch runs; I rely on none. My verdict needs them reproduced by qa's tests.
 - One C-76 forged answer: two resolvers is the lesser harm, so not BLOCKS.
 - I do not require `nosniff` or `no-store` from `web`: Caddy is the only way in from outside and sets both whatever `web` sends (C-07, R-25). S10's `no-store` is the hook's existing one on signed-in pages; a `nosniff` check stays at Caddy.
+
+## Addendum 2 (`54a25988`)
+
+- **B2 closed by R14.** It binds at the gate with both red cases: a planted server import and a client-only one.
+- **R15 holds, with one addition to S3:** the replacement is unmeasured, so the test asserts **exactly one** CSP header on the 200 page, carrying Kit's nonce or hash, and that the page's own script runs in a browser. Two headers would both apply and block it; a page whose scripts do not run passes a header check.
