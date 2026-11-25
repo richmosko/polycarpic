@@ -78,7 +78,12 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (isAuthTree(pathname)) return notFound();
   if (isPublic(pathname)) return page();
 
-  const signIn = () => new Response(null, { status: 303, headers: { location: `/sign-in?${new URLSearchParams({ next: safeNext(pathname + search) })}` } });
+  // A bare Response is not stamped with event.cookies, so the clearing header of a dead handle is written on the 303 itself.
+  const signIn = (clearHandle = false) => {
+    const headers = new Headers({ location: `/sign-in?${new URLSearchParams({ next: safeNext(pathname + search) })}` });
+    if (clearHandle) headers.append('set-cookie', `${HANDLE_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`);
+    return new Response(null, { status: 303, headers });
+  };
   const handleValue = event.cookies.get(HANDLE_COOKIE);
   if (!handleValue) return signIn();
   let entered;
@@ -87,8 +92,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   } catch (e) {
     if (e instanceof NoLiveSession) {
       // A dead handle: clear the cookie so the browser does not look signed in, and go to sign-in.
-      event.cookies.delete(HANDLE_COOKIE, { path: '/', secure: true, httpOnly: true, sameSite: 'lax' });
-      return signIn();
+      return signIn(true);
     }
     throw e;
   }
