@@ -1054,3 +1054,16 @@ Add new decisions ABOVE this comment, newest first.
 - A boot-time recovery unit for `first-deploy` and `edge-deploy` in this loop (a new systemd unit with its own ruling and tests, ahead of a staging box that does not exist yet).
 - Keep the mark blocking every deploy until `rollback`, which has nothing to roll back to on staging's second deploy.
 **Approved by:** team-lead, under the Principal's delegation of 2026-11-25; open to reversal.
+
+### 2026-11-25 — POLY-101: the auth row is named and proved, not rebuilt; a based manual run is red; one older residue put to the Principal
+**Decision:** The Principal gave POLY-101 the same delegation as POLY-160 on 2026-11-25 ("start poly 101, same authorization as 160"); every item here is open to reversal. Records: `process/cairn/reviews/POLY-101/` (`ruling.md`, `ruling-review.md`, `red-run.md`, `gate.md`, `build-review.md`, `verdict.md`).
+- **No new job.** The route-policy and routing-pool tests already ran in `db`, under the required `app` check, for every path a BetterAuth bump can take. The loop adds a named, unconditional lint step for the adapter rule and `infra/ci/auth-row.mjs`, which is red when a named test was skipped, missing, marked expected-to-fail or below its measured floor.
+- **A manual run with a `base` range is red at `app`.** It could otherwise skip most jobs and report a passing `app` on a head sha. No documented use of that run mode was found.
+- **Taken from seceng:** all 12 conditions on the ruling, its 3 changes, and build follow-ups F1 to F3 in this loop (they were small and closed gaps in the proof). seceng reproduced five of qa's reds itself.
+- **Not built, stated as residue (ruling condition 11, with build follow-up F4):** a pull request runs its own workflow, scripts and tests, so one commit can change the code and disarm the gate; a bracket or alias form of the expected-to-fail mark is the same class. Reach: anyone who can push a branch and merge, with no review required, which today is the Principal and any session holding his token. Stronger option: required code-owner review on `.github/`, `infra/ci/`, `tests/ci/` and the three row files; cost: a second GitHub identity, since an author cannot approve their own pull request. Not accepted as closed: it is older than this loop, covers every gate, and is the Principal's call; filed on POLY-135.
+- **Not proved:** a real newer BetterAuth was not installed; a real bump trips other pins too and could not isolate this row. The standing proof is the control with a synthetic plugin on the pinned version.
+**Alternatives considered:**
+- A separate `auth` job with its own filter key (more to keep in step with the `db` areas, and nothing it would run that `db` and `lint` do not).
+- Detect "BetterAuth changed" by parsing manifests (misses transitive packages; path matching does not).
+- Leave F1 to F3 as follow-ups (three small tests; cheaper now than a second loop).
+**Approved by:** team-lead, under the Principal's delegation of 2026-11-25; open to reversal.

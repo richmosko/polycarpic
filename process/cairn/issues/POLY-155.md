@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-21
-updated: 2026-11-24
+updated: 2026-11-25
 ---
 
 The second auth loop: what POLY-137 deferred by the Principal's scope decision of 2026-11-21 (`process/DECISIONS.md`), plus the follow-ups that loop's ruling, reviews and verdict recorded (`process/cairn/reviews/POLY-137/`). Not a condition of the first deploy. Add later auth nits here.
@@ -40,3 +40,7 @@ From POLY-98 (Principal, 2026-11-22; `process/DECISIONS.md`; ruling §D1, M3): e
 ### @team-lead — 2026-11-24
 
 Placed in POLY-M6 (Production readiness) at the M1 regroup, 2026-11-25. The architect's proposed cut, for seceng to confirm at this issue's ruling (`architect-m1r`, review of 2026-11-25): **gate part, before prod is opened to a second person:** the `reset-mfa` operator verb with the email to the owner, the per-email sign-in limit (C-04), the reused-code refusal, the second-step cap and lock notice, the recent-changes view, and POLY-153's F1 (a sign-in from a browser that already carries a live session ends that earlier session; the comment of 2026-11-19 on POLY-139). **Not a prod gate, to POLY-1.0 as their own issue once the cut is confirmed:** the backup-code count, `/change-email`, avatar upload, the first-password notice, the failed-lookup log line, the wording pass, the e2e reset walk, and the Principal's open question on holding new backup codes for 24 hours.
+
+### @team-lead — 2026-11-25
+
+Flaky test seen on PR #158 (run 45664122857, first attempt; green on rerun): `tests/db/auth-service-main.test.ts`, "the database lost under the auth service (POLY-160 R5)", failed with `listen EADDRINUSE 0.0.0.0:41208`. The file takes `AUTH_PUBLIC_PORT` from `41000 + (pid % 500) * 4` and counts up, which sits inside Linux's ephemeral range (32768 to 60999), so any other process's outgoing connection or `listen(0)` can already hold the port. Fix: take a free port from the OS (listen on 0 and read it back) or retry on EADDRINUSE; check the worker and web outage tests for the same scheme. `db` is behind the required `app` check, so this can block any PR at random; do it as the first commit of the next loop that touches `tests/db` (POLY-90 or POLY-91) rather than waiting for this issue's turn.

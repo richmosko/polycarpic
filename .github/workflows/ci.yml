@@ -284,6 +284,16 @@ jobs:
         # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
+      # POLY-101 B1: the auth row's lint half, by name and ahead of the layer checks, so it is what goes red. No `if:`, no `--affected`.
+      - name: "Auth row: drizzleAdapter lint"
+        env:
+          VITEST_JSON: ${{ runner.temp }}/vitest-auth-lint.json
+        run: |
+          set -euo pipefail
+          pnpm exec eslint packages/auth
+          pnpm exec vitest run packages/auth/src/boundaries.test.ts --reporter=default --reporter=json --outputFile="$VITEST_JSON"
+          node infra/ci/auth-row.mjs lint
+
       - name: Layer map checks (criterion 6)
         if: needs.changes.outputs.layers == 'true' || needs.changes.outputs.node == 'true'
         run: |
@@ -593,6 +603,13 @@ jobs:
             done
           fi
           pnpm exec vitest run -c tests/db/vitest.config.ts --reporter=default --reporter=json --outputFile="$VITEST_JSON" "${FILES[@]}"
+
+      # POLY-101 B2: a skipped route-policy or routing-pool test is not a pass. Directly after the battery, no `if:`.
+      - name: "Auth row: route-policy and routing-pool tests ran"
+        env:
+          DB_AUTH: ${{ needs.changes.outputs.db_auth }}
+          VITEST_JSON: ${{ runner.temp }}/vitest-db.json
+        run: node infra/ci/auth-row.mjs db
 
       - name: Record timing
         if: always()
@@ -953,4 +970,5 @@ jobs:
       - name: Aggregate
         env:
           NEEDS: ${{ toJSON(needs) }}
+          DISPATCH_BASE: ${{ inputs.base }}
         run: node infra/ci/aggregate.mjs

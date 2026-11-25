@@ -89,6 +89,12 @@ export function generateConfig(layers, opts = {}) {
       // POLY-86 criterion 2: BetterAuth runs on its Kysely path over the routing pool, never a Drizzle adapter (ARCH §2.2).
       paths.push({ name: 'better-auth/adapters/drizzle', message: 'drizzleAdapter is refused in packages/auth: BetterAuth uses its Kysely path (ARCH §2.2).' });
       banned.push('better-auth/adapters/drizzle');
+      // POLY-101 B4: the adapter's own package too, so a direct dependency does not bring it back.
+      const adapter = '@better-auth/drizzle-adapter';
+      const message = 'drizzleAdapter is refused in packages/auth: BetterAuth uses its Kysely path (ARCH §2.2).';
+      paths.push({ name: adapter, message });
+      patterns.push({ group: [`${adapter}/*`], message });
+      banned.push(adapter, `${adapter}/*`);
     }
     if (!isSecrets) {
       for (const c of ['crypto', 'node:crypto']) {

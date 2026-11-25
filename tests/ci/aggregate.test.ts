@@ -113,3 +113,31 @@ describe('aggregate.mjs: the changes outputs are validated (POLY-141 C20)', () =
     expect(src).toMatch(/from ['"]\.\/changes\.mjs['"]/);
   });
 });
+
+// POLY-101 B6 (seceng condition 10) and condition 6. A dispatch with a `base` filters a range the caller chooses, so its `app` is
+// never green; and the auth row's two jobs cannot be skipped while their keys are true.
+describe('aggregate.mjs: the auth row cannot be skipped (POLY-101)', () => {
+  const allOk = (on: string[]) => { let n = base(on); for (const j of ['lint', 'unit', 'db', 'image', 'provision', 'deploy-real']) n = set(n, j, 'success'); return n; };
+  const withBase = (n: Needs, dispatchBase?: string) => node('aggregate.mjs', { env: { NEEDS: JSON.stringify(n), ...(dispatchBase === undefined ? {} : { DISPATCH_BASE: dispatchBase }) } });
+  for (const [out, job] of [['node', 'lint'], ['layers', 'lint'], ['db', 'db']] as const) {
+    it(`output ${out}=true, ${job} skipped, every other job success -> red naming the key and the job  [red if: REQUIRED drops ${job} from ${out}]`, () => {
+      const r = withBase(set(allOk([out]), job, 'skipped'), '');
+      expect(r.code).not.toBe(0);
+      expect(r.stderr).toContain(`output ${out}=true but ${job} is skipped`);
+    });
+  }
+  it('a based dispatch is red even with every job green, and says why  [red if: DISPATCH_BASE is not read]', () => {
+    const r = withBase(allOk(OUT), 'a'.repeat(40));
+    expect(r.code).not.toBe(0);
+    expect(r.stderr).toMatch(/dispatch.*base|DISPATCH_BASE/i);
+  });
+  it('any non-empty base is red, not only a well-formed sha  [red if: only 40 hex is refused]', () => {
+    for (const v of ['main', 'HEAD', ' ', '0']) expect(withBase(allOk(OUT), v).code, JSON.stringify(v)).not.toBe(0);
+  });
+  it('an empty base (pull_request, or a full dispatch) and an unset one stay green  [red if: the variable\'s presence is refused]', () => {
+    for (const v of ['', undefined]) {
+      const r = withBase(allOk(OUT), v);
+      expect(r.code, r.stderr).toBe(0);
+    }
+  });
+});

@@ -3,6 +3,7 @@
 // Housing: this suite needs Postgres, so it lives in the `db` job battery (ruling R10), not under packages/auth.
 // Titles end with [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createAuthEndpoint } from 'better-auth/api';
 import { BASE, boot, get, jar, post, teardown, url, PW, type Env, type Mode } from './helpers/auth';
 import { must } from './helpers/sql';
 import { withHandle } from './helpers/handle';
@@ -20,16 +21,90 @@ async function instances() {
   return Promise.all(modes.map(async (m) => [m, await e.mk(m)] as const));
 }
 
+// POLY-101 B3. The router's own rule (better-call's router skips only a missing `path` or `options`, and SERVER_ONLY): `isAction`
+// does not take a route off HTTP. One copy, used by the live-route test, the METHOD path pin and the synthetic-plugin control.
+const httpEndpoints = (api: object): any[] => Object.values(api as Record<string, any>).filter((x) => x?.path && x.options && !x.options.metadata?.SERVER_ONLY);
+
+function routeDiff(api: object, routes: object) {
+  const live = new Set<string>(httpEndpoints(api).map((x) => x.path));
+  const listed = new Set(Object.keys(routes));
+  return { unclassified: [...live].filter((p) => !listed.has(p)).sort(), dead: [...listed].filter((p) => !live.has(p)).sort() };
+}
+
+// `method` is absent (any method), one string, or an array: normalised, so a widening cannot hide in the form.
+const methodPaths = (api: object): string[] =>
+  httpEndpoints(api).flatMap((x) => (x.options.method === undefined ? ['*'] : [x.options.method].flat()).map((m: string) => `${m} ${x.path}`)).sort();
+
+const METHOD_PATHS = [
+  'GET /account-info',
+  'GET /callback/:id',
+  'GET /delete-user/callback',
+  'GET /error',
+  'GET /get-session',
+  'GET /list-accounts',
+  'GET /list-sessions',
+  'GET /magic-link/verify',
+  'GET /ok',
+  'GET /passkey/generate-authenticate-options',
+  'GET /passkey/generate-register-options',
+  'GET /passkey/list-user-passkeys',
+  'GET /reset-password/:token',
+  'GET /verify-email',
+  'POST /callback/:id',
+  'POST /change-email',
+  'POST /change-password',
+  'POST /delete-user',
+  'POST /get-access-token',
+  'POST /get-session',
+  'POST /link-social',
+  'POST /passkey/delete-passkey',
+  'POST /passkey/update-passkey',
+  'POST /passkey/verify-authentication',
+  'POST /passkey/verify-registration',
+  'POST /refresh-token',
+  'POST /request-password-reset',
+  'POST /reset-password',
+  'POST /revoke-other-sessions',
+  'POST /revoke-session',
+  'POST /revoke-sessions',
+  'POST /second-step/cancel-hold',
+  'POST /second-step/confirm-code',
+  'POST /second-step/reauth',
+  'POST /second-step/reauth/begin',
+  'POST /second-step/reauth/passkey',
+  'POST /second-step/send-code',
+  'POST /send-verification-email',
+  'POST /sign-in/email',
+  'POST /sign-in/magic-link',
+  'POST /sign-in/social',
+  'POST /sign-out',
+  'POST /sign-up/email',
+  'POST /two-factor/disable',
+  'POST /two-factor/enable',
+  'POST /two-factor/generate-backup-codes',
+  'POST /two-factor/get-totp-uri',
+  'POST /two-factor/send-otp',
+  'POST /two-factor/verify-backup-code',
+  'POST /two-factor/verify-otp',
+  'POST /two-factor/verify-totp',
+  'POST /unlink-account',
+  'POST /update-session',
+  'POST /update-user',
+  'POST /verify-password',
+];
+
 describe.each(modes)('route policy, %s mode', (mode) => {
   let auth: any;
   beforeAll(async () => { auth = await e.mk(mode); });
 
   it('every HTTP route of the instance is in AUTH_ROUTES and every entry is live, naming the path  [red if: a plugin or version adds a route unclassified, or the map keeps a dead entry]', () => {
-    const eps = Object.values(auth.api as Record<string, any>).filter((x) => x?.path && !x.options?.metadata?.SERVER_ONLY && x.options?.metadata?.isAction !== false);
-    const live = new Set<string>(eps.map((x) => x.path));
-    const listed = new Set(Object.keys(e.A.AUTH_ROUTES));
-    expect([...live].filter((p) => !listed.has(p)), 'live but unclassified').toEqual([]);
-    expect([...listed].filter((p) => !live.has(p)), 'classified but not live').toEqual([]);
+    const { unclassified, dead } = routeDiff(auth.api, e.A.AUTH_ROUTES);
+    expect(unclassified, 'live but unclassified').toEqual([]);
+    expect(dead, 'classified but not live').toEqual([]);
+  });
+
+  it('the METHOD path list of the instance is the pinned one  [red if: a plugin or version adds or removes a method on a route, listed paths included]', () => {
+    expect(methodPaths(auth.api)).toEqual(METHOD_PATHS);
   });
 
   it('an unlisted path answers 404 with and without a session, the same answer as a blocked path  [red if: an unknown path falls through to BetterAuth\'s router]', async () => {
@@ -316,5 +391,45 @@ describe('POLY-146: reset and magic-link tokens are stored hashed', () => {
     expect(sessionCookie(r1)).toBe(true);
     const r2 = await e.handle(get(`/magic-link/verify?token=${token}&callbackURL=/`), auth);
     expect(sessionCookie(r2)).toBe(false);
+  });
+});
+
+// POLY-101 criterion 1, standing form: what a version bump that adds a route looks like to this suite. Two synthetic routes:
+// one whose literal path fits the listed template /callback/:id (only the hook can refuse it), one marked isAction: false.
+describe('route policy control: a synthetic plugin (POLY-101)', () => {
+  const FITS = '/callback/qa-bump';
+  const NO_ACTION = '/qa-noaction';
+  const reached = async (c: any) => c.json({ reached: true });
+  const plugin = {
+    id: 'qa-bump',
+    endpoints: {
+      qaBump: createAuthEndpoint(FITS, { method: 'GET' }, reached),
+      qaNoAction: createAuthEndpoint(NO_ACTION, { method: 'GET', metadata: { isAction: false } }, reached),
+    },
+  };
+  const bumped = (extra: (o: any) => any = (o) => o) => e.mk('real-domain', (o) => extra({ ...o, plugins: [...o.plugins, plugin] }));
+  const answer = async (r: Response) => ({ status: r.status, body: await body(r) });
+  const HOOK_404 = { status: 404, body: expect.objectContaining({ message: 'Not found' }) };
+  const REACHED = { status: 200, body: { reached: true } };
+
+  it('the predicate names both synthetic routes against AUTH_ROUTES, and nothing once both are listed  [red if: the predicate filters on isAction, or names nothing]', async () => {
+    const auth = await bumped();
+    expect(routeDiff(auth.api, e.A.AUTH_ROUTES)).toEqual({ unclassified: [FITS, NO_ACTION], dead: [] });
+    const classified = { ...e.A.AUTH_ROUTES, [FITS]: { class: 'open' }, [NO_ACTION]: { class: 'open' } };
+    expect(routeDiff(auth.api, classified)).toEqual({ unclassified: [], dead: [] });
+  });
+
+  it('both synthetic routes answer 404 while unlisted, and each of the two refusals holds on its own  [red if: the hook lets an unlisted path through, or the handler passes a path no template matches]', async () => {
+    const auth = await bumped();
+    for (const p of [FITS, NO_ACTION]) {
+      expect(await answer(await auth.handler(get(p))), `auth.handler ${p}`).toEqual(HOOK_404);
+      expect(await answer(await e.handle(get(p), auth)), `handleAuthRequest ${p}`).toEqual(HOOK_404);
+    }
+    // Without the hook both are real routes (so the 404s above were refusals, not a route that never existed).
+    const hookless = await bumped((o) => ({ ...o, hooks: { ...o.hooks, before: undefined } }));
+    for (const p of [FITS, NO_ACTION]) expect(await answer(await hookless.handler(get(p))), `hookless auth.handler ${p}`).toEqual(REACHED);
+    // The handler's own refusal covers the path no template matches; the template-shaped one passes it, so only the hook stops that one.
+    expect(await answer(await e.handle(get(NO_ACTION), hookless)), 'handler refusal without the hook').toEqual(HOOK_404);
+    expect(await answer(await e.handle(get(FITS), hookless)), 'only the hook refuses a template-shaped path').toEqual(REACHED);
   });
 });

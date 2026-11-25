@@ -408,3 +408,64 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
     expect(st.run).not.toContain('${{');
   });
 });
+
+// POLY-101 V7 (ruling §3 B1, B2 wiring, B6; seceng Part 2 item 3 and condition 12): the auth row's steps are unconditional.
+describe('ci.yml: the auth row (POLY-101)', () => {
+  type S = ReturnType<typeof steps>[number] & { 'continue-on-error'?: unknown };
+  const stepsOf = (job: string) => steps(w.jobs[job]!) as S[];
+  const rowStep = (job: string, mode: string) => {
+    const hits = stepsOf(job).filter((s) => new RegExp(`node infra/ci/auth-row\\.mjs ${mode}\\b`).test(s.run ?? ''));
+    expect(hits.length, `exactly one \`auth-row.mjs ${mode}\` step in ${job}`).toBe(1);
+    return hits[0]!;
+  };
+  const battery = () => stepsOf('db').find((s) => /tests\/db\/vitest\.config\.ts/.test(s.run ?? ''))!;
+  const unconditional = (s: S) => {
+    expect(s.if, 'no if:').toBeUndefined();
+    expect(s['continue-on-error'], 'no continue-on-error').toBeUndefined();
+    expect(s.run).not.toContain('--affected');
+    expect(s.run).not.toContain('${{');
+    expect(s.run).not.toMatch(/\|\||passWithNoTests|set \+e/);
+    expect((s as { shell?: string }).shell, 'the default shell keeps -e').toBeUndefined();
+  };
+
+  it('lint: "Auth row: drizzleAdapter lint" runs ESLint on packages/auth, then boundaries.test.ts with a JSON report, then the check  [red if: the named step is removed or reordered]', () => {
+    const s = rowStep('lint', 'lint');
+    unconditional(s);
+    expect(s.name).toBe('Auth row: drizzleAdapter lint');
+    const run = s.run!;
+    const at = [run.search(/pnpm exec eslint packages\/auth(\s|$)/m), run.search(/vitest run[^\n]*packages\/auth\/src\/boundaries\.test\.ts/), run.search(/node infra\/ci\/auth-row\.mjs lint/)];
+    expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(run).toContain('--reporter=json');
+    expect(run).toMatch(/--outputFile[= ]"?\$VITEST_JSON"?/);
+    expect(s.env?.VITEST_JSON).toBeDefined();
+    expect(stepsOf('lint').indexOf(s)).toBeGreaterThan(stepsOf('lint').findIndex((x) => /pnpm install/.test(x.run ?? '')));
+  });
+  it('lint: the job starts on node and on layers, the two keys every auth-row path sets, and has no continue-on-error  [red if: either key leaves the job\'s if:]', () => {
+    for (const k of ['node', 'layers']) expect(w.jobs.lint!.if).toContain(`needs.changes.outputs.${k} == 'true'`);
+    for (const j of ['lint', 'db']) expect((w.jobs[j] as { 'continue-on-error'?: unknown })['continue-on-error'], j).toBeUndefined();
+  });
+  it('db: the check directly follows the battery, unconditional; DB_AUTH comes from the filter through env:  [red if: it moves, gains if:, or reads another value]', () => {
+    const s = rowStep('db', 'db');
+    unconditional(s);
+    expect(stepsOf('db').indexOf(s)).toBe(stepsOf('db').indexOf(battery()) + 1);
+    expect(s.env?.DB_AUTH).toBe('${{ needs.changes.outputs.db_auth }}');
+    expect(s.run).not.toMatch(/DB_AUTH/);
+    expect(s.env?.VITEST_JSON).toBe(battery().env?.VITEST_JSON);
+    expect((battery() as S)['continue-on-error'], 'the battery itself').toBeUndefined();
+    expect(battery().if, 'the battery itself').toBeUndefined();
+  });
+  it('the lint row\'s report and the battery\'s report are different files  [red if: one path serves both]', () => {
+    const [a, b] = [rowStep('lint', 'lint').env?.VITEST_JSON, battery().env?.VITEST_JSON];
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(a).not.toBe(b);
+  });
+  it('app: the Aggregate step gets DISPATCH_BASE from inputs.base through env:  [red if: the aggregate cannot see a based dispatch]', () => {
+    const s = steps(w.jobs.app!).find((x) => /aggregate\.mjs/.test(x.run ?? ''))!;
+    expect(s.env?.DISPATCH_BASE).toBe('${{ inputs.base }}');
+  });
+  it('no step or job is skipped by actor: ci.yml reads no github.actor or triggering_actor  [red if: a bot or user gets a skip]', () => {
+    expect(wfText('ci.yml')).not.toMatch(/github\.actor|triggering_actor|github\[['"]actor/);
+  });
+});

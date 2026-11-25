@@ -11,6 +11,8 @@ export const DB_SHARED = [
   /^packages\/db\//, /^apps\/migrate\//, /^packages\/config\//,
   /^tests\/db\/helpers\//, /^tests\/db\/global-setup\.ts$/, /^tests\/db\/vitest\.config\.ts$/, /^tests\/db\/docker\//,
   /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/, /^pnpm-lock\.yaml$/,
+  // POLY-101 B5: an install hook or a patch changes a dependency's code; B2: the db job runs auth-row.mjs.
+  /^\.pnpmfile\./, /^patches\//, /^infra\/ci\/auth-row\.mjs$/,
   // S8: the root manifests and config every package resolves through.
   /^package\.json$/, /^pnpm-workspace\.yaml$/, /^\.npmrc$/, /^tsconfig[^/]*\.json$/, /^apps\/web\/package\.json$/, /^apps\/web\/tsconfig\.json$/,
   // C25: the files the db job itself executes (its steps, the area selector, the timing report, the preflight).
@@ -44,7 +46,7 @@ export const TABLE = {
   node: [
     /^packages\//, /^apps\//, /^package\.json$/, /^pnpm-lock\.yaml$/, /^pnpm-workspace\.yaml$/, /^turbo\.json$/,
     /^tsconfig[^/]*\.json$/, /^eslint\.config\.js$/, /^\.npmrc$/, /^tests\/config\//, /^tests\/image\//, /^tests\/log\//,
-    /^docs\/DESIGN\/tokens\.css$/,
+    /^docs\/DESIGN\/tokens\.css$/, /^\.pnpmfile\./, /^patches\//,
   ],
   layers: [
     /^layers\.json$/, /^docs\/ARCH\/index\.html$/, /^scripts\/layers\//, /^tests\/layers\//, /^eslint\.config\.js$/,
