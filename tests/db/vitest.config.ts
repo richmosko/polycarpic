@@ -14,7 +14,7 @@ import { defineConfig } from 'vitest/config';
 //   gate-check-membership role-membership GRANTs planted with the deploy-gate check, each rolled back (POLY-149e)
 //   gate-check-role-setting poly_auth's cluster-wide role setting, planted and restored (POLY-137)
 //   web-server*    spawn main.ts, which binds the fixed port 3000 (POLY-161)
-export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts', 'tests/db/web-server.test.ts', 'tests/db/web-server-start.test.ts'];
+export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts', 'tests/db/web-server.test.ts', 'tests/db/web-server-start.test.ts', 'tests/db/web-server-limits.test.ts'];
 
 export default defineConfig({
   test: {

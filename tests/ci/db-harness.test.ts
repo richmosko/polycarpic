@@ -203,7 +203,7 @@ describe('C6 the vitest config shape', () => {
   const projectOf = (cfg: Cfg, name: string) => (cfg.test?.projects ?? []).find((p: any) => p?.test?.name === name);
   it('SERIAL is exactly runner, template-clone, ops-hardening, web-server and web-server-start (they bind the fixed port 3000), pgtap-membership, gate-check-membership (the role-membership plants) and gate-check-role-setting (poly_auth cluster-wide setting, restored), as repo-relative paths that exist', async () => {
     const { SERIAL } = await config();
-    expect([...SERIAL].sort()).toEqual(['tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/web-server-start.test.ts', 'tests/db/web-server.test.ts']);
+    expect([...SERIAL].sort()).toEqual(['tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/web-server-limits.test.ts', 'tests/db/web-server-start.test.ts', 'tests/db/web-server.test.ts']);
     for (const f of SERIAL) expect(existsSync(join(ROOT, f)), f).toBe(true);
   });
   it('projects db-parallel (groupOrder 0, fileParallelism true) and db-serial (groupOrder 1, fileParallelism false)', async () => {

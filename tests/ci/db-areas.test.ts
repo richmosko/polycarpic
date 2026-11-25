@@ -32,7 +32,7 @@ const TABLE: Record<(typeof AREAS)[number], string[]> = {
   auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard', 'auth-method-hold', 'auth-mail-flows', 'auth-notice-triggers', 'worker-mail-jobs'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'gate-check-role-setting', 'migration-0017', 'runner', 'template-clone'],
-  ops: ['ops-status', 'ops-hardening', 'web-server', 'web-server-start'],
+  ops: ['ops-status', 'ops-hardening', 'web-server', 'web-server-start', 'web-server-limits'],
 };
 const tf = (names: string[]) => names.map((n) => `tests/db/${n}.test.ts`).sort();
 
