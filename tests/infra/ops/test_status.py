@@ -110,6 +110,30 @@ class Status(OpsTest):
         self.assertEqual(len(hits), 1, "want one %s %s line in:\n%s" % (item, project, r.out))
         return hits[0]
 
+    # ---- POLY-160 R1.12: a mark with no alert is RED where nothing polls it (edge, or no `current`); with a `current` the poller recovers it
+    INTERRUPTED = "interrupted or running; run the command again"
+
+    def test_a_mark_with_no_alert_and_no_current_is_red_interrupted(self):
+        """mutant: the no-`current` condition dropped"""
+        import os
+        os.unlink(str(self.host.p("/var/lib/polycarpic/state/deploy/staging/current")))
+        self.host.write("/var/lib/polycarpic/state/deploy/staging/in-progress", "sha256:" + "ab" * 32 + "\n")
+        self.assertEqual(self.find(self.go(), "deploy", "staging"), line("RED", "deploy", "staging", self.INTERRUPTED))
+
+    def test_a_mark_with_no_alert_on_edge_is_red_interrupted(self):
+        """mutant: the edge condition dropped"""
+        self.host.write("/var/lib/polycarpic/state/deploy/edge/current", "sha256:%s %s %s %s 2026-11-22T18:21:00Z\n" % ("1a2b3c4d5e6f" + "0" * 52, "edge-1", "a" * 40, "0" * 64))
+        self.host.write("/var/lib/polycarpic/state/deploy/edge/in-progress", "sha256:" + "ab" * 32 + "\n")
+        os_unlink_prod = str(self.host.p("/var/lib/polycarpic/state/deploy/prod/current"))
+        import os
+        os.unlink(os_unlink_prod)
+        self.assertEqual(self.find(self.go(), "deploy", "edge"), line("RED", "deploy", "edge", self.INTERRUPTED))
+
+    def test_a_mark_with_a_current_and_no_alert_is_left_to_the_poller(self):
+        """mutant: the condition widened to every mark"""
+        self.host.write("/var/lib/polycarpic/state/deploy/staging/in-progress", "sha256:" + "ab" * 32 + "\n")
+        self.assertEqual(self.find(self.go(), "deploy", "staging").split()[0], "OK")
+
     # ---- whole-screen shape, summary, exit
     def test_all_green_exact_screen_summary_and_exit_0(self):
         r = self.go()
