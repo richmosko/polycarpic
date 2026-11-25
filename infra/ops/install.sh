@@ -19,7 +19,8 @@ while [ $# -gt 0 ]; do
 done
 case "$host" in -* | *[!A-Za-z0-9@._-]* | '') echo "install.sh: bad host" >&2; exit 2 ;; esac
 case "$key" in -*) echo "install.sh: bad --ssh-key" >&2; exit 2 ;; esac
-case "$commit" in *[!0-9a-f]*) echo "install.sh: bad --commit" >&2; exit 2 ;; esac
+# every digit and letter written out: in some locales a range like [a-f] also holds upper-case letters
+case "$commit" in *[!0123456789abcdef]*) echo "install.sh: bad --commit" >&2; exit 2 ;; esac
 if [ -n "$commit" ] && [ "${#commit}" -ne 40 ]; then echo "install.sh: bad --commit" >&2; exit 2; fi
 
 # The repository that counts is the one this script lives in, wherever the operator stands (POLY-104 F2). Each git call runs from its root, in a
@@ -52,6 +53,19 @@ ssh_run() { # remote command (a fixed string)
   if [ -n "$key" ]; then ssh -i "$key" "$host" "$1"; else ssh "$host" "$1"; fi
 }
 
-repo_git show "$sha:infra/ops/install_box.py" | ssh_run 'sudo install -d -m 0700 /opt/polycarpic/.incoming && sudo tee /opt/polycarpic/.incoming/install_box.py > /dev/null'
+# sh gives a pipe its last command's status, so `git | ssh` would hide a failed git: both outputs are written out and git's status checked before
+# the first ssh. The box cannot tell a tar cut between two members from a whole one. (Committed files only, no secrets.)
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+git_to() { # file, git arguments
+  out=$1; shift
+  rc=0
+  repo_git "$@" > "$out" || rc=$?
+  [ "$rc" = 0 ] || { echo "install.sh: git $1 failed (exit $rc); nothing was sent to the box" >&2; exit "$rc"; }
+}
+git_to "$tmp/install_box.py" show "$sha:infra/ops/install_box.py"
 # shellcheck disable=SC2086
-repo_git archive --format=tar "$sha" -- $PATHS | ssh_run "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py $id $host"
+git_to "$tmp/bundle.tar" archive --format=tar "$sha" -- $PATHS
+
+ssh_run 'sudo install -d -m 0700 /opt/polycarpic/.incoming && sudo tee /opt/polycarpic/.incoming/install_box.py > /dev/null' < "$tmp/install_box.py"
+ssh_run "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py $id $host" < "$tmp/bundle.tar"
