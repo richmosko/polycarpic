@@ -61,3 +61,49 @@ By reading, also good: the stop is labels plus a second listing, never the exit 
 ## SECURITY
 
 R-35 (the residue, as `process/DECISIONS.md` words it) is in this commit, 1.21.2. **C-83's bullet and R-32 stay as they are** until B1 to B7 are confirmed: R-32 says a gap is open, and while the missing-token case has no test I will not write that it is closed. Both change with the delta read.
+
+---
+
+## Delta read @ `655fb279`: **PASS WITH FOLLOW-UPS**
+
+**CI condition met:** run 45565943755 at this sha concluded success on all ten jobs, `deploy-real` included (read from the run). Void if a product file moves.
+
+**Read:** the whole delta, `gate.md`, `red-run.md`'s new part. **Run by me, unit tests on fakes only:** `test_deploy_recover_rows.py` (21 green) and twelve mutants, each one text edit, reverted after, against `test_deploy_[rbsu]*.py`. No container suite. T-real, the other suites and the rest of the mutant column are qa's word.
+
+| Mine | Result |
+|---|---|
+| `rel.token` above `recover` | red (the missing-token case: the gate's other half) |
+| Compose check above `recover`, staging; edge | red; red |
+| `check_edge_env` above `recover` | red |
+| `recover` above the data mount | red |
+| saved pair used under the pinned Compose (my delta change 1) | red, staging and edge |
+| B1's check dropped, staging; edge | red; red |
+| no stand-down with no `current` | red |
+| `pair_ok` dropped in `_saved_pair` | **green** |
+| stand-down dropped in the unwind; the unwind clearing the mark on a failed restore | red (4); red (2) |
+
+- **B1, B2, B3 closed.** B1 ends the run before the work directory, on both paths, and INFRA says so. B2 keys on the commit. B3 is `-t 30`, and the fake refuses anything else.
+- **B4 closed** but for the rows ruled below. **B5 closed, with one correction:** the row "saved pair: hash check dropped: RED" is not a result. Its only failing test was red on the unmutated build at that tip (the edge allowlist case, a test fault since fixed). My run shows it green. It is the same equivalent as the second survivor, and I accept the equivalence: the bytes must still equal their own correction, pass the guard and match the environment, and `verify` compares the file with the recorded hash before any start.
+- **B6 closed:** auth, web after a page's query, all three in T-real; type and code only, through the real logger.
+- **B7 closed** on real Docker (qa, local): red without the stand-down.
+
+### `gate.md` §5 (b) and (c), by name. None blocks
+
+| Item | Ruling |
+|---|---|
+| Token, `edge.env`, unmounted volume: position mutants | **Done above, red.** Not owed |
+| C21 "during COMMIT" | POLY-165 (the proxy form) |
+| R7: home not root-owned; group- or other-writable | POLY-165. One comparison (`0 755`) that the link and non-empty cases already reach beside |
+| `edge-probe-baseline` raising; prod settle steps one by one | POLY-165: prod only |
+| `clear_transient` raising | POLY-165. Read: one `try`, one stderr line |
+| Edge forms of R2.4 and of the tree check | POLY-165. Read: the same comparison in `edge.restore` and `edge.rollback`; altering a tree needs root |
+| A second signal inside the stop | POLY-165. Read: nothing in `on_interrupt` touches the mark |
+| stderr closed | POLY-165. Read: the stop precedes the line in `on_interrupt`; in `recover` the line precedes the restore, so the test there must show a closed stderr does not stop it |
+| `sudo rm` help text | Accepted, not owed |
+| Read-back against a `docker stop` that exits 0 and leaves the container up (§3, R1.2 "P") | POLY-165. Read: the exit code is not used at all; B7 shows the real stop |
+| Unreadable quarantine file bans nothing; a second `rollback` (§3) | POLY-165 |
+| Mutants owed: settle's list, `clear_transient`, edge's tree check, status 08, the provision scripts, R4.1 per service, `rel.log` after `up` | POLY-165 |
+
+They are tests of code that reads right, on paths that fail closed or that only root can reach. They must be written into POLY-165 as listed; I have not checked that they are.
+
+**SECURITY 1.21.3:** C-83 states the recovery as built; R-32 is gone, its gap closed here; R-35 stays.
