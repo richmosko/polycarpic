@@ -73,3 +73,7 @@ By reading; nothing run by me. Red and green below are qa's record (`gate.md`).
 
 SECURITY 1.21.0: C-07, C-76, C-82 and TB-2 state this. Risk rows R-33 (P2) and R-34 (P3) are in 1.21.1, with the approver as `process/DECISIONS.md` records it.
 - **qa's two stated gaps do not matter to security.** B38 not red: a missing `qrcode-generator` is a 500 on one page, a loss of function, and exposes nothing. One total floor for the bundle list: the exact comparison is the control, and a plant on the client side alone goes red, so an unread client side cannot pass; a per-side floor would add nothing.
+
+## Final: **PASS. CI condition MET at `95ddd3c0`**
+
+Run 45535390085 concluded success, all ten jobs (read from the run; the test counts are the lead's reading). `35908f5b..95ddd3c0` changes two tests, docs and records, no product file (read); the new form of the start-order test is still red if the listen comes first. The earlier run, 45533753986 at `35908f5b`, failed (`db`, `unit`, `app`) and is not evidence. Void if a product file moves.
