@@ -131,12 +131,68 @@ class RestoreNeedsNoWrite(u.Helpers):
         for n, b in saved.items():
             self.assertEqual((d / n).read_bytes(), b, "%s was rewritten by a restore that needed no write" % n)
 
-    def test_a_restore_that_must_save_and_cannot_uses_the_saved_pair_when_its_hash_holds_and_its_bytes_pass_the_guard(self):
-        x1, x2 = self.unhealthy_second_deploy()
-        # the fresh render of previous's bundle differs from what was saved (an env value changed since): a save is needed, and the disk is full
+    # ---- POLY-160, seceng-160's exemption ruling (ruling-review.md, "Exemptions ruled" 1): a changed `environment` is refused (a); the rule "a needed save fails, a sound saved pair serves" is case (b),
+    # whose hook changes a key OUTSIDE `environment`. The hash and sidecar tests take (b)'s hook so they cannot pass on the environment alone.
+    def hook_environment_added(self):
         self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].setdefault("environment", {}).update(S36_NEW="1") or doc
-        self.full_disk_for_saves()
+
+    def hook_environment_changed(self):
+        def change(doc):
+            env = doc["services"]["web"].setdefault("environment", {})
+            key = sorted(env)[0]
+            env[key] = str(env[key]) + "-changed"
+            return doc
+        self.world.render_hooks[("staging", None)] = change
+
+    def hook_outside_environment(self):
+        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].update(restart="always") or doc
+
+    def recording_full_disk(self):
+        guard = guard_mod()
+        attempts = []
+
+        def save(*a, **k):
+            attempts.append(a)
+            raise OSError(errno.ENOSPC, "No space left on device")
+        self.addCleanup(setattr, guard, "save", guard.save)
+        guard.save = self.after_up(save)
+        return attempts
+
+    def saved_bytes(self, x1):
+        d = self.host.p("%s/staging" % SDIR)
+        return {n: (d / n).read_bytes() for n in os.listdir(str(d)) if n.startswith("render-%s" % x1.split(":")[1][:12])}
+
+    def assert_refused_restore(self, hook, what):
+        x1, x2 = self.unhealthy_second_deploy()
+        before_bytes = self.saved_bytes(x1)
+        hook()
+        self.recording_full_disk()
+        mark = len(self.world.compose_log)
         r = self.deploy("staging")
+        self.assertEqual(r.rc, 1, "%s: %s" % (what, r.err))
+        self.assertEqual(last(r), "deploy: rollback-unhealthy", "%s: %s" % (what, r.err))
+        ups = [c for c in self.world.compose_log[mark:] if c["cmd"] == "up" and c["project"] == "polycarpic-staging"]
+        self.assertTrue(all("render-%s.json" % x1.split(":")[1][:12] not in " ".join(c["argv"]) for c in ups[1:]), "%s: the old render was never upped after the candidate" % what)
+        self.assertEqual(self.saved_bytes(x1), before_bytes, "%s: x1's saved pair has the same bytes" % what)
+        self.assertEqual((self.state("staging", "in-progress") or "").strip(), x2, "%s: the mark is still there" % what)
+        self.assertIn(x2, self.state("staging", "quarantine") or "", "%s: the candidate is quarantined" % what)
+        stopped = sorted(e[1] for e in self.world.stop_log if e[0] == "stop")
+        self.assertEqual(stopped, ["cid-polycarpic-staging-%s-1" % s for s in ("auth", "web", "worker")], "%s: the candidate's three are stopped, not Postgres" % what)
+        self.assertEqual(self.alert_name("staging"), "rollback-unhealthy", what)
+
+    def test_a_restore_that_must_save_and_cannot_with_a_changed_environment_is_refused_and_the_old_release_is_not_upped(self):
+        """(a) mutants: the environment comparison dropped from the failed-save path; the comparison on keys only (a value change passes)"""
+        self.assert_refused_restore(self.hook_environment_added, "a key added")
+        self.setUp()
+        self.assert_refused_restore(self.hook_environment_changed, "an existing value changed")
+
+    def test_a_restore_that_must_save_and_cannot_uses_the_saved_pair_when_its_hash_holds_and_its_bytes_pass_the_guard(self):
+        """(b) the positive case, a key outside `environment`; mutant: the saved-pair fallback removed (every needed save that fails is refused)"""
+        x1, x2 = self.unhealthy_second_deploy()
+        self.hook_outside_environment()
+        attempts = self.recording_full_disk()
+        r = self.deploy("staging")
+        self.assertTrue(attempts, "the fresh bytes differ from the saved ones: a save was attempted, and it failed")
         self.restored(r, x1, "the saved pair is used")
 
     def test_a_restore_that_must_save_and_cannot_with_a_saved_pair_that_fails_its_hash_is_rollback_unhealthy(self):
@@ -144,7 +200,7 @@ class RestoreNeedsNoWrite(u.Helpers):
         d = self.host.p("%s/staging" % SDIR)
         with open(str(d / ("render-%s.json" % x1.split(":")[1][:12])), "ab") as fh:
             fh.write(b" ")
-        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].setdefault("environment", {}).update(S36_NEW="1") or doc
+        self.hook_outside_environment()  # POLY-160 exemption 1: (b)'s hook, so the hash check alone decides
         self.full_disk_for_saves()
         r = self.deploy("staging")
         self.assertEqual(last(r), "deploy: rollback-unhealthy", r.err)
@@ -154,7 +210,7 @@ class RestoreNeedsNoWrite(u.Helpers):
         x1, x2 = self.unhealthy_second_deploy()
         d = self.host.p("%s/staging" % SDIR)
         (d / ("render-%s.sha256" % x1.split(":")[1][:12])).write_text("0" * 64 + "\n")
-        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].setdefault("environment", {}).update(S36_NEW="1") or doc
+        self.hook_outside_environment()  # POLY-160 exemption 1: (b)'s hook, so the sidecar check alone decides
         self.full_disk_for_saves()
         r = self.deploy("staging")
         self.assertEqual(last(r), "deploy: rollback-unhealthy", r.err)

@@ -31,7 +31,7 @@ class S36Env(u.Helpers):
     def test_a_difference_outside_the_environment_still_uses_the_saved_pair(self):
         """positive case; mutant: any difference refuses"""
         x1, x2 = self.unhealthy_second_deploy()
-        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].setdefault("labels", {}).update(s36="1") or doc
+        self.world.render_hooks[("staging", None)] = lambda doc: doc["services"]["web"].update(restart="always") or doc
         self.full_disk_for_saves()
         r = self.deploy("staging")
         self.restored(r, x1, "ENOSPC at the save, environments equal")

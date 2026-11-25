@@ -37,3 +37,14 @@ The signal test installs its own raising handlers first, so a build with no hand
 | `tests/db/worker-mail-jobs.test.ts` (new describe) | green on the pool build; red with `survive()` a no-op (verified, reverted). Removing only the per-client `connect` line stays green here: the schedule's clients are idle between runs, the web and wrappers cases cover the checked-out path | `job.run` outcome `error` while down, `ok` again after `up()`, schedule not stopped |
 
 **C21 "during COMMIT": tried, cannot be timed.** `withSession` sends COMMIT in the same tick as the callback's return; there is no hook between the callback and the COMMIT write, so a loss cannot be placed inside it from a test. Tried: dropping the client's socket from the callback just before it returns (that is the "before COMMIT" case written), and a deferred constraint trigger with `pg_sleep` to widen the COMMIT (a loss during it needs a second connection killing the backend: `pg_terminate_backend`, which tests/ci forbids outside the serial project, and the client-socket drop lands before or after the COMMIT bytes, never reliably within). The two cases that stand: no query in flight (before COMMIT) and mid-query. seceng-160 rules at the build review whether they stand for it.
+
+## The two exemptions (seceng-160, ruling-review.md "Exemptions ruled" @ 8ab61533)
+
+| Edit | State on `7613d4e9` | Mutants (must turn it red once the build exists) |
+|---|---|---|
+| `test_deploy_unwind_more.py`: (a) `…with_a_changed_environment_is_refused_and_the_old_release_is_not_upped` (a key added, then an existing value changed; all eight assertions of the ruling) | red: today the old release is upped from the saved pair (`rolled-back`, not `rollback-unhealthy`) | environment comparison dropped from the failed-save path; comparison on keys only |
+| (b) `…uses_the_saved_pair…` now with a key outside `environment` (`restart`: the guard passes it, the correction keeps it) and the assertion that a save was attempted and failed | green today (positive guard) | the saved-pair fallback removed |
+| hash and sidecar tests, hook moved to (b)'s | green today, assertions unchanged | `pair_ok` dropped (red only after the hook moved) |
+| `test_deploy_hang.py` leftover mark: first half plus `current == x2` and the mark gone; second half on `x3`, no candidate offered, then offered; the tool writes `interrupted`, exactly one quarantine line `interrupted` for `x3`, no `up` names `x3`, `current` x2, mark gone | green today (the rule is unchanged; the fixture no longer plants a mark on the running digest) | the record never quarantines; the first time quarantines; `interrupted` not written; the mark unlinked before the record |
+
+Key for (b): `restart` on `web` (candidate and old release both pass the guard; `labels` and `healthcheck` do not: `guard-key`, `guard-pinned`). `test_deploy_s36_env.py` uses it too.

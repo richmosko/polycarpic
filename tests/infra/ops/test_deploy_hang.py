@@ -109,17 +109,32 @@ class F2(Hang):
         r = self.deploy("staging")
         self.assertIn("interrupted", (self.state("staging", "deploy.log") or "") + (self.state("staging", "alert") or "") + r.err, "alerts interrupted")
         self.assertNotIn(x2, self.state("staging", "quarantine") or "", "the first time it is tried again, not banned")
-        self.host.write("%s/staging/in-progress" % SDIR, x2 + "\n")
-        self.world.runs.clear()
-        self.staging_candidate()
-        # the same digest interrupted a second time is banned: plant it again and offer the same digest
-        self.world.runs.clear()
-        self.world.staging_run(self.world.commit_b, x2, run_id="9999")
-        self.host.write("%s/staging/interrupted" % SDIR, x2 + "\n")
-        self.host.write("%s/staging/in-progress" % SDIR, x2 + "\n")
-        r = self.deploy("staging")
-        self.assertIn(x2, self.state("staging", "quarantine") or "", "the second time it is quarantined")
-        self.assertIn("interrupted", self.state("staging", "quarantine"))
+        self.assertEqual(self.state("staging", "current").split()[0], x2, "tried again: x2 is current")
+        self.assertIsNone(self.state("staging", "in-progress"), "the mark is gone")
+        # POLY-160 exemption 2 (seceng-160): the second half runs on an x3 that never went healthy; the tool writes `interrupted`, not the test
+        x3 = self.staging_candidate()
+        offered = list(self.world.runs)
+        self.world.runs.clear()  # no candidate offered
+        self.host.write("%s/staging/in-progress" % SDIR, x3 + "\n")
+        before = len([c for c in self.world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"])
+        self.deploy("staging")
+        self.assertNotIn(x3, self.state("staging", "quarantine") or "", "the first time x3 is not banned")
+        self.assertEqual((self.state("staging", "interrupted") or "").strip(), x3, "the tool itself wrote `interrupted`")
+        self.assertEqual(self.state("staging", "current").split()[0], x2)
+        ups = [c for c in self.world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"][before:]
+        self.assertIn("render-%s.json" % x2.split(":")[1][:12], " ".join(ups[-1]["argv"]), "current's render is the last `up`")
+        self.assertIsNone(self.state("staging", "in-progress"), "the mark is gone")
+        self.world.runs[:] = offered  # now x3 is offered
+        self.host.write("%s/staging/in-progress" % SDIR, x3 + "\n")
+        before = len([c for c in self.world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"])
+        self.deploy("staging")
+        q = [l for l in (self.state("staging", "quarantine") or "").splitlines() if x3 in l]
+        self.assertEqual(len(q), 1, q)
+        self.assertEqual(q[0].split()[2], "interrupted")
+        ups = [c for c in self.world.compose_log if c["cmd"] == "up" and c["project"] == "polycarpic-staging"][before:]
+        self.assertTrue(all("render-%s.json" % x3.split(":")[1][:12] not in " ".join(c["argv"]) for c in ups), "no `up` names x3's render")
+        self.assertEqual(self.state("staging", "current").split()[0], x2)
+        self.assertIsNone(self.state("staging", "in-progress"), "the mark is gone")
 
     def test_a_first_deploy_interrupted_alerts_once(self):
         import shutil
