@@ -68,9 +68,9 @@ Build order: **R1, R2, R3, R4** (one sequence, same functions, one commit each),
 4. **`rollback`, project and edge:** `previous` naming `current`'s digest is "no previous release", exit 4. A pointer write that fails also raises the alert `rollback-pointers` (best-effort) and says to free space and run `rollback` again; `rollback.py` uses `deployer.link_current`.
 5. A first deploy whose settle fails still leaves the timers off and a rerun `already-deployed`: H3, POLY-165. Not worsened here.
 
-### R3 (H4) — `lib/deployer.py`, `lib/edge.py`
+### R3 (H4) — `lib/deployer.py`, `lib/edge.py`, `lib/release.py`
 
-After the candidate's first `up`, every unhealthy, uncommitted exit quarantines: `reason = err.name` for a `Refusal`, quarantine flag or not; `unhealthy` otherwise. Another digest is never affected; the alert stays RED until a healthy run. Pre-`up` refusals unchanged. A lift for prod is POLY-165's.
+After the candidate's first `up`, every unhealthy, uncommitted exit writes a quarantine line. `unhealthy`, `internal` and refusals that quarantine: as today. **A refusal that does not** (a box fault, `unjudged`): reason `held-<name>` with the bundle id as fourth field; `quarantine` and `quarantined` treat `held-` as they treat `guard-`, so it lifts with another installed bundle, and another digest is never affected. The alert stays RED until a healthy run. Pre-`up` refusals unchanged.
 
 ### R4 (H5) — `lib/deployer.py`, `lib/edge.py`
 
@@ -78,16 +78,20 @@ After the candidate's first `up`, every unhealthy, uncommitted exit quarantines:
 2. `rel.log` in both `Transient` handlers and `busy`, and every `rel.log` after the first `up`, becomes `_note`; `clear_transient` never raises. Both print one stderr line when they fail.
 3. The double crash on the running digest is R1.3e. `deploy-real-undo.sh` in the trigger is done (POLY-162).
 
-### R5 (pool) — `packages/db/src/pool.ts` only; backend-lead
+### R5 (pool) — `packages/db/src/pool.ts`, `startup.ts`, `apps/{web,auth,worker}/src/main.ts`; backend-lead
 
 ```ts
-function survive(pool: pg.Pool): pg.Pool {
-  pool.on('error', () => undefined);                            // idle: the pool has already removed the client
-  pool.on('connect', (c) => { c.on('error', () => undefined); }); // the client's whole life, checked out included
+export type PoolName = 'app' | 'auth' | 'worker' | 'operator';
+export interface LostConnection { pool: PoolName; type: string; code: string | undefined } // never the error itself
+let lost: (e: LostConnection) => void = () => undefined;
+export function onConnectionLost(fn: (e: LostConnection) => void): void { lost = fn; }     // re-exported by db/startup only
+function survive(name: PoolName, pool: pg.Pool): pg.Pool {
+  pool.on('error', () => undefined);                                      // idle: the pool has already removed the client
+  pool.on('connect', (c) => { c.on('error', (e) => tell(name, c, e)); }); // the client's whole life, checked out included
   return pool;
 }
 ```
-Each of the four constructors becomes `survive(new pg.Pool({ …, Client: ExtendedClient, … }))`, the literal kept. Nothing is logged here: pg-pool sets `err.client`, which holds the password. The failure shows in the services' own lines, which exist: `auth.request_failed`, the worker's `job.run` with `outcome: error`, and web's health at 503. No `console`, no process-wide handler change, no retry, no connect timeout. `release()` drops a client that errored (M15). A COMMIT whose connection is lost rejects and nothing is retried. `migrate.ts`'s own clients are out of scope: one shot, a crash is a failed run.
+`tell`: once per client, and at most one call per pool in 10 s; `type` is `e.name` when it matches `/^[A-Za-z]{1,40}$/` (else `unknown`), `code` when it matches `/^[0-9A-Z_]{2,20}$/` (else undefined); a callback that throws is ignored. Each constructor becomes `survive('<name>', new pg.Pool({ …, Client: ExtendedClient, … }))`, the literal kept. Each `main.ts` registers, before its first pool, a callback that logs `warn`, event `db.connection_lost.<pool>`, with a fresh `Error` carrying only that name and code in `err` (no schema change). pg-pool sets `err.client`, which holds the password, so the original never leaves `pool.ts`. The services' own lines stay: `auth.request_failed`, the worker's `job.run` with `outcome: error`, web's health at 503. No `console`, no process-wide handler change, no retry, no connect timeout. `release()` drops a client that errored (M15). A COMMIT whose connection is lost rejects and nothing is retried. `migrate.ts`'s own clients are out of scope: one shot, a crash is a failed run.
 
 ### R6 — `infra/provision.sh`
 
@@ -105,7 +109,7 @@ Runbook, `edge-deploy` row: "After Ctrl-C, a dropped connection or a power cut, 
 ## S. Test seams
 
 - **Deploy:** `Hang`, `Helpers` (`test_deploy_unwind.py`) and `EdgeBase`; `world.raise_cmd={"exec": KeyboardInterrupt()}` with `hang_from`; `world.compose_versions`; `patch(write=, put=, log=, alert=, quarantine=)`; `tempfile.mkdtemp`; `compose_log` for "the last `up` names the old digest's `render-<12 hex>.json`". The fake gains `docker ps` by label, `docker inspect <id>`, `docker stop`. Names: `recover(project, ctx, cur, run)`, `stand_down(project, ctx, keep_ref=None)`, `commit(project, ctx, cur, new, run)`, `settle(project, ctx, rdir, digest)`, in `deployer`. State files unchanged (`sha256:<64 hex>\n`), no new one. New alerts: `records`, `rollback-pointers`, `check-config-timeout`, `not-stopped`, `current-quarantined`. No new log event. New files: `test_deploy_recover.py` (R1), `test_deploy_commit.py` (R2), `test_deploy_retry.py` (R3, R4); `test_status.py` for R1.12.
-- **Pool, unit:** `packages/db/src/pool-errors.test.ts`, no database: for each of the four pools `pool.emit('error', new Error('x'), {})` does not throw; after `pool.emit('connect', c)` with `c = new EventEmitter()`, `c.emit('error', …)` does not throw; nothing is written to stdout or stderr.
+- **Pool, unit:** `packages/db/src/pool-errors.test.ts`, no database: for each of the four pools `pool.emit('error', new Error('x'), {})` does not throw; after `pool.emit('connect', c)` with `c = new EventEmitter()`, `c.emit('error', …)` does not throw and calls the callback once, with name and code only; a canary password on `err.client` and a canary `detail` are in nothing it received, and nothing is written to stdout or stderr.
 - **Pool, process:** `tests/db/web-server.test.ts` (existing; the proxy gains `down()` and `up()` on the same port): 200, `down()`, 503, `up()`, 200, same pid, no `process.crash`, line count bounded over the outage, the password in no output. A planted throw still exits 1.
 - **Auth and worker, outage:** `tests/db/auth-service-main.test.ts` and `worker-mail-jobs.test.ts` (existing): with the database unreachable, auth answers an error and writes `auth.request_failed`; a job run writes `job.run` with `outcome: error`; both go on, and the next works.
 - **C20, C21:** `tests/db/wrappers.test.ts` (existing): backend terminated inside `withSession` with no query in flight, before COMMIT and during it: an error, never the result; the next checkout carries no identity.
@@ -143,12 +147,12 @@ Runbook, `edge-deploy` row: "After Ctrl-C, a dropped connection or a power cut, 
 | Saving `current` raises **before** and **after** writing; put-back fails too: a later run never ups the refused digest | the re-read removed; `previous` not put back |
 | An unreadable `interrupted` after the commit does not unwind | the `Refusal` handler's `committed` check dropped |
 | `previous == current` → rollback exit 4, no `up` (project, edge) | the check dropped, each |
-| `unjudged` after `up`: polls two and three 0 ups; a new digest deploys | quarantined only when the flag is set |
+| `unjudged` after `up`: polls two and three 0 ups; a new digest deploys; another bundle lifts it | held only when the flag is set; `held-` not lifted |
 | `check-config` client timeout, each service: no quarantine; exit 124 and exit 1: quarantined | told apart by the code |
 | Transient and `busy` with `log` raising: exit 0, `transient-since` written, a stderr line | `rel.log` put back |
 | Unwind with **no** `current` clears the mark after the stand-down | mark kept there |
 | status: mark, no alert: edge and no-`current` RED; with a `current` unchanged | the condition dropped either way |
-| Pool unit, per pool | `survive` removed from one pool; either `on(…)` line removed; a `console.error(err)` in either |
+| Pool unit, per pool | `survive` removed from one pool; either `on(…)` line removed; a `console.error(err)` in either; the error object passed to the callback; the 10 s bound removed |
 | Real pool in `wrappers.test.ts`: terminated with no query in flight, and at COMMIT | the `connect` line removed |
 | Auth and worker each write their own error line in an outage | the error line removed from each |
 | Web down and up | `on('error')` removed; a cached health answer |
@@ -163,7 +167,7 @@ Traps: "exit is 1" passes every wrong build; assert the last `up`'s render, the 
 | Guard | What happens |
 |---|---|
 | `packages/db/src/pg-seam-scan.test.ts` | four literal `new pg.Pool({… Client: ExtendedClient` kept: green. A factory would break it: not allowed. "Each is wrapped in `survive(`" is qa's addition |
-| `layers.json`, `tests/layers`, eslint | no import, module or subpath added: green |
+| `layers.json`, `tests/layers`, eslint | `db/startup` is already importable by the three apps; no module or subpath added: green. `onConnectionLost` must not join `db`'s index. The log schema needs no change: the event name fits its pattern, `err` is declared (unmeasured) |
 | `tests/ci/db-areas`, `changes.mjs` | no new `tests/db` file; `pool.ts` already in `deploy` and `db`: green. `tests/db/helpers` turns on `e2e` and all db areas |
 | `test_lint.py` (argv, `shell=`), `release.EVENTS` | new children are list argv; no new event: green |
 | `test_deploy_oneoff.py`, `test_deploy_budget.py` | pin migrate's 30 minutes, not `check-config`'s 600 s (searched by name): green |
@@ -191,7 +195,7 @@ Traps: "exit is 1" passes every wrong build; assert the last `up`'s render, the 
 | C12 | R1.9 |
 | C13, C14 | R2; a re-read that also fails leaves `current` new **and quarantined**, which R1.3b refuses, so it is not read as C8's crash |
 | C15 | R1.3b |
-| C16 | R3 (met by the lead's decision; prod's lift is POLY-165) |
+| C16 | R3 |
 | C17 | R4.1 |
 | C18 | R4.2, R1.3g |
 | C19 | C7, C8 |
@@ -204,14 +208,14 @@ The review's 13 changes: 1, 2 → R1.1 to R1.3, D1 to D3; 3 → R1.4; 4 → R1.6
 
 ## C. Verdict checklist (pre-registered)
 
-1. M1–M12 each reversed, by committed tests, red-first at a named sha. 2. Every mutant in V recorded red, or equivalent with the reason. 3. By grep: the mark is unlinked in exactly `unwind`, `settle`, `recover` and R1.9; nothing but the listed reads precedes the restore. 4. No raw `rel.log` after the first `up` or in the transient and busy paths. 5. `BASH_SOURCE` once in `provision.sh`; every compose call in both scripts names `rh` and `/dev/null`. 6. Four `survive(new pg.Pool(`; no logger or `console` in `pool.ts`. 7. T-real green with the restart and SIGKILL cases; `deploy-real` wall time against 15 minutes and a same-day control (M17); the provision job too. 8. INFRA §4.4–4.6, the runbook lines, ARCH §8.1, SECURITY C-83 and R-32 match the code; no history in them. 9. seceng's verdict at the exact sha, C1–C28 each answered. 10. CI's exact commands green; `tests/ci` run.
+1. M1–M12 each reversed, by committed tests, red-first at a named sha. 2. Every mutant in V recorded red, or equivalent with the reason. 3. By grep: the mark is unlinked in exactly `unwind`, `settle`, `recover` and R1.9; nothing but the listed reads precedes the restore. 4. No raw `rel.log` after the first `up` or in the transient and busy paths. 5. `BASH_SOURCE` once in `provision.sh`; every compose call in both scripts names `rh` and `/dev/null`. 6. Four `survive('<name>', new pg.Pool(`; no logger or `console` in `pool.ts`; no raw error reaches a callback. 7. T-real green with the restart and SIGKILL cases; `deploy-real` wall time against 15 minutes and a same-day control (M17); the provision job too. 8. INFRA §4.4–4.6, the runbook lines, ARCH §8.1, SECURITY C-83 and R-32 match the code; no history in them. 9. seceng's verdict at the exact sha, C1–C28 each answered. 10. CI's exact commands green; `tests/ci` run.
 
 ## O. Owners
 
-devops-engineer: `infra/ops/**`, `infra/provision.sh`, `infra/provision-check.sh`, `docs/INFRA/**`. backend-lead: `packages/db/src/pool.ts`. qa-engineer: every test file, `tests/db/helpers/web-server.ts`, T-real. seceng: `docs/SECURITY/**`. architect: `docs/ARCH/**`. **No file is shared** between builders; the two builds can run in parallel.
+devops-engineer: `infra/ops/**`, `infra/provision.sh`, `infra/provision-check.sh`, `docs/INFRA/**`. backend-lead: `packages/db/src/pool.ts`, `startup.ts`, `apps/{web,auth,worker}/src/main.ts`. qa-engineer: every test file, `tests/db/helpers/web-server.ts`, T-real. seceng: `docs/SECURITY/**`. architect: `docs/ARCH/**`. **No file is shared** between builders; the two builds can run in parallel.
 
 ## L. For the lead
 
-Decided (`process/DECISIONS.md`, 2026-11-25): (1) a box fault after `up` quarantines; (2) a failed recovery stops the release, keeps the mark and lets a different digest deploy; (3) `check-config-timeout` at 120 s is retried without a ban on staging; (4) `status`'s RED line; (5) the Postgres restart runs in T-real; (6) T-real is measured against its own 15 minutes; the hand-run residue (D4) is accepted for staging. POLY-165, by name, before the first prod deploy: boot-time recovery for the two hand-run commands; the backup set per retried poll; a lift for R3's quarantine; prod's Caddy when a prod restore fails.
+Decided (`process/DECISIONS.md`, 2026-11-25): (1) a box fault after `up` holds the digest until another bundle is installed (R3); (2) a failed recovery stops the release, keeps the mark and lets a different digest deploy; (3) `check-config-timeout` at 120 s is retried without a ban on staging; (4) `status`'s RED line; (5) the Postgres restart runs in T-real; (6) T-real is measured against its own 15 minutes; the hand-run residue (D4) is accepted for staging. POLY-165, by name, before the first prod deploy: boot-time recovery for the two hand-run commands; the backup set per retried poll; whether R3's lift is enough for prod; prod's Caddy when a prod restore fails.
 
 Open: **T-real gains two cases**, the Postgres restart (about 2 minutes) and the SIGKILL with a mismatched Compose (about 2 to 4), both unmeasured, on 7 min 38 s of 15. If the job passes 13 minutes, raise the limit rather than drop a case; that edits `ci.yml`, and is yours.
