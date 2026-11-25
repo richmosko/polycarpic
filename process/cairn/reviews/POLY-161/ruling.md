@@ -134,7 +134,7 @@ Criteria "No SvelteKit route is served by the image before POLY-86's signed-out 
 1. **Paths:** add `packages/config/src/check.ts` (frontend, `Config.zone`). The other way is a second `tldts` parse in `apps/web`, which could disagree with the first. Recommended: add the path.
 2. **Sign-in smoke in T-real (R9.3).** Recommended: yes; otherwise nothing runs the bundle against a database in the image before POLY-104.
 3. **Two resolvers must agree on NXDOMAIN (R7)** narrows a ratified control's wording (C-76). Recommended: yes; seceng decides the wording.
-4. **The exposure in R6 and the residual in R4** go to the Principal's summary. Recommended: accept the residual for POLY-M1; the other way is a rate limiter built into Caddy, its own issue.
+4. **The exposure in R6 and the residual in R4** go to the Principal's summary. Decided: addendum 2.
 
 ## Addendum 1: `safeNext`, remote functions, one instance
 
@@ -144,3 +144,13 @@ Test rows, refused: the measured four, `/\0/evil.example`, `/x/..//evil.example`
 **R6, added:** Kit takes `event.url.pathname` of a remote call from a client header, which the guard trusts (seceng, read). `manifest.js`'s `remotes` is empty; a test holds it empty, and a request to `/_app/remote/x/y` with `x-sveltekit-pathname: /sign-in` is asserted on the built server. A service worker file is absent from `build/client`; its file list is asserted exact outside `_app/immutable`.
 
 **R2, added:** two copies of `@poly/db` are ruled, not an accident. The bundle's serves every request and health; `main.ts`'s serves `init()` and `/status` only. Both read the same environment and both log through the schema. Neither calls `configure`. One instance would mean keeping `@poly/*` external, so the bundle would load TypeScript sources at run time; not taken.
+
+## Addendum 2: seceng's review (`ruling-review.md` @ `0079a2a0`) and the lead's decisions
+
+**All of S1 to S10 and the C-76 wording are adopted as written there**, and bind the build and the tests. Decisions 1 to 3 are yes. Decision 4: R4's residual is accepted **for this loop, which deploys nothing**; a rate limiter at Caddy is a gate on POLY-156 before prod is opened to the internet. This replaces "accept for POLY-M1" here and in seceng's P2.
+
+**R14 What is in the bundle (closes B2).** Measured: the source maps of `build/server` name 39 packages, picomatch not among them; 28 of 81 server files have no map and the client has none, so maps alone are not enough. Ruled: a Vite plugin (frontend, `apps/web/bundle-packages.ts`, used in `vite.config.ts`) records every module id of both the client and the server build in `.svelte-kit/`; `infra/ci/bundle-packages.mjs` (devops) takes the union of those ids and the maps' sources, before the maps are deleted, and writes `build/packages.json`: sorted `{name, version}`. Client maps are never emitted: the adapter would list and serve them. The file travels in the image, is outside `build/client` and is not served (asserted): it is the kept artefact, and F2 reads it. The names are compared exactly with the committed `apps/web/bundle-packages.txt` (frontend), in the stage and in `image.sh check`; picomatch is refused by name whatever the list says. Versions are not in the committed list. `audit-exemption.test.ts` builds and checks the bundle too (qa). Red on an import planted in a server file and on one planted in a client-only component. A server file that has no map and no plugin record fails.
+
+**R15 CSP on every HTML answer (S3).** Measured: the 500 page has no CSP header, because Kit's static error page does not go through it. `apps/web/src/lib/csp.ts` (frontend) holds C-07's directives once; `vite.config.ts` reads them, and `server.ts` sets them as the default header before the handler, which Kit's own (with its nonce) replaces. `(unmeasured: the replacement)`. The `deploy` key gains `csp.ts`, `bundle-packages.ts` and `infra/ci/bundle-packages.mjs`.
+
+**S6, S7** are measured by qa before the gate. If S7 does not fit 384m, the cap comes down, not the memory up; the number comes back to me once.

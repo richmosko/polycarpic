@@ -13,6 +13,8 @@ Architect. Checklist pre-registered with the ruling, before any test was written
 | A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | | |
 | A6 | R6: what is served | crawl over the manifest red on an unguarded new route and on a prefix `isPublic`; seceng's review has no open item | | |
 | A12 | R13: `safeNext` | every row of addendum 1 red on today's module or on its mutant; the two Chromium cases green | | |
+| A13 | R14, B2: the bundle's packages | list exact in the stage and the final image, red on both plants and on picomatch | | |
+| A14 | seceng S1 to S10, R15 | each shown as its row says; S6 and S7 with their measured values | | |
 | A7 | R4: limits and Host | each limit driven, not read; 421 and 400 asserted with bodies; positive case through the public host | | |
 | A8 | R5: logging | a real 500 (database down) and a planted `console.error(object)` leave no request or error text; red without `handleError` and without the guard, separately | | |
 | A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | | |
@@ -59,3 +61,6 @@ Each is settled in the first tests or the first build. Open at the gate: CHANGES
 | B32 | `safeNext` | Node's parser stands in for the browser | the two Chromium cases end on our origin after a real sign-in | qa |
 | B33 | `safeNext` | only tab tested, or only in second position; the origin check hides a missing control check | every control, two positions; each rule dropped in turn is red | qa |
 | B34 | remotes | an empty `remotes` object asserted on a name that does not exist (undefined) | the key exists and has no entry; the header request is made | qa |
+| B35 | bundle list | server only, or an empty list equal to an empty list | floors per side; a client-only plant is red; `svelte` and `pg` are in it | qa, devops |
+| B36 | CSP | "has a CSP header" passes a widened one; the 500 page is never reached | by value, on 200, 404 and a real 500 | qa |
+| B37 | S7 | 512 sockets that never reach web (the client's own limit) | the server counts 512; peak memory read under the 384m limit | qa |
