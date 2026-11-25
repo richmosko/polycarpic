@@ -549,7 +549,7 @@ jobs:
       - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
         run: pnpm --filter @poly/web exec svelte-kit sync
 
-      - name: Build the web app (POLY-161 R10: tests/db/web-server.test.ts spawns main.ts against build/handler.js; a missing build fails the suite, it never skips)
+      - name: Build the web app (POLY-161 R10, tests/db/web-server.test.ts spawns main.ts against build/handler.js, a missing build fails the suite and never skips)
         run: pnpm --filter @poly/web build
 
       - name: DB battery (one Postgres container, RLS battery included)

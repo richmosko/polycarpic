@@ -35,7 +35,7 @@ export const DB_AREAS = {
   },
   ops: {
     tests: T(['ops-status', 'ops-hardening', 'web-server']),
-    paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
+    paths: [/^apps\/web\/src\/ops\//, /^apps\/web\/src\/lib\/csp\.ts$/, /^apps\/web\/tests\/helpers\/fake-dns\.ts$/, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//],
   },
 };
 const areaMatches = (name, p) => DB_AREAS[name].tests.includes(p) || DB_AREAS[name].paths.some((re) => re.test(p));
@@ -56,7 +56,7 @@ export const TABLE = {
     /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/,
     /^apps\/worker\/src\/jobs\//, /^packages\/mail\//,
     /^infra\/postgres\/gate-check\.(sh|sql)$/,
-    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
+    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/lib\/csp\.ts$/, /^apps\/web\/tests\/helpers\/fake-dns\.ts$/, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
     ...DB_SHARED,
   ],
   // POLY-97: infra/hetzner/ and infra/operator/ and the dry-run test files belong to the `provision` job. infra/provision*.sh and the
