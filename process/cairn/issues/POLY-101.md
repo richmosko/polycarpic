@@ -1,7 +1,7 @@
 ---
 id: POLY-101
 title: CI: auth route-policy row
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96, POLY-86]
@@ -30,3 +30,7 @@ Feature started. Branch: `feature/poly-101-ci-auth-route-policy-row`. Sub-issues
 ### @team-lead — 2026-11-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/158. Awaiting the PR's own CI run and the final verdict lines.
+
+### @team-lead — 2026-11-25
+
+Validate passed (seceng PASS at ae693858, architect PASS at ecee6edc, PR run 45664122857 green on rerun); merging via PR #158. Closing.
