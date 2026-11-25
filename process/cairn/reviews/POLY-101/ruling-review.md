@@ -81,3 +81,21 @@ the test lists the instance's endpoints and fails on a missing path. ARCH 1.31.1
 
 **Must be shown red:** rule deleted in `generate.mjs` (B1's step by itself); each path of 2 and 3 dropped; skip, todo, `fails`, missing file, below floor, one TLS mode; the two control
 faults; `lint` or `db` skipped with its key true; based dispatch.
+
+## Part 3: the lead's two questions, and the ruling @ f0bf6d03
+
+**G1: the retraction is the true statement.** The rule cannot be deleted in `generate.mjs` with `lint` green (measured, Part 1 condition 1). f0bf6d03 now says so: item 1 of Part 2 closed.
+B1 is the right size: one named step, about 1 s, and no job or key. Smaller (pin structure.test.ts alone) would not give B2 a report that shows LINT ran.
+
+**G3: confirmed from the code (read; not run over HTTP).** An unlisted path is refused twice, and neither place looks at `isAction`:
+(a) `handleAuthRequestInner` answers 404 when `matchAuthPath` finds no template, before `auth.handler`; (b) `routePolicyHook` throws NOT_FOUND when `AUTH_ROUTES[ctx.path]` is absent.
+better-auth's `dispatch.mjs` sets that `path` to `endpoint.path` (line 204) and puts the user `hooks.before` ahead of the plugin ones; every endpoint passes through `toAuthEndpoints`.
+A new literal that fits a listed template (`/callback/x` under `/callback/:id`) passes (a) and is stopped by (b). So it is a test hole, not a control hole.
+Two limits: a plugin `onRequest` answers inside `auth.handler` before (b), though (a) still precedes it for unlisted paths; and a synthetic-route 404 over `auth.handler` exercises (b) alone.
+The ruling names `refusedByHandle` as the first refusal. Nothing in `packages/auth/src` or `apps/auth/src` calls it (grep); the refusal is `handleAuthRequestInner`.
+
+**Verdict on f0bf6d03: CHANGES.** Open: Part 2 items 2 (`it.fails`) and 3 (standing V7). One added line for B3, from G3:
+4. The control's synthetic routes are asked through `handleAuthRequest` as well as `auth.handler`, so (a) and (b) are each shown to refuse; and one of the two uses a path that fits a listed
+   template (for example `/callback/:id`'s shape), where only (b) can refuse. Name `handleAuthRequestInner`, not `refusedByHandle`.
+Condition 7: agreed, RP's predicate becomes the router's own rule. Build conditions and the red list stand as in Part 2; add a red for 4: with the hook removed from the control's options, the template-shaped
+synthetic route no longer answers the hook's 404.
