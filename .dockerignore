@@ -21,3 +21,7 @@ packages/secrets/**/*.test.*
 packages/secrets/**/*.spec.*
 **/.turbo
 *.pdf
+# POLY-161 R1: the web stage builds from source; a local build output or generated tree never enters the context
+**/.svelte-kit
+apps/web/build
+apps/web/tests

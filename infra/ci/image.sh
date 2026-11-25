@@ -74,6 +74,40 @@ case "$cmd" in
       if (typeof a.handler !== 'function' || Object.keys(m.AUTH_ROUTES).length !== 53) process.exit(1);"
     docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module --eval "$smoke" >/dev/null 2>&1 \
       || { echo "image check: @poly/auth does not start in the built image" >&2; exit 1; }
+    # POLY-161 R1, S9 (B24, B25, B26): what the web stage left in the FINAL image. Each find has a control that it can see handler.js, so an error or a wrong path is not read as "nothing found".
+    docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint sh "$ref" -c '
+      bad=0; web=/app/apps/web
+      [ -n "$(find $web/build -name handler.js 2>/dev/null)" ] || { echo "image check: find cannot see build/handler.js" >&2; exit 1; }
+      [ -f $web/build/packages.json ] || { echo "image check: build/packages.json is missing" >&2; bad=1; }
+      for f in $web/build/index.js $web/build/server/adapter-index.js; do
+        [ ! -e "$f" ] || { echo "image check: $f is in the image" >&2; bad=1; }
+      done
+      found="$(find $web \( -name "*.map" -o -name .svelte-kit -o -name tests -o -name ".env*" \) 2>/dev/null; find /app -name ".env*" 2>/dev/null)"
+      [ -z "$found" ] || { echo "image check: files that must not ship:" >&2; echo "$found" >&2; bad=1; }
+      tools="$(find /app -path "*/node_modules/*" \( -name vite -o -name rolldown -o -name "rolldown-*" -o -name svelte-check -o -name playwright -o -name playwright-core -o -name "@sveltejs" -o -name "@playwright" \) -prune -print 2>/dev/null; find /app/node_modules/.pnpm -maxdepth 1 \( -name "@sveltejs+*" -o -name "rolldown@*" -o -name "svelte-check@*" -o -name "playwright*" \) 2>/dev/null)"
+      [ -z "$tools" ] || { echo "image check: build tooling in the image:" >&2; echo "$tools" >&2; bad=1; }
+      exit $bad' || { echo "image check: web build contents" >&2; exit 1; }
+    for uid in 1000 10101; do
+      w="$(docker run --rm --network none --cap-drop ALL --user "$uid" --entrypoint sh "$ref" -c 'find /app/apps/web/build -writable 2>/dev/null; test -n "$(find /app/apps/web/build -name handler.js)" || echo CONTROL-FAILED')"
+      [ -z "$w" ] || { echo "image check: uid $uid can write under apps/web/build (or the control failed): $w" >&2; exit 1; }
+    done
+    # R14: the packages the bundle holds are the committed ones; picomatch is refused by name whatever the list says.
+    pk="const fs = await import('node:fs'); const have = [...new Set(JSON.parse(fs.readFileSync('/app/apps/web/build/packages.json', 'utf8')).map((p) => p.name))].sort();
+      const want = fs.readFileSync('/app/apps/web/bundle-packages.txt', 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).sort();
+      if (have.length === 0 || have.includes('picomatch') || JSON.stringify(have) !== JSON.stringify(want)) { console.error('bundle packages differ from the committed list'); process.exit(1); }"
+    docker run --rm --network none --cap-drop ALL --entrypoint node "$ref" --input-type=module --eval "$pk" \
+      || { echo "image check: build/packages.json is not the committed list" >&2; exit 1; }
+    # B26: the bundle answers in the image, with no network: status and a body marker are compared, so a silent catch cannot pass. packages.json is not served.
+    app="const http = await import('node:http'); const { handler } = await import('/app/apps/web/build/handler.js');
+      const srv = http.createServer((req, res) => handler(req, res, () => { res.statusCode = 404; res.end(); })).listen(0, '127.0.0.1');
+      await new Promise((r) => srv.once('listening', r));
+      const get = async (p) => { const r = await fetch('http://127.0.0.1:' + srv.address().port + p, { redirect: 'manual' }); return [r.status, await r.text(), r.headers.get('location')]; };
+      const [s1, b1] = await get('/sign-in'); const [s2, , l2] = await get('/dashboard'); const [s3] = await get('/packages.json');
+      const ok = s1 === 200 && b1.includes('<html') && s2 === 303 && (l2 ?? '').startsWith('/sign-in') && s3 !== 200;
+      if (!ok) console.error('smoke:', s1, s2, l2, s3);
+      process.exit(ok ? 0 : 1);"
+    docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module --eval "$app" \
+      || { echo "image check: the web bundle does not answer /sign-in (200 HTML) and /dashboard (303) in the built image" >&2; exit 1; }
     ;;
   sbom)
     ref="${2:-polycarpic:ci}"

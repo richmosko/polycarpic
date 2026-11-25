@@ -21,6 +21,23 @@ RUN set -eu; mkdir /release; \
     find /release -type f -exec chmod 0644 {} +; \
     chmod 0755 /release/infra/backup/backup.sh /release/infra/backup/upload.sh /release/infra/postgres/archive-wal.sh
 
+# --- web: build the SvelteKit app (POLY-161 R1) ------------------------------------------------------------------------
+# Dev dependencies (vite, the Svelte compiler) live in this stage only. Nothing but apps/web/build leaves it, and the final stage copies exactly that.
+# The build itself runs with no network, so third-party build code can neither fetch nor send (seceng P3: this flag is not dropped without the Principal). It gets no build arg and no secret.
+FROM node:26.12.0-slim@sha256:e556a144463cc8dc53afe8de6d2fa0db5c132fd39ffa232c17641bd40df2bf11 AS web
+WORKDIR /app
+RUN npm i -g --allow-scripts=pnpm pnpm@12.18.0
+COPY . .
+RUN pnpm install --frozen-lockfile --filter "@poly/web..."
+# R14: the packages the bundle holds, taken before the maps go, compared with the committed list (picomatch is refused by name). build/packages.json stays.
+# Then: no adapter entry point (main.ts mounts handler.js), no source maps.
+RUN --network=none set -eu; \
+    cd apps/web; node_modules/.bin/vite build; \
+    node /app/infra/ci/bundle-packages.mjs /app/apps/web /app/apps/web/bundle-packages.txt; \
+    rm -f build/index.js build/server/adapter-index.js; \
+    find build -name '*.map' -delete; \
+    chmod -R a-w build
+
 # --- runtime ------------------------------------------------------------------------------------------------------------
 FROM node:26.12.0-slim@sha256:e556a144463cc8dc53afe8de6d2fa0db5c132fd39ffa232c17641bd40df2bf11
 ARG GIT_COMMIT
@@ -38,6 +55,8 @@ ENV POLY_IMAGE_REVISION=$GIT_COMMIT NODE_ENV=production
 WORKDIR /app
 COPY --chown=node:node --from=build /app /app
 COPY --chown=root:root --from=build /release /release
+# The only thing that comes from the web stage (POLY-161 R1): the built app, owned by root and not writable.
+COPY --chown=root:root --from=web /app/apps/web/build /app/apps/web/build
 RUN chmod -R a-w /release
 USER node
 ENTRYPOINT ["/app/bin/polycarpic"]
