@@ -23,6 +23,10 @@ The first red model, in `9027719c`, was wrong: the test box had mawk 1.3.4, whic
 
 Run on `2034dff2` (that fix plus the F4, F6 and DR3 red tests) with the gawk model. Box suite: 212 run, 210 passed, 2 failed, both F6. `test_provision.py`: 24 run; the F4 tests fail (1 test and 22 subtests), the rest pass, the signal tests among them. CI's `shellcheck -x` in the test box on `provision.sh`, `provision-check.sh` and `drill.sh`: exit 0. The whole ops unit directory was not run: `test_run_guard` refused it as an un-tiered full run.
 
+### Build-green for F4, F6 and DR3 at `ff62d0d0`
+
+Run on `ff53d4f5`, which holds it. Box suite: 212 run, 212 passed. `test_provision.py`: 24 run, all passed; `test_dispatcher.py` and `test_lint.py` passed. `vitest run -c tests/infra/vitest.config.ts`: 680 run, 677 passed, 0 failed, 3 skipped, `drill-dr3.test.ts` 9 of 9. The DR3 block also gives the right result in the test box with GNU grep 3.11 (`FAIL` on a password in a large plain or gzipped file, a missing, corrupt or cut file; `PASS` on a clean one). CI's `shellcheck -x` command: exit 0. Not run here: the backup container suite (`vitest.backup.config.ts`, which runs the whole of `drill.sh`) and the rest of the ops unit directory.
+
 ### The same shape elsewhere
 
 A pipe whose reader can leave before the writer is done, in a script with `pipefail`. Searched `infra/**` and `.github/**` for a pipe into `head`, `read`, `cmp`, `grep -q`/`-m`/`-l`, `sed …q` and `awk … exit`. No ops Python command runs a shell pipe (`shell=False` everywhere).
