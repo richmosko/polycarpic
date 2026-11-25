@@ -32,14 +32,14 @@ R2, R3, R5's `handleError`, the Host pin (it also fixes Kit's form-origin check 
 
 - F1 (POLY-160, with U1): unpinned environment keys. `NODE_OPTIONS` in `environment` can now change the whole app, not a health path. Still from the same attested commit; not new reach.
 - F2: the weekly re-scan of the published image cannot see bundled packages; make it read B2's list. Until then the check after release is the lockfile audit, which runs on PRs only (read: the schedule is in `build.yml` and `renovate-check.yml`).
-- F3: the per-address limit for web, if the Principal does not accept P2.
+- F3: the edge limits, ruled in "The gate on R4's residual" below.
 
 ## For the Principal: exposure changes and accepted risks
 
 | # | What, mechanism, who | Recommendation |
 |---|---|---|
 | P1 | **Changes what the internet can reach.** On prod anyone reaches the sign-in, reset, second-step, cancel and sign-up pages, the static JavaScript and health; on staging only the allowlist with basic auth. Signed out, the database work is one `enter_session` per request with a handle cookie | Accept: it is the issue's purpose. A guard failure would expose pages; row-level security still needs a live handle |
-| P2 | **Accepts a risk: loss of service.** Anyone on the internet can fill the 512 connections or the database pool; health then goes red, and in a deploy window the deploy rolls back. No disclosure. Stronger option: a rate limiter compiled into Caddy, its own issue | Accept for POLY-M1 |
+| P2 | **Accepts a risk: loss of service.** Anyone on the internet can fill the 512 connections or the database pool; health then goes red, and in a deploy window the deploy rolls back. No disclosure. Stronger option: a rate limiter compiled into Caddy, its own issue | Accept until prod is opened to the internet; the gate below |
 | P3 | **Accepts a risk: build tools now shape shipped code.** Vite, the Svelte compiler and their dependencies run at build and write the code that handles sessions. Before, dev packages never reached the image. Who: whoever gets a malicious version into our lockfile; it needs a reviewed lockfile change. `--network=none` stops fetching and sending at build; it does not stop a poisoned compiler altering output. Mitigations: pinned lockfile, no install scripts (C-80), audit, B2's list | Accept; there is no way to ship a built Svelte app without it |
 | P4 | **Narrows C-76 and sends the zone name out.** Two resolvers must both say NXDOMAIN. This stops one wrong or filtering resolver (Quad9 answers NXDOMAIN for names it blocks, by its documentation). It does **not** stop someone on the box's network path, who can forge both: they can keep web down at its next start, nothing more. Every start tells Cloudflare and Quad9 the registrable domain and the box's address | Accept; wording below |
 
@@ -52,3 +52,21 @@ R2, R3, R5's `handleError`, the Host pin (it also fixes Kit's form-origin check 
 ## Decisions for the lead, my side
 
 1 (`Config.zone`): yes. 2 (sign-in smoke in T-real): yes, required; it is the guard's only positive case in the image. 3: yes, with the wording above. 4: P1 to P4.
+
+## The gate on R4's residual (the lead's decision)
+
+**The moment is right: before prod is opened to the internet. An umbrella bullet is weak**: POLY-156 is nits, nothing waits on it. Recommended: its own issue that the first prod deploy is `blocked_by`; failing that, a POLY-156 criterion named in the prod runbook's gate. This replaces F3 and P2's "for POLY-M1".
+
+A request rate limiter **alone does not cover R4**. Required, all at the edge:
+1. Request rate per client (the TCP peer; IPv6 by /64), on every path to `web` except `/_app/immutable/*`. A stricter bucket for any request carrying a handle cookie, `__data.json` included: each opens a transaction. The excess is 429 at Caddy and never reaches `web`.
+2. Slow connections, which a request counter never counts: Caddy's `read_header`, `read_body` and write timeouts, and a cap on connections per address (host firewall). Our Caddyfile sets none of these today (read).
+3. Bounded state in the limiter itself (keys, memory), and prod and staging counted apart.
+4. Shown by: one address over the limit is refused while a second address and the loopback health check still get 200; 512 slow bodies from one address leave health at 200. Both red with the limit off.
+
+It does not stop a distributed flood. That stays accepted (loss of service only). A plugin compiled into Caddy is new code at TLS termination: pinned, scanned, and reviewed by me (R-25 relies on Caddy being out of `web`'s reach).
+
+## Evidence, and `nosniff`/`no-store`
+
+- M3, the statuses in M4 and R6, M5 to M11 and R13's values are single scratch runs; I rely on none. My verdict needs them reproduced by qa's tests.
+- One C-76 forged answer: two resolvers is the lesser harm, so not BLOCKS.
+- I do not require `nosniff` or `no-store` from `web`: Caddy is the only way in from outside and sets both whatever `web` sends (C-07, R-25). S10's `no-store` is the hook's existing one on signed-in pages; a `nosniff` check stays at Caddy.
