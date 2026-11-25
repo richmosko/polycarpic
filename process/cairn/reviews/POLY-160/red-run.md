@@ -90,3 +90,44 @@ Written, **not run here**: T-real needs Linux, root and Docker (`deploy-real` jo
 | mutant: `survive()` returns at once, web image rebuilt from the mutated `pool.ts` | the restart case red: "StartedAt and RestartCount of the three are unchanged"; 16 passed, 1 failed |
 
 Both mutations were made on a scratch copy (container tree, and a temporary edit of `pool.ts` reverted before any commit).
+
+## B5 mutant table: the built deploy code, tests at `53a601d3` on devops-160's build through `5dbbfaf1` (B1)
+
+Each mutant is one text edit of `infra/ops/**`, made on a scratch copy in this worktree and reverted (the tree was clean after each); the named test files are run; RED = at least one test fails. Two surviving rows are explained below the table.
+
+| Mutant | Result | Failing tests (first three) |
+|---|---|---|
+| stand_down skipped after a failed recovery restore | RED | standdown:a_restore_that_fails_stops_the_candidates_thr; standdown:a_stop_that_fails_is_not_stopped_red_and_the_ |
+| keep_ref ignored (current's own containers stopped) | RED | standdown:current_s_own_containers_are_not_stopped |
+| docker stop given --time | RED | build_review:docker_stop_is_given_the_short_t_30_and_no_ot |
+| interrupt after the commit stops the release (B2) | RED | build_review:an_interrupt_inside_settle_of_a_first_edge_de; build_review:an_interrupt_inside_settle_of_a_first_deploy_ |
+| rel.write: file fsync removed | RED | test_release_records:write_fsyncs_the_file_then_replaces_then_fsyn |
+| rel.write: directory fsync removed | RED | test_release_records:write_fsyncs_the_file_then_replaces_then_fsyn |
+| quarantine not idempotent | RED | test_release_records:quarantine_twice_for_the_same_digest_and_reas |
+| held- does not lift (LIFTING guard only) | RED | test_release_records:a_held_line_lifts_with_another_bundle_and_nev; recover_checks:a_lifted_line_on_current_does_not_stop_the_re |
+| saved pair: hash check dropped | RED | recover_rows:an_allowlist_changed_since_under_the_pinned_c |
+| saved pair: environment comparison dropped | RED | recover_rows:a_mismatched_compose_whose_environment_differ; recover_rows:an_allowlist_changed_since_under_the_pinned_c; s36_env:a_changed_environment_value_since_is_not_uppe …+1 |
+| restore: tree hash of current skipped (deployer) | RED | recover_rows:a_tampered_tree_of_current_is_not_upped_and_t; recover_rows:an_allowlist_changed_since_under_the_pinned_c |
+| mark names current: no settle (3e deleted) | RED | recover_checks:a_mark_that_names_current_is_settled_never_qu; recover_rows:an_allowlist_changed_since_under_the_pinned_c |
+| recovery always uses an ordinary restore (keep dropped) | RED | recover_rows:a_mismatched_compose_whose_environment_differ; recover_rows:a_mismatched_compose_whose_render_differs_ups; recover_rows:a_tampered_saved_pair_under_a_mismatched_comp …+1 |
+| commit: re-read of current removed | RED | commit:a_save_of_current_that_raises_after_writing_i |
+| commit: previous not put back | RED | commit:a_save_of_current_that_raises_before_writing_; recover_rows:an_allowlist_changed_since_under_the_pinned_c |
+| recover: no stand-down with no current | GREEN (survived) |  |
+| on_interrupt: no stand-down | RED | standdown:ctrl_c_in_a_first_deploy_stops_the_candidate_; standdown:sighup_and_sigterm_take_ctrl_cs_path_and_the_ |
+| SIGHUP and SIGTERM handlers not installed | RED | standdown:sighup_and_sigterm_take_ctrl_cs_path_and_the_ |
+| rollback: recovered_first dropped (project) | RED | recover_edge:a_rollback_with_a_mark_recovers_first_and_rol |
+| rollback: recovered_first dropped (edge) | RED | recover_edge:an_edge_rollback_with_a_mark_recovers_first |
+| recover not called in _deploy_checked | RED | recover:a_mark_with_a_different_compose_restores_the_; recover_checks:a_ctrl_c_in_the_health_wait_keeps_the_mark_an; recover_checks:a_full_disk_at_every_write_still_restores_bef …+18 |
+| exemption (a): environment comparison dropped | RED | unwind_more:a_restore_that_must_save_and_cannot_with_a_ch |
+| exemption (a): comparison on keys only | RED | unwind_more:a_restore_that_must_save_and_cannot_with_a_ch |
+| exemption (b): saved-pair fallback removed | RED | unwind_more:a_restore_that_must_save_and_cannot_uses_the_; unwind_more:a_restore_whose_render_equals_the_saved_file_ |
+| exemption: pair_ok dropped (hash and sidecar tests, after the hook moved) | GREEN (survived) |  |
+| exemption 2: the record never quarantines | RED | hang:a_leftover_in_progress_is_interrupted_the_fir |
+| exemption 2: the first time quarantines | RED | hang:a_leftover_in_progress_is_interrupted_the_fir |
+| exemption 2: `interrupted` not written | RED | hang:a_leftover_in_progress_is_interrupted_the_fir |
+
+**Survivors.** "recover: no stand-down with no current" survived the first list (no test of a planted mark with no `current`) and is red once `a_planted_mark_with_no_current_is_stood_down…` was added (last row of the second list, not repeated here). "pair_ok dropped" survives the hash and sidecar tests: **equivalent at the outcome**, because two later checks refuse the same inputs: `canonical(corrected) != data` refuses tampered bytes, and `verify` re-hashes the file against the sidecar value carried in `Judged`. Both tests still end `rollback-unhealthy` with `pair_ok` gone; they cannot tell which check refused, and a test that removes both checks is not worth building.
+
+**Red on the build and not a mutant row:** `EdgeRows…allowlist_changed_since_under_the_pinned_compose…` (devops-160 has it: edge's restore under a pinned Compose with a changed environment value does not come up; staging's twin is green).
+
+**Not mutated** (named, per B5): `settle`'s step list (R2.2), `clear_transient` raising, the position of `check_edge_env`, of `rel.token` and of the unmounted-volume check relative to `recover`, edge's tree check, status 08's conditions, `provision*.sh` (the box tests were run on the old scripts instead), R4.1 per service, `rel.log` after `up`. Their tests exist and were red on the base; the mutant run of each is owed.
