@@ -26,3 +26,13 @@ The part of POLY-160 that gates prod and real data, not staging. Split out by th
 - [ ] The weekly re-scan of the published image reads the bundle's package list; bits-ui becomes a dev dependency so `svelte` leaves the runtime install.
 - [ ] The lesser findings: H7, H10, one-off containers "gone" by listing, the deploy test's rollback lower bound, the CI sweep's absent-input case.
 - [ ] `self-update` installs the ops bundle from the attested release, or gets its own issue with the reason; the provision CI time is re-measured.
+
+## Comments
+
+### @team-lead — 2026-11-24
+
+Placed from devops-100's hand-off notes of 2026-11-24 (POLY-100 loop), at the temp sweep of 2026-11-25. The Alpine `docker:dind` recipe used for the measurements is `process/cairn/reviews/POLY-100/render-dind-recipe.md`.
+- **A `guard-render` refusal says nothing about its cause.** On T-real run 45317002038 the step log and the kept log held only "deploy: refused guard-render"; the tool discards compose's stderr. devops-100 proposed two ways to see the cause, neither built: (a) the test harness reruns the three render commands as uid 10020 after a guard-render exit and logs their stderr to the kept log; (b) the tool logs which step failed and its exit code (raw, plain, stdin render, fixed point, empty-number correction) in `deploy.log`, fixed strings only, no compose text. For the architect to rule. That run's own cause was later found and fixed (the pinned Compose version and the caller's directory, G10 and G11).
+- **`render_user_ok` refuses a user that appears in its own group's member field.** Alpine's `adduser` writes that; Ubuntu's `useradd` does not. Not the cause of any failure seen; a box where the render user is added to its own group by hand would be refused.
+- **`test_install_commit`'s bad-hosts case is order-dependent and unproven.** It failed three times in whole-directory runs on the Mac and passed alone every time and in the last whole run; the assertion text was not captured.
+- Measured, for the record: `compose_guard.judge` as root with umask 077 under `unshare --net` and `setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs`, an empty root-owned HOME, secrets directories 0750 root:gid and files 0440, returns a Judged record; the uid, the unreadable secret directories, the empty HOME and the isolation do not make the render fail.
