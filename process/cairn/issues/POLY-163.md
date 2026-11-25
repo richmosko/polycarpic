@@ -19,7 +19,13 @@ Mechanism: once the image serves the app, anyone on the internet reaches sign-in
 
 ## Acceptance criteria
 
-- [ ] A per-address request limit at Caddy for web's routes, with a stricter bucket for requests that carry a handle cookie.
-- [ ] Caddy read and write timeouts and a per-address connection cap (none are set today), so slow connections are bounded as well as fast requests.
-- [ ] Each limit has a test shown red with the limit off, and the health readers (the compose healthcheck and the deploy tool's probe) still pass under a driven flood.
-- [ ] SECURITY states the control and what it does not cover.
+Required items as seceng set them (`process/cairn/reviews/POLY-161/ruling-review.md` @ 08f95376, "the edge gate"; `build-review.md` F4):
+
+- [ ] Request rate per client at Caddy (the TCP peer; IPv6 counted by /64), on every path to `web` except `/_app/immutable/*`. A stricter bucket for any request carrying a handle cookie, `__data.json` included, since each opens a transaction. The excess is 429 at Caddy and never reaches `web`.
+- [ ] Slow connections, which a request counter never counts: Caddy's `read_header`, `read_body` and write timeouts, and a cap on connections per address (host firewall). None is set today. The write timeout must bound the slow reader measured in POLY-161 (S6): a client reading 1 byte every 20 s kept its socket open 160 s against web's 60 s `server.timeout`, so web's own timeouts do not bound it and today the only bound is web's 512-connection cap.
+- [ ] Bounded state in the limiter itself (keys, memory), and prod and staging counted apart.
+- [ ] Shown by: one address over the limit is refused while a second address and the loopback health check still get 200; 512 slow bodies from one address leave health at 200. Both red with the limit off.
+- [ ] A limiter plugin compiled into Caddy is new code at TLS termination: pinned, scanned, and reviewed by seceng (SECURITY R-25 relies on Caddy being out of `web`'s reach).
+- [ ] SECURITY states the control and what it does not cover: a distributed flood stays accepted (loss of service only).
+
+Measured in POLY-161 (S7, `process/cairn/reviews/POLY-161/gate.md`): web idle 99 MiB, 512 slow bodies 144 MiB, 512 open-header sockets 153 MiB against staging's 384m.
