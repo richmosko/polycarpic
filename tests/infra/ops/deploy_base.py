@@ -147,7 +147,7 @@ class World(object):
         self.docker_log, self.unhandled, self.pulled = [], [], []
         self.cids = {}
         self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
-        self.stopped_names, self.stop_log, self.stop_fail = set(), [], set()  # POLY-160: plain `docker ps -q` / `inspect <cid>` / `stop`; stop_fail holds cids, ("ps", proj, svc) or "stop"
+        self.stopped_names, self.stop_log, self.stop_fail, self.stop_unknown_flags = set(), [], set(), []  # POLY-160: plain `docker ps -q` / `inspect <cid>` / `stop`; stop_fail holds cids, ("ps", proj, svc) or "stop"
         self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
@@ -400,6 +400,10 @@ class World(object):
             return 0, json.dumps([{"Id": argv[2], "Config": {"Image": c["image"]}, "State": {"Status": "running"}}]), ""
         if sub == "stop":
             cid = argv[-1]
+            flags = [a for a in argv[2:-1] if a.startswith("-")]
+            if any(f not in ("-t", "--timeout") for f in flags):  # POLY-160 B3: `--time` is deprecated and gone from newer Docker's help: only the short `-t` (and `--timeout`) are known
+                self.stop_unknown_flags.append(list(argv))
+                return 1, "", "unknown flag: %s\n" % [f for f in flags if f not in ("-t", "--timeout")][0]
             self.stop_log.append(("stop", cid))
             if cid in self.stop_fail or "stop" in self.stop_fail:
                 return 1, "", "FAKE: cannot stop\n"
