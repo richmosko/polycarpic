@@ -1,7 +1,7 @@
 ---
 id: POLY-161e
 title: Web server image and CI
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-161
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-161.md, process/cairn/reviews/POLY-161/**, pro
 stage: execute
 estimate.cost_usd: "15.00"
 estimate.gate_cycles: 3
-labels: []
+actual.cost_usd: "3.1609"
+actual.tokens: 18542882
+actual.gate_cycles: 5
+actual.wall_clock: 128
+ratio: "0.21"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-24

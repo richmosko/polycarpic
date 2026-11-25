@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-161-web-server-release-image`
 - **Started:** 2026-11-25
 - **Goal:** the release image builds and serves the SvelteKit app on 3000, with health on the real server and the stand-in listener removed, and the end-to-end deploy test passes against it.
-- **Status:** In Progress
+- **Status:** In Review. Gate `process/cairn/reviews/POLY-161/gate.md`; seceng final PASS (`ecd8f6f0`); architect PASS WITH FOLLOW-UPS at `95ddd3c0`; CI green (run 45535390085)
 
 _Standing context. POLY-162 (Deploy test passing end to end) merged 2026-11-24 via PR [#153](https://github.com/richmosko/polycarpic/pull/153) — ARCH 1.28.1, SECURITY 1.20.2, INFRA 1.3.28. A real first deploy completes on real Linux, Docker and Compose in the end-to-end test (T-real), which runs in CI in its own job, `deploy-real`, with a rollback case; the database is created by `provision --stage database`, every service's command and entrypoint are pinned, and `web` answers health on 3000 from a minimal listener that POLY-161 replaces. **No deploy to a real box has been made** and T-real's release attestation is a fake; nothing is deployed and no `v1.*` or `edge-*` tag is cut until POLY-160 (follow-ups, with H1 and the guard's environment-key gap U1 as gates) and POLY-161 (web server in the release image) are done. The record is `process/cairn/reviews/POLY-162/`; decisions taken by the lead under the Principal's delegation are in `process/DECISIONS.md` (2026-11-24)._
 

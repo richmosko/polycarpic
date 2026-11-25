@@ -1,7 +1,7 @@
 ---
 id: POLY-161d
 title: Web server build
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-161
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-161.md, process/cairn/reviews/POLY-161/**, pro
 stage: execute
 estimate.cost_usd: "20.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "2.0954"
+actual.tokens: 10719416
+actual.gate_cycles: 3
+actual.wall_clock: 75
+ratio: "0.10"
 labels: []
 priority: null
 pr: null
