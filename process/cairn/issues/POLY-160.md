@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-160.md, process/cairn/issues/POLY-165.md, process/cairn/issues/POLY-104.md, process/cairn/reviews/POLY-160/**, infra/**, .github/workflows/**, Dockerfile, packages/db/**, packages/*/package.json, apps/*/package.json, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, .gitignore, process/STATE.md, process/DECISIONS.md, apps/*/src/**, apps/*/tests/**]
 labels: [ops, deploy, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/157
 created: 2026-11-23
 updated: 2026-11-24
 ---
