@@ -1,7 +1,7 @@
 ---
 id: POLY-160
 title: Deploy follow-ups
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
@@ -79,3 +79,7 @@ Read the acceptance criteria above against this list: the third (`self-update`) 
 ### @team-lead — 2026-11-24
 
 Feature started. Branch: `feature/poly-160-deploy-follow-ups`. Scope is the Principal's cut of 2026-11-25 (the comment above): H1, the pool `error` listener, H2, H4, H5, `provision.sh`'s relative path, H6's `--project-directory`, INFRA §4.4 to §4.6 with the Ctrl-C runbook line, and T-real green with its time recorded. The Principal delegated this loop's decisions and the merge to the lead (2026-11-25); each decision is recorded in `process/DECISIONS.md` as taken.
+
+### @team-lead — 2026-11-24
+
+Verified at `655fb279`: CI run 45565943755 green on all ten jobs (`deploy-real` 631 s of its 900 s limit); architect's verdict `37600cff` and seceng's delta read `bb1d06ff` with `26579880`, both pass with follow-ups. Follow-ups are on POLY-165 (before prod) and POLY-104 (first box). Decisions: `process/DECISIONS.md`, 2026-11-25. PR opening; awaiting merge under the Principal's delegation.
