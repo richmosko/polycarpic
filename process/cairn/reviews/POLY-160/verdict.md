@@ -12,10 +12,10 @@ Architect. Judged on `655fb279` (product, tests, INFRA), against `ruling.md` @ `
 | 4 | No raw `rel.log` after the first `up` or in the transient and busy paths | met | grep: the only two after `up` are in `unwind`'s own `try` |
 | 5 | `BASH_SOURCE` once; every project compose call names `rh` and `/dev/null` | met | grep; H25's two `docker compose version` calls name no project and are as before |
 | 6 | Four `survive('<name>', new pg.Pool(`; no logger or `console` in `pool.ts`; no raw error to a callback | met | grep and reading; `pool-errors.test.ts` |
-| 7 | T-real with the restart and SIGKILL cases; wall time; provision | cases met locally, 27 of 27, 502 s, three reds; **CI wall time with the stop case pending**. Before it: 558 s and 573 s of 900, control 458 s. Provision 211 s against 245 s | `red-run.md`, `gate.md` §2; CI 45565943755 |
+| 7 | T-real with the restart and SIGKILL cases; wall time; provision | cases met locally, 27 of 27, 502 s, three reds; **pending: deploy-real’s time with the stop case, from CI 45565943755**. Before it: 558 s and 573 s of 900, control 458 s. Provision 211 s against 245 s | `red-run.md`, `gate.md` §2; CI 45565943755 |
 | 8 | INFRA, ARCH, SECURITY match the code; no history | INFRA met (read whole as a word diff); ARCH in this commit; **SECURITY C-83 and R-32 are seceng's, pending its delta read** | `docs/INFRA` 1.3.31, `docs/ARCH` 1.31.0 |
-| 9 | seceng at this sha, C1–C28 each answered | **pending** | `build-review.md` @ `6be9067b` was CHANGES 7; B1 to B3 I confirm fixed by reading, B4 to B7 have tests |
-| 10 | CI's exact commands green; `tests/ci` | local 743 of 743 (qa); CI green at `e65307c0`; **this sha running** | CI 45561301953, 45565943755 |
+| 9 | seceng at this sha, C1–C28 each answered | **pending: seceng’s delta read of `655fb279`** | `build-review.md` @ `6be9067b` was CHANGES 7; B1 to B3 I confirm fixed by reading, B4 to B7 have tests |
+| 10 | CI's exact commands green; `tests/ci` | local 743 of 743 (qa); CI green at `e65307c0`; **pending: 45565943755 on this sha** | CI 45561301953, 45565943755 |
 
 **Read:** every product line of the diff, the recover-rows tests, gate.md, red-run.md, build-review.md, INFRA's delta. **Not read line by line:** the other test files; there I rely on qa's and seceng's records. **Ran:** only the harness (fakes), one file at a time; no container.
 
@@ -45,7 +45,7 @@ These close `gate.md` §5 (c) and status 08's row in "Not mutated".
 
 | # | Owner | Finding |
 |---|---|---|
-| D1 | devops | `on_interrupt` writes `interrupted` over `stand_down`'s `not-stopped`, as R1.8's own order says, against R1.4's rule that the worse name wins. The run is RED, the mark is kept and the line says to run it again, so it is a wrong name only. My ruling's fault. Fix: keep `not-stopped` when the stop was not shown |
+| D1 | devops | `on_interrupt` writes `interrupted` over `stand_down`'s `not-stopped`, as R1.8's own order says, against R1.4's rule that the worse name wins. The run is RED, the mark is kept and the line says to run it again, so it is a wrong name only. My ruling’s fault. **Follow-up, not a fix in this loop:** the fix is two lines and one test (keep `not-stopped` when the stop was not shown), but it moves the frozen sha, so CI (about 11 minutes), the gate rows and both reviews are read again. seceng rules it in its delta read |
 | D2 | devops | `stuck_end`'s docstring says `rollback-unhealthy` is the last alert; the code and R1.4 say three names |
 | D3 | qa | Ruled, not built: C21 during COMMIT (seceng's proxy); a second signal inside the stop; stderr closed; R7's home not root-owned, and group- or other-writable; R2.4's edge forms; edge's tree check and its stderr line; an unreadable quarantine file; `edge-probe-baseline` and `clear_transient` raising; `settle`'s steps singly; the `sudo rm` help text; a second `rollback` after a recovered one; `rel.log` after `up` |
 
