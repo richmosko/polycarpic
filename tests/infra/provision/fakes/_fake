@@ -81,15 +81,23 @@ case "$name" in
     [ -s "$S/compose-installed" ] || exit 1
     printf '%s' "$(cat "$S/compose-installed")"; exit 0 ;;
   apt-cache)
+    # POLY-104 F3: the real apt-cache writes line by line and Docker's repository lists many versions, so it is still writing when a reader that
+    # stops at the first match has gone: its next write is SIGPIPE (141), as on the box. Both verbs print the interesting lines, then about
+    # 2 MB of older versions. The size is what makes it certain with the test box's awk: mawk fills a large buffer before it runs a line, and
+    # 220 KB did not break the pipe (measured, POLY-104).
+    older() { local i; for ((i = 0; i < 20000; i++)); do printf "$1" "$i"; done; }
     want=$(tr -d '\n' < /repo/infra/deploy/compose-version 2>/dev/null || echo 5.7.1)
     case "$1" in
       madison)
         # the versions Docker's repository offers: the pinned one, an older and a newer
         for v in ${COMPOSE_MADISON:-$(cat "$S/compose-madison" 2>/dev/null || echo "5.8.0 $want 2.40.3")}; do
-          echo " docker-compose-plugin | $v-1~ubuntu.24.04~noble | $(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu) noble/stable amd64 Packages"; done ;;
+          echo " docker-compose-plugin | $v-1~ubuntu.24.04~noble | $(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu) noble/stable amd64 Packages"; done
+        older ' docker-compose-plugin | 1.0.%s-1~ubuntu.24.04~noble | https://download.docker.com/linux/ubuntu noble/stable amd64 Packages\n' ;;
       policy)
         inst=$(cat "$S/compose-installed" 2>/dev/null || echo "(none)")
-        printf 'docker-compose-plugin:\n  Installed: %s\n  Candidate: %s\n  Version table:\n *** %s 500\n        500 %s noble/stable amd64 Packages\n' "$inst" "$inst" "$inst" "$(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu)" ;;
+        printf 'docker-compose-plugin:\n  Installed: %s\n  Candidate: %s\n  Version table:\n *** %s 500\n        500 %s noble/stable amd64 Packages\n' "$inst" "$inst" "$inst" "$(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu)"
+        origin=$(cat "$S/compose-origin" 2>/dev/null || echo https://download.docker.com/linux/ubuntu)
+        older "     1.0.%s-1~ubuntu.24.04~noble 500\n        500 $origin noble/stable amd64 Packages\n" ;;
     esac
     exit 0 ;;
   docker)

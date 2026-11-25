@@ -34,6 +34,23 @@ class Provision(ProvisionBase):
         for code in (1, 3):
             self.assertEqual(self.prov(*self.BASE, code=code).rc, code)
 
+    # POLY-104 F3b: on the first real box a provision that ended 141 printed nothing at all. 128+n is how bash reports a child killed by
+    # signal n; a negative code is how subprocess reports provision.sh itself being killed.
+    def test_a_provision_ended_by_a_signal_prints_a_line_naming_it_and_exits_128_plus_n(self):
+        for code, signal_name, status in ((141, "SIGPIPE", 141), (137, "SIGKILL", 137), (-13, "SIGPIPE", 141), (-9, "SIGKILL", 137)):
+            with self.subTest(code=code):
+                r = self.prov(*self.BASE, code=code)
+                self.assertEqual(r.rc, status, r.err)
+                lines = r.err.splitlines()
+                self.assertEqual(len(lines), 1, "one line naming the signal, got %r" % r.err)
+                for term in ("provision", signal_name, str(status)):
+                    self.assertIn(term, lines[0])
+
+    def test_an_ordinary_exit_adds_no_line(self):  # positive twin
+        for code in (0, 1, 2):
+            r = self.prov(*self.BASE, code=code)
+            self.assertEqual((r.rc, r.err), (code, ""), code)
+
     def test_target_home_exits_2_with_the_message_and_runs_nothing(self):
         r = self.prov("provision", "--target", "home", "--domain", "polycarpic.com")
         self.assertEqual((r.rc, r.err), (2, "provision: --target home is not available\n"))

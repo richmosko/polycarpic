@@ -23,7 +23,8 @@ beforeAll(() => {
     if (c.code !== 0) throw new Error(`planting the complete box failed: ${c.all.slice(-600)}`);
   } catch (e) { setupError = String((e as Error).message); }
 }, 600_000);
-beforeEach(() => { if (setupError) throw new Error(setupError); });
+// The F3 tests do not use the shared snapshots: they run even when that setup fails, so each names its own reason.
+beforeEach(({ task }) => { if (setupError && !task.name.startsWith('F3')) throw new Error(setupError); });
 
 describe('provision.sh host stage (R5)', () => {
   it('a second run changes nothing and says so per stage; files, modes and mtimes are identical and no volume verb is called', () => {
@@ -36,6 +37,27 @@ describe('provision.sh host stage (R5)', () => {
     expect(r.out).not.toMatch(/^change: /m);
     expect(post).toBe(pre);
     expect(rest[rest.length - 1]).toBe('0');
+  });
+
+  // POLY-104 F3 (first real box): `apt-cache ... | awk '{...; exit}'` under pipefail. awk leaves at the first match, apt-cache keeps writing and dies of SIGPIPE.
+  it('F3: the host stage completes when apt-cache is still writing after the wanted version (exit 141 = apt-cache killed by SIGPIPE)', () => {
+    const want = readFileSync(join(ROOT, 'infra', 'deploy', 'compose-version'), 'utf8').trim();
+    const r = run(`${ENTER} ${HOSTRUN} > /tmp/o 2>&1${rc}; tail -n 5 /tmp/o; grep -E '^apt-get .*install.*docker-compose-plugin=' /var/fake-state/calls.log`);
+    expect(r.out.split('\n')[0], `provision.sh must exit 0; 141 means a pipe reader left early and apt-cache died of SIGPIPE under pipefail:\n${r.out}`).toBe('rc=0');
+    expect(r.out).toContain(`docker-compose-plugin=${want}-`);
+  });
+
+  it('F3 harness: the fake apt-cache dies of SIGPIPE (141) when its reader leaves early, for madison and for policy', () => {
+    const r = run(`for v in madison policy; do apt-cache $v docker-compose-plugin | head -n 1 > /dev/null; echo "$v \${PIPESTATUS[0]}"; done`);
+    expect(r.out.trim().split('\n')).toEqual(['madison 141', 'policy 141']);
+  });
+
+  // The complete box needs a finished host stage, so while F3 stands this one cannot reach H25; once madison is fixed it tests H25 itself.
+  it('F3 same shape: provision-check H25 passes a complete box when apt-cache policy is still writing after the first download.docker.com line', () => {
+    if (setupError) throw new Error(setupError);
+    const r = run(`${b2Fixture({})}\n${CHECK}`, { image: COMPLETE });
+    expect(find(r.out, 'FAIL', 'H25')?.text, 'a false FAIL: grep -q left early and pipefail reported the SIGPIPE of apt-cache').toBeUndefined();
+    expect(find(r.out, 'PASS', 'H25'), r.out.slice(-800)).toBeDefined();
   });
 
   it('installs Docker Engine and the compose plugin from Docker\'s apt repository, only after the key fingerprint matches the pinned one', () => {
