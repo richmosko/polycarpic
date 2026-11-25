@@ -1,7 +1,7 @@
 // POLY-85 seceng S-8 (health hardening) and the dynamic half of S-7(b) (crash handler). Needs Postgres (tests/db harness).
 // Same assumed surface as ops-status.test.ts: apps/web/src/ops/{status,health}.ts, apps/web/src/main.ts.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -103,5 +103,9 @@ describe('S-7(b) web crash handler (dynamic)', () => {
     expect(crash).toHaveLength(1);
     expect(crash[0].err).toEqual({ type: 'Error', code: '23505' });
     expect(crash[0].service).toBe('web');
+    // POLY-161 B30: exit 1 alone would also be a missing build, a busy port or a refused zone. The build is there, and the planted 23505 is the one fatal event.
+    expect(existsSync(join(ROOT, 'apps/web/build/handler.js')), 'apps/web/build is missing: build it first (this test never skips)').toBe(true);
+    const fatal = out.split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l)).filter((l) => l.level === 'fatal').map((l) => l.event);
+    expect(fatal).toEqual(['process.crash']);
   }, 40_000);
 });
