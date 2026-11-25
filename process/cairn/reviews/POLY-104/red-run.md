@@ -74,6 +74,10 @@ Box suite: 214 run, 203 passed, 11 failed, all on the one false `FAIL H25`: the 
 
 **The deploy's own render HOME** (`state/deploy/render-home`, `compose_guard._render_env`): `dirs.ensure` keeps it root 0755 by `chmod`, so uid 10020 can read it. Covered by `test_deploy_paths.py` (modes under umask 077, with fakes) and, for real, by the CI `deploy-real` job: `first-deploy staging` runs the G10 version question as uid 10020 on real Docker, which would refuse `render-env` on an unreadable HOME, and G1 there asserts `755 root:root`. No unit test asks as uid 10020. `deploy-real` was not run here. No red test added.
 
+### Build-green for F9 at `410a3e47`
+
+Box suite: 214 run, 214 passed. `shellcheck -x` on `provision-check.sh`: exit 0. The fix keeps the HOME root-owned and makes it 0755.
+
 ## F4, F6 and the drill (DR3)
 
 - **F4** (`test_provision.py`, 24 run): `polycarpic-ops provision` refuses `--bind-addr`, `--staging-allow`, `--acme-email`. Red: the forwarding test (1) and the bad-value test (22 subtests), which wants exit 2 with `provision: bad --<flag>` and nothing run. The signal test (4) is still red.
