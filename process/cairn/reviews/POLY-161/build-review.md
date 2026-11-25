@@ -56,3 +56,19 @@ By reading, also good: the Host pin and probe exception are exact; `guardConsole
 - `bits-ui` to dev dependencies, which takes `svelte` out of the runtime install.
 
 SECURITY (C-76 wording, C-07's home `csp.ts`, TB-2) lands with the confirmed delta.
+
+## Delta `577be1de..35908f5b`: **PASS WITH CONDITION. 0 BLOCKS open**
+
+By reading; nothing run by me. Red and green below are qa's record (`gate.md`).
+**Condition:** a full green CI run at `35908f5b` or later with no product change after it; run 45533753986 was queued when I read it. `gate.md`'s suite run is at `4971dc28`, before F1's tests and devops's two commits; they change tests, `.dockerignore` and `ci.yml` only.
+
+- **B1 closed (D1a).** Exact deep equal in `apps/web` only, ten mutants, `#web-build` named in `main.ts` only. No lint rule changed.
+- **F1 closed.** Exact list on a dead handle (unit, db, T-real), none on any signed-out answer, `cookies.set` refused; red on the public-branch and second-append mutants.
+- **F2 closed** (`aca1ddc5`, pinned, five mutants). **F3 dropped** (D3, measured). **F4 closed** (`01c654e4`, `857beb36`).
+- **F5 closed.** S7: at most 153 MiB of 384, host reading. S6: still open at 160 s; accepted until prod is opened (POLY-163).
+- **F6 closed.** Event renamed; S-7(c) untouched.
+- **Not shown red, accepted:** S1 (no remote planted: the test asserts the generated `remotes: {}` by text, which any entry breaks); S4 (asserts Kit's 403 and message, which cannot hold with the check off); S10; B38 (positive on the image only). B31 and B7/B28 by reading.
+- D4: `qrcode-generator` is loaded from the production install, where Trivy sees it. No new reach.
+- One e2e failure in one run (`second-step-locked.spec.ts`), unexplained, in a spec this loop does not touch. Not counted as evidence either way.
+
+SECURITY 1.21.0: C-07, C-76, C-82 and TB-2 state this. **Not written:** risk rows for P2 (flooding, slow readers) and P3 (build tools). A row names the approver, and I have no record of the Principal's approval. I add both when the lead has it.
