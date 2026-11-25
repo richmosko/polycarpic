@@ -62,6 +62,10 @@ describe('lint', () => {
   it('refuses drizzleAdapter in packages/auth  [red if: the restriction rule is absent for this package]', async () => {
     expect((await lint('packages/auth/src/options.ts', `import { drizzleAdapter } from 'better-auth/adapters/drizzle';\nexport const a = drizzleAdapter;\n`)).length).toBeGreaterThan(0);
   }, 60_000);
+  it('refuses @better-auth/drizzle-adapter in packages/auth  [red if: only the better-auth/adapters/drizzle path is restricted]', async () => {
+    const messages = await lint('packages/auth/src/options.ts', `import { drizzleAdapter } from '@better-auth/drizzle-adapter';\nexport const a = drizzleAdapter;\n`);
+    expect(messages.map((m) => `${m.ruleId}: ${m.message}`).join('\n')).toMatch(/no-restricted-imports: .*drizzleAdapter is refused in packages\/auth/);
+  }, 60_000);
   it('refuses a pg import in packages/auth  [red if: the layers rule does not cover auth]', async () => {
     expect((await lint('packages/auth/src/routing-pool.ts', `import pg from 'pg';\nexport const a = pg;\n`)).length).toBeGreaterThan(0);
   }, 60_000);

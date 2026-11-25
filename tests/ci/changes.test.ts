@@ -4,8 +4,10 @@
 // POLY-141 C16 (seceng S1): stdin is NUL-separated (`git diff --no-renames -z --name-only`), so a name with a newline, tab or
 // non-ASCII byte arrives literal. The five original keys are checked here; the area keys are in db-areas.test.ts.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { ci, node } from './helpers.ts';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse } from 'yaml';
+import { ci, node, ROOT } from './helpers.ts';
 
 const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'backup'] as const; // POLY-99: `backup` gates the backup/restore/drill container suite (ruling Guards @ 91d8e94e)
 const run = (paths: string[]) => {
@@ -134,5 +136,44 @@ describe('changes.mjs: NUL-separated input (POLY-141 C16, seceng S1)', () => {
   it('the source reads stdin split on \\0', () => {
     const src = readFileSync(ci('changes.mjs'), 'utf8');
     expect(src).toMatch(/split\((['"])\\0\1\)/);
+  });
+});
+
+// POLY-101 (seceng conditions 2 and 3, ruling §4): the paths that must start the auth row, one case each. The database paths set
+// `db_auth` (RP and POOL, `db` job); every path sets `node` or `layers`, and both start `lint` (LINT). Matched on path alone: a bump
+// may move only a transitive package (@better-auth/core, better-call), which no parse of "better-auth changed" would see.
+describe('the auth row trigger set (POLY-101)', () => {
+  const DATABASE = ['packages/auth/src/route-policy.ts', 'apps/auth/src/main.ts', 'packages/tenancy/src/index.ts', 'pnpm-lock.yaml', 'package.json', 'pnpm-workspace.yaml', '.npmrc',
+    '.pnpmfile.cjs', '.pnpmfile.mjs', 'patches/better-auth@1.7.18.patch'];
+  const LINT_ONLY = ['scripts/layers/generate.mjs', 'layers.json', 'eslint.config.js'];
+  for (const p of [...DATABASE, ...LINT_ONLY]) {
+    const db = DATABASE.includes(p);
+    it(`${p} -> node or layers${db ? ', and db_auth with db' : ''}  [red if: the path is dropped from the filter]`, () => {
+      const { r, out } = run([p]);
+      expect(r.code, r.stderr).toBe(0);
+      expect(out.node === 'true' || out.layers === 'true', `${p}: node=${out.node} layers=${out.layers}`).toBe(true);
+      if (db) expect([out.db, out.db_auth], `${p}: db, db_auth`).toEqual(['true', 'true']);
+    });
+  }
+  // B5: a patch or a pnpmfile changes what every package installs, so it is a shared path.
+  for (const p of ['.pnpmfile.cjs', 'patches/better-auth@1.7.18.patch']) {
+    it(`${p} -> node and every db area  [red if: it is missing from \`node\` or DB_SHARED]`, () => {
+      const { out } = run([p]);
+      expect([out.node, out.db_auth, out.db_tenancy, out.db_migrate, out.db_ops]).toEqual(['true', 'true', 'true', 'true', 'true']);
+    });
+  }
+  it('the two new patterns are anchored at the root: docs/patches/x and docs/.pnpmfile.cjs set nothing', () => {
+    expect(run(['docs/patches/x.md', 'docs/.pnpmfile.cjs']).trueKeys).toEqual([]);
+  });
+  it('every workspace manifest that names better-auth or @better-auth/* sets db_auth  [red if: a package outside the auth paths takes the dependency]', () => {
+    const globs = (parse(readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8')) as { packages: string[] }).packages;
+    const dirs = globs.flatMap((g) => (g.endsWith('/*') ? readdirSync(join(ROOT, g.slice(0, -2))).map((d) => `${g.slice(0, -2)}/${d}`) : [g]));
+    const manifests = ['package.json', ...dirs.map((d) => `${d}/package.json`)].filter((f) => existsSync(join(ROOT, f)));
+    const naming = manifests.filter((f) => {
+      const m = JSON.parse(readFileSync(join(ROOT, f), 'utf8'));
+      return ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'].flatMap((k) => Object.keys(m[k] ?? {})).some((n) => n === 'better-auth' || n.startsWith('@better-auth/'));
+    });
+    expect(naming, 'the walk found the known consumers').toEqual(expect.arrayContaining(['package.json', 'packages/auth/package.json']));
+    for (const f of naming) expect(run([f]).out.db_auth, f).toBe('true');
   });
 });

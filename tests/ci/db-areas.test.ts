@@ -223,7 +223,8 @@ describe('C10 --db-select', () => {
 describe('C25 the files the db job runs set every area', () => {
   const ALL = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
   const OWN = ['.github/workflows/ci.yml', 'infra/ci/changes.mjs', 'infra/ci/job-report.mjs', 'infra/ci/budgets.json',
-    'tests/ci/db-filter-imports.test.ts', 'tests/ci/db-areas.test.ts', 'tests/ci/db-harness.test.ts', 'tests/ci/helpers.ts', 'tests/ci/vitest.config.ts'];
+    'tests/ci/db-filter-imports.test.ts', 'tests/ci/db-areas.test.ts', 'tests/ci/db-harness.test.ts', 'tests/ci/helpers.ts', 'tests/ci/vitest.config.ts',
+    'infra/ci/auth-row.mjs']; // POLY-101: the step after the battery
   for (const p of OWN) {
     it(`${p} -> db and all four areas  [red if: it is dropped from TABLE.db / DB_SHARED]`, async () => {
       const { classify } = await ch();
