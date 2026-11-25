@@ -138,6 +138,20 @@ class FirstDeployCut(Base):
         self.assertEqual(r.rc, 0, r.err)
         self.assertEqual(self.state("staging", "current").split()[0], x)
 
+    def test_a_planted_mark_with_no_current_is_stood_down_by_the_next_run_and_the_rerun_ends_healthy(self):
+        """a power cut or SIGKILL: the candidate keeps running, the mark is kept; mutant: `recover` skips the stand-down when there is no `current`"""
+        x = self.cut_first_deploy(KeyboardInterrupt())
+        with self.assertRaises(KeyboardInterrupt):
+            self.deploy("staging", cmd="first-deploy")
+        self.world.raise_cmd = {}
+        self.world.hang_from = 10 ** 9
+        self.world.stopped_names.clear()  # the cut left the candidate running (no handler ran)
+        self.world.stop_log.clear()
+        r = self.deploy("staging", cmd="first-deploy")
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertEqual(stopped_services(self.world), ["auth", "web", "worker"], "the next run stopped the never-healthy candidate before its own `up`")
+        self.assertEqual(self.state("staging", "current").split()[0], x)
+
     def test_a_first_deploy_that_ends_unhealthy_without_a_cut_is_stopped_too(self):
         """mutant: stand-down only on a signal"""
         import shutil
