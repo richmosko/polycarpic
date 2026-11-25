@@ -22,22 +22,28 @@ case "$key" in -*) echo "install.sh: bad --ssh-key" >&2; exit 2 ;; esac
 case "$commit" in *[!0-9a-f]*) echo "install.sh: bad --commit" >&2; exit 2 ;; esac
 if [ -n "$commit" ] && [ "${#commit}" -ne 40 ]; then echo "install.sh: bad --commit" >&2; exit 2; fi
 
+# The repository that counts is the one this script lives in, wherever the operator stands (POLY-104 F2). Each git call runs from its root, in a
+# subshell: the script stays where the operator is, so a relative --ssh-key keeps its meaning.
+unset CDPATH
+repo=$(cd -- "$(dirname -- "$0")/../.." && pwd -P)
+repo_git() { (cd -- "$repo" && git "$@"); }
+
 PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/deploy/compose-allow.json infra/deploy/compose-version infra/deploy/systemd infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
 
 if [ -n "$commit" ]; then
   # no checkout: a checkout would run C's tracked git hooks on this machine
-  git cat-file -e "$commit^{commit}" 2> /dev/null || { echo "install.sh: $commit is not a commit here; git fetch origin first" >&2; exit 2; }
-  git merge-base --is-ancestor "$commit" origin/main || { echo "install.sh: $commit is not an ancestor of origin/main" >&2; exit 2; }
+  repo_git cat-file -e "$commit^{commit}" 2> /dev/null || { echo "install.sh: $commit is not a commit here; git fetch origin first" >&2; exit 2; }
+  repo_git merge-base --is-ancestor "$commit" origin/main || { echo "install.sh: $commit is not an ancestor of origin/main" >&2; exit 2; }
   sha=$commit
 else
   # shellcheck disable=SC2086
-  dirty=$(git status --porcelain -- $PATHS)
+  dirty=$(repo_git status --porcelain -- $PATHS)
   if [ -n "$dirty" ]; then
     echo "install.sh: uncommitted changes under the bundle paths; commit or discard them first:" >&2
     printf '%s\n' "$dirty" >&2
     exit 2
   fi
-  sha=$(git rev-parse HEAD)
+  sha=$(repo_git rev-parse HEAD)
 fi
 id="git-$(printf '%s' "$sha" | cut -c1-12)"
 
@@ -46,6 +52,6 @@ ssh_run() { # remote command (a fixed string)
   if [ -n "$key" ]; then ssh -i "$key" "$host" "$1"; else ssh "$host" "$1"; fi
 }
 
-git show "$sha:infra/ops/install_box.py" | ssh_run 'sudo install -d -m 0700 /opt/polycarpic/.incoming && sudo tee /opt/polycarpic/.incoming/install_box.py > /dev/null'
+repo_git show "$sha:infra/ops/install_box.py" | ssh_run 'sudo install -d -m 0700 /opt/polycarpic/.incoming && sudo tee /opt/polycarpic/.incoming/install_box.py > /dev/null'
 # shellcheck disable=SC2086
-git archive --format=tar "$sha" -- $PATHS | ssh_run "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py $id $host"
+repo_git archive --format=tar "$sha" -- $PATHS | ssh_run "sudo /usr/bin/python3 -I /opt/polycarpic/.incoming/install_box.py $id $host"
