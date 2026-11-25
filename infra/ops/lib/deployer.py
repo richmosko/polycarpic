@@ -5,7 +5,9 @@ Exit codes: 0 done, nothing to do, busy or a transient outage (the timer); 1 ref
 import fcntl
 import os
 import re
+import signal
 import tempfile
+import threading
 
 from lib import compose, compose_guard, dirs, guardhelp, release as rel, sauth, spool, stack, tokenexp
 from lib.release import Refusal
@@ -48,19 +50,14 @@ def locked(project, ctx, first, wait=0, existing_data=False):
             return 4
         rel.log(ctx, project, "busy")
         return 0
-    work = None
     try:
         try:
             dirs.ensure_shared(ctx, project)  # G1: every shared directory exactly 0755, or `render-path` and nothing repaired through a link
         except Refusal as err:
             return refuse(project, ctx, err)
         rel.clear_incoming(ctx)  # leftovers of an interrupted run, removed under the lock (F3)
-        work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, project))
-        os.chmod(work, 0o700)
-        return _deploy(project, ctx, work, first, existing_data)
+        return _deploy(project, ctx, first, existing_data)
     finally:
-        if work:
-            rel.remove_tree(work)
         os.close(fd)
 
 
@@ -107,37 +104,348 @@ def clear_transient(ctx, project):
     _unlink(ctx, project, "transient-since")
 
 
-# ---- F2: an interrupted run (power loss, systemd's kill) is found by `in-progress`
-def _handle_interrupted(project, ctx, cur):
-    ip = rel.read(ctx, project, "in-progress")
-    if ip is None:
-        return
-    digest = ip.strip()
-    if not rel.DIGEST.fullmatch(digest):
-        raise Refusal("state")
-    rel.alert(ctx, project, "interrupted")
-    rel.log(ctx, project, "refused", "interrupted", digest)
-    prev = rel.read(ctx, project, "interrupted")
-    if prev is not None and prev.strip() == digest:
-        rel.quarantine(ctx, project, digest, "interrupted")  # the second time for the same digest
-    else:
-        rel.put(ctx, project, "interrupted", digest + "\n")  # the first time: tried again
+# ---- F2, R1: an interrupted run (power loss, systemd's kill, Ctrl-C) is found by `in-progress`, which is kept by default
+STOP_SERVICES = ("web", "auth", "worker")
+STOP_CLIENT = 60
+MARK_HELP = "in-progress is malformed; after checking: sudo rm /var/lib/polycarpic/state/deploy/%s/in-progress"
+
+
+def new_run():
+    return {"up": False, "cur": None, "loaded": False, "owns": False, "probe": None, "work": None, "stuck": False, "stuck_digest": None,
+            "committed": False, "healthy": False}
+
+
+def _mark(ctx, project):
+    """-> (present, digest or None). Only a missing file is absent; an unreadable, empty or malformed one is present with no digest (R1.3a)."""
+    try:
+        path = os.path.join(rel.sdir(ctx, project), "in-progress")
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return False, None
+    except OSError:
+        return True, None
+    try:
+        text = os.read(fd, 4096).decode("utf-8", "replace").strip()
+    except OSError:
+        return True, None
+    finally:
+        os.close(fd)
+    return True, (text if rel.DIGEST.fullmatch(text) else None)
+
+
+def _mark_present(ctx, project):
+    return _mark(ctx, project)[0]
+
+
+def _listing(ctx, cproject, svc):
+    """The ids of running or restarting containers of one service of one project, by label: plain Docker, since Compose or the render may be the fault."""
+    code, out, _ = ctx.run(["docker", "ps", "-q", "--no-trunc", "--filter", "label=com.docker.compose.project=" + cproject,
+                            "--filter", "label=com.docker.compose.service=" + svc], timeout=30)
+    if code != 0:
+        raise OSError("docker ps")
+    return [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def _keep_ref(project, ctx, cur):
+    """The image reference of `current`'s own service containers, or None when it cannot be read (then everything is stopped)."""
+    if not cur:
+        return None
+    try:
+        kinds = stack.kinds(stack.refs(rel.release_dir(ctx, cur["digest"])))
+        return kinds["caddy"] if project == "edge" else kinds["app"]
+    except Exception:
+        return None
+
+
+def stand_down(project, ctx, keep_ref=None):
+    """R1.2: stop (never `down`, `rm` or remove) this project's `web`, `auth`, `worker` (edge: `caddy`) except containers of `keep_ref`, which is `current`'s
+    own reference; Postgres stays. Read back by a second listing, never by the exit code. -> True when nothing but a kept container is shown running."""
+    cproject = "polycarpic-" + project
+    services = ("caddy",) if project == "edge" else STOP_SERVICES
     ok = True
-    if cur:  # G6: the answer of the restore counts; the mark is cleared only after a good one
+    for svc in services:
+        kept = set()
         try:
-            if project == "edge":
-                from lib import edge
-                ok = edge.restore(ctx, cur)
-            else:
-                ok = restore(project, ctx, cur, project == "prod")
+            for cid in _listing(ctx, cproject, svc):
+                try:
+                    if keep_ref is not None and compose.image_ref(compose.inspect(ctx, cid, timeout=30)) == keep_ref:
+                        kept.add(cid)
+                        continue
+                except (TimeoutError, OSError):
+                    pass  # an image that cannot be read is stopped
+                try:
+                    ctx.run(["docker", "stop", "--time", "30", cid], timeout=STOP_CLIENT)
+                except (TimeoutError, OSError):
+                    pass
+            ok = ok and all(cid in kept for cid in _listing(ctx, cproject, svc))
+        except (TimeoutError, OSError):
+            ok = False
+    if not ok:
+        try:
+            rel.alert(ctx, project, "not-stopped")
+        except Exception:
+            pass
+        ctx.err("deploy: not-stopped: a container of the candidate could not be shown stopped")
+    return ok
+
+
+def _held(ctx, project, digest):
+    """R1.3b: held by `quarantined()`'s own rule, lift included. An unreadable quarantine file bans nothing here."""
+    try:
+        return digest in rel.quarantined(ctx, project)
+    except Exception:
+        return False
+
+
+def restore_checked(ctx, project, cur, do):
+    """An automatic restore of `current`: True, False, or the alert name `current-quarantined` when `current` is held (nothing is upped)."""
+    if _held(ctx, project, cur["digest"]):
+        return "current-quarantined"
+    try:
+        return bool(do())
+    except Exception:
+        return False
+
+
+def _restore_cur(project, ctx, cur, keep=False, probe=None):
+    if project == "edge":
+        from lib import edge
+        return restore_checked(ctx, project, cur, lambda: edge.restore(ctx, cur, keep=keep))
+    return restore_checked(ctx, project, cur, lambda: restore(project, ctx, cur, project == "prod", probe, keep=keep))
+
+
+def _stuck_records(project, ctx, name, digest, stopped):
+    final = "not-stopped" if not stopped else name
+    try:
+        rel.alert(ctx, project, final)
+    except Exception:
+        pass
+    _note(ctx, project, "rollback-unhealthy", digest or "-")
+    ctx.err("deploy: " + final)
+
+
+def _caddy_back(project, ctx):
+    """A prod run with no `current` that ups Caddy puts it back on edge's `current` (S23)."""
+    if project != "prod":
+        return
+    from lib import edge
+    try:
+        ptr = rel.load_pointer(ctx, "edge", "current")
+        if ptr:
+            edge.restore(ctx, ptr, wait_healthy=False)
+    except Exception:
+        pass
+
+
+def _interrupted_records(project, ctx, digest):
+    """R1.3g: the alert and the log, each in its own `try`; then the record (the second time for a digest it is quarantined). Not on disk: stopped."""
+    try:
+        rel.alert(ctx, project, "interrupted")
+    except Exception:
+        pass
+    _note(ctx, project, "refused", "interrupted", digest or "-")
+    if digest is None:
+        return
+    try:
+        prev = rel.read(ctx, project, "interrupted")
+        if prev is not None and prev.strip() == digest:
+            rel.quarantine(ctx, project, digest, "interrupted")
+        else:
+            rel.put(ctx, project, "interrupted", digest + "\n")
+    except Exception:
+        ctx.err("deploy: the record of the interruption could not be written")
+        raise _Stop(1)
+
+
+def _clear_mark(ctx, project):
+    try:
+        _unlink(ctx, project, "in-progress")
+    except OSError:
+        ctx.err("deploy: the interrupted-run mark could not be removed")
+        raise _Stop(1)
+
+
+def recover(project, ctx, cur, run):
+    """R1.3: with the mark present, `current` is put back FIRST, before any check, record, token or network call. -> None (no mark), "recovered", or
+    "stuck" (the restore failed: the candidate's services are stopped, RED, the mark kept, tried again next run)."""
+    present, digest = _mark(ctx, project)
+    if not present:
+        return None
+    ctx.err("deploy: recovering an interrupted run")
+    if not cur:
+        stopped = stand_down(project, ctx, None)
+        _caddy_back(project, ctx)
+        if not stopped:
+            raise _Stop(1)
+        _interrupted_records(project, ctx, digest)
+        _clear_mark(ctx, project)
+        return "recovered"
+    keep = not compose_guard.version_ok(ctx)
+    if keep:
+        ctx.err("warning: compose is not the pinned version; a recovery uses the saved render of the release")
+    res = _restore_cur(project, ctx, cur, keep=keep)
+    if res is not True:
+        stopped = stand_down(project, ctx, _keep_ref(project, ctx, cur))
+        _stuck_records(project, ctx, res if isinstance(res, str) else "rollback-unhealthy", digest, stopped)
+        run["stuck"], run["stuck_digest"] = True, digest
+        return "stuck"
+    if digest is None:
+        err = Refusal("state")
+        err.help_lines = (MARK_HELP % project,)
+        raise err
+    if digest == cur["digest"]:
+        if not settle(project, ctx, rel.release_dir(ctx, digest), digest):
+            raise _Stop(1)
+        return "recovered"
+    _interrupted_records(project, ctx, digest)
+    _clear_mark(ctx, project)
+    return "recovered"
+
+
+def recovered_first(project, ctx, cur):
+    """R1.9, for `rollback` by hand: with the mark present the interrupted run is recovered first. -> an exit code when that is all `rollback` did
+    (a good recovery exits 1, nothing is rolled back), else None: go on to `previous`."""
+    try:
+        res = recover(project, ctx, cur, new_run())
+    except _Stop as stop:
+        return stop.code
+    except Refusal as err:
+        for line in err.help_lines or ():
+            ctx.err(line)
+        ctx.err("rollback: refused %s" % err.name)
+        return err.code
+    if res == "recovered" and cur:
+        ctx.err("rollback: recovered; nothing rolled back")
+        return 1
+    return None
+
+
+class _Signals(object):
+    """SIGHUP and SIGTERM take Ctrl-C's path for the length of the run (main thread only); the old handlers are put back on every path."""
+    def __enter__(self):
+        self.old = {}
+        if threading.current_thread() is threading.main_thread():
+            for sig in (signal.SIGHUP, signal.SIGTERM):
+                try:
+                    self.old[sig] = signal.signal(sig, self._raise)
+                except (ValueError, OSError):
+                    pass
+        return self
+
+    @staticmethod
+    def _raise(sig, frame):
+        raise SystemExit(128 + sig)
+
+    def __exit__(self, *exc):
+        for sig, handler in self.old.items():
+            try:
+                signal.signal(sig, handler)
+            except (ValueError, OSError):
+                pass
+        return False
+
+
+def on_interrupt(project, ctx, run):
+    """R1.8: a non-`Exception` with the mark present. With a loaded pointer showing no `current` the candidate's services are stopped; the alert and the
+    stderr line are best effort; none can stop the next, and a second signal in here leaves the mark in place."""
+    try:
+        if not _mark_present(ctx, project):
+            return
+        if run.get("loaded") and not run.get("cur"):
+            stand_down(project, ctx, None)
+        try:
+            rel.alert(ctx, project, "interrupted")
+        except Exception:
+            pass
+        try:
+            ctx.err("deploy: interrupted; run the same command again")
+        except Exception:
+            pass
+    except BaseException:
+        pass
+
+
+def stuck_end(project, ctx):
+    """A run that started stuck and did not end healthy: `rollback-unhealthy` is its last alert and its last stderr line, so nothing hides it."""
+    try:
+        rel.alert(ctx, project, "rollback-unhealthy")
+    except Exception:
+        pass
+    ctx.err("deploy: rollback-unhealthy")
+    return 1
+
+
+def settle(project, ctx, rdir, digest):
+    """R2.2: finish what a promotion leaves: link, prod's images.env, first-attempt, the interruption's record, prune. Idempotent, each step in its own `try`.
+    All good: the alert, then the mark go, `healthy` is logged, True. Else the alert `records`, stderr, the mark kept, False."""
+    ok = True
+    steps = [lambda: link_current(ctx, project, rdir)]
+    if project == "prod":
+        steps.append(lambda: rel.write(ctx, ctx.p("/opt/polycarpic/images.env"), open(os.path.join(rdir, "images.env"), encoding="utf-8").read()))
+    if project != "edge":
+        steps.append(lambda: _unlink(ctx, project, "first-attempt"))
+
+    def inter():
+        text = rel.read(ctx, project, "interrupted")
+        if text is not None and text.strip() == digest:  # that digest is healthy now (S33)
+            _unlink(ctx, project, "interrupted")
+    steps.append(inter)
+    for step in steps:
+        try:
+            step()
+        except Exception:
+            ok = False
+    try:
+        _prune(ctx)  # its failure does not count
+    except Exception:
+        pass
+    if ok:
+        try:
+            rel.clear_alert(ctx, project)
+            _unlink(ctx, project, "in-progress")
         except Exception:
             ok = False
     if not ok:
-        rel.log(ctx, project, "rollback-unhealthy", digest)
-        rel.alert(ctx, project, "rollback-unhealthy")
-        ctx.err("deploy: rollback-unhealthy")
-        raise _Stop(1)
-    _unlink(ctx, project, "in-progress")
+        try:
+            rel.alert(ctx, project, "records")
+        except Exception:
+            pass
+        ctx.err("deploy: records: the release is healthy and current, but its records could not all be written; run the command again")
+        return False
+    _note(ctx, project, "healthy", digest)
+    return True
+
+
+def commit(project, ctx, cur, new, run):
+    """R2.1: the one commit point of a healthy candidate: tree hash first; save `previous`; save `current`. If a save raises: `current` is re-read; naming the
+    new digest it is committed, else `previous` is put back (best effort) and the error raised, so the unwind restores the old release. -> the pointer."""
+    rdir = rel.release_dir(ctx, new["digest"])
+    ptr = dict(digest=new["digest"], tag=new["tag"], commit=new["commit"], tree=stack.tree(rdir), at=rel.now_utc(ctx))
+    old_prev = rel.load_pointer(ctx, project, "previous")
+    try:
+        if cur:
+            rel.save_pointer(ctx, project, "previous", cur)
+        rel.save_pointer(ctx, project, "current", ptr)
+    except Exception:
+        try:
+            named = rel.load_pointer(ctx, project, "current")
+        except Exception:
+            named = None
+        if named and named["digest"] == ptr["digest"]:
+            run["committed"] = True
+            run["healthy"] = True
+            return ptr
+        try:
+            if old_prev:
+                rel.save_pointer(ctx, project, "previous", old_prev)
+            else:
+                _unlink(ctx, project, "previous")
+        except Exception:
+            pass
+        raise
+    run["committed"] = True
+    run["healthy"] = True
+    return ptr
 
 
 def _note(ctx, project, *fields):
@@ -149,8 +457,11 @@ def _note(ctx, project, *fields):
 
 
 def _internal(project, ctx, err, digest, run):
-    """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it the unwind (R8's automatic rollback)."""
+    """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it the unwind (R8's automatic rollback);
+    after the commit nothing unwinds (R2.3)."""
     ctx.err("deploy: internal error: %s" % err.__class__.__name__)
+    if run["committed"]:
+        return after_commit(project, ctx)
     if not run["up"]:
         try:
             rel.alert(ctx, project, "internal")
@@ -162,22 +473,42 @@ def _internal(project, ctx, err, digest, run):
     return _rollback_auto(project, ctx, digest, run["cur"], run["owns"], run["probe"], why="internal", run=run)
 
 
-def _deploy(project, ctx, work, first, existing_data):
+def after_commit(project, ctx):
+    """R2.3: the release is healthy and `current`; a failure after that is not a reason to unwind. The records are finished by the next run."""
+    try:
+        rel.alert(ctx, project, "records")
+    except Exception:
+        pass
+    ctx.err("deploy: records: the release is healthy and current; run the command again")
+    return 1
+
+
+def _deploy(project, ctx, first, existing_data):
     seen = {"digest": "-"}
-    run = {"up": False, "cur": None, "owns": False, "probe": None, "held": False}
+    run = new_run()
+    with _Signals():
+        try:
+            code = _handled(project, ctx, first, existing_data, seen, run)
+        except BaseException as exc:
+            if not isinstance(exc, Exception):
+                on_interrupt(project, ctx, run)
+            raise
+        finally:
+            if run["work"]:
+                rel.remove_tree(run["work"])
+    if run["stuck"] and not run["healthy"]:
+        return stuck_end(project, ctx)
+    return code
+
+
+def _handled(project, ctx, first, existing_data, seen, run):
     try:
         try:
-            return _deploy_checked(project, ctx, work, first, existing_data, seen, run)
+            return _deploy_checked(project, ctx, first, existing_data, seen, run)
         except (rel.Transient, Refusal, _Stop):
             raise
         except Exception as err:
             return _internal(project, ctx, err, seen["digest"], run)
-        finally:
-            if run["up"] and not run.get("held"):
-                try:
-                    _unlink(ctx, project, "in-progress")
-                except OSError:
-                    pass
     except rel.Transient as err:
         rel.log(ctx, project, "transient", str(err))
         mark_transient(ctx, project)
@@ -186,6 +517,8 @@ def _deploy(project, ctx, work, first, existing_data):
             return 1
         return 0
     except Refusal as err:
+        if run["committed"]:
+            return after_commit(project, ctx)
         if run["up"]:  # G2: a refusal after the first `up` is not a clean refusal: the old release comes back first
             return _rollback_auto(project, ctx, seen["digest"], run["cur"], run["owns"], run["probe"], reason=err.name if err.quarantine else None, why=err.name, run=run)
         return refuse(project, ctx, err, seen["digest"])
@@ -193,18 +526,21 @@ def _deploy(project, ctx, work, first, existing_data):
         return stop.code
 
 
-def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
+def _deploy_checked(project, ctx, first, existing_data, seen, run):
     require_data_mount(ctx)
+    cur = rel.load_pointer(ctx, project, "current")  # a damaged one is `state`: nothing safe to restore
+    run["cur"], run["loaded"] = cur, True
+    recover(project, ctx, cur, run)  # R1: before any check that can refuse, any record, the token or the network
+    work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, project))
+    run["work"] = work
+    os.chmod(work, 0o700)
     compose_guard.check_compose_version(ctx)  # G10, before any network call
     tok = rel.token(ctx)
     tokenexp.refresh(ctx, tok, work)
-    cur = rel.load_pointer(ctx, project, "current")
     rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)
-    run["cur"] = cur
     since = rel.read(ctx, project, "transient-since")  # F12: a malformed mark stops the run with `state`
     if since is not None and rel.ts.parse(since.strip()) is None:
         raise Refusal("state")
-    _handle_interrupted(project, ctx, cur)
     if cur:  # a leftover first-attempt file beside `current` has no effect and is removed (S19)
         _unlink(ctx, project, "first-attempt")
     if first and cur:
@@ -213,7 +549,7 @@ def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
         raise Refusal("not-first-deployed", code=4)
     fresh = _first_preconditions(project, ctx, existing_data) if first else False
     try:
-        digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen)
+        digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen, run)
     except _Skip:
         clear_transient(ctx, project)
         return 0
@@ -278,7 +614,7 @@ def _first_preconditions(project, ctx, existing_data):
     return empty and not existing_data
 
 
-def _candidate(project, ctx, tok, work, cur, seen):
+def _candidate(project, ctx, tok, work, cur, seen, run):
     """R2: -> (digest, commit, tag). Raises _Skip when there is nothing new, or the candidate is quarantined."""
     if project == "staging":
         digest, commit, _ = rel.staging_candidate(ctx, tok, work)
@@ -287,6 +623,8 @@ def _candidate(project, ctx, tok, work, cur, seen):
         digest, tag = rel.prod_candidate(ctx, tok, work)
         commit = None
     seen["digest"] = digest
+    if run["stuck"] and digest == run["stuck_digest"]:  # R1.4: the candidate that is stuck is not tried again; a different one may deploy
+        raise _Skip()
     rel.put(ctx, project, "last-poll", rel.now_utc(ctx) + "\n")
     inter = rel.read(ctx, project, "interrupted")
     if inter is not None and inter.strip() != digest:  # another digest is tried: the interruption's mark goes (S33)
@@ -368,11 +706,11 @@ def digest_of(rdir):
     return "sha256:" + os.path.basename(os.path.normpath(rdir))[len("sha256-"):]
 
 
-def guard(project, ctx, rdir, images, restore=False):
+def guard(project, ctx, rdir, images, restore=False, keep=False):
     """F4: the isolated render of the release's compose file is corrected, judged, saved and rendered once more; -> the Judged record that every
     `up` and `run` of this release then names (never a bundle's file)."""
     env_files = ["%s/images.env" % rdir] + ([ctx.p(EDGE_ENV)] if project == "edge" else [])
-    return compose_guard.judge(ctx, rdir, project, env_files, images, digest_of(rdir), bind_addr(ctx), restore=restore)
+    return compose_guard.judge(ctx, rdir, project, env_files, images, digest_of(rdir), bind_addr(ctx), restore=restore, keep=keep)
 
 
 def edge_domain(ctx):
@@ -572,9 +910,12 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, r
     if up_ok and owns:
         up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=live_probe, judged=judged["edge"])
     if up_ok:
-        code = _healthy(project, ctx, rdir, digest, tag, commit, cur)
+        code = _healthy(project, ctx, rdir, digest, tag, commit, cur, run)
         if probe and not baseline_ok:  # A13: the probe was not required, and the alert says so even when healthy
-            rel.alert(ctx, project, "edge-probe-baseline")
+            try:
+                rel.alert(ctx, project, "edge-probe-baseline")
+            except Exception:
+                pass
         return code
     return _rollback_auto(project, ctx, digest, cur, owns, live_probe, run=run)
 
@@ -613,21 +954,9 @@ def _edge_up(ctx, judged, digest):
     return code
 
 
-def _healthy(project, ctx, rdir, digest, tag, commit, cur):
-    if cur:
-        rel.save_pointer(ctx, project, "previous", cur)
-    rel.save_pointer(ctx, project, "current", dict(digest=digest, tag=tag, commit=commit, tree=stack.tree(rdir), at=rel.now_utc(ctx)))
-    link_current(ctx, project, rdir)
-    if project == "prod":
-        rel.write(ctx, ctx.p("/opt/polycarpic/images.env"), open(os.path.join(rdir, "images.env"), encoding="utf-8").read())
-    _prune(ctx)
-    rel.clear_alert(ctx, project)
-    _unlink(ctx, project, "first-attempt")
-    inter = rel.read(ctx, project, "interrupted")
-    if inter is not None and inter.strip() == digest:  # that digest is healthy now (S33)
-        _unlink(ctx, project, "interrupted")
-    _note(ctx, project, "healthy", digest)
-    return 0
+def _healthy(project, ctx, rdir, digest, tag, sha, cur, run):
+    commit(project, ctx, cur, dict(digest=digest, tag=tag, commit=sha), run)
+    return 0 if settle(project, ctx, rdir, digest) else 1
 
 
 def link_current(ctx, project, rdir):
@@ -671,13 +1000,18 @@ def _prune(ctx):
 
 
 def unwind(project, ctx, digest, restore_fn, reason=None, why=None, run=None):
-    """G2: the one exit of a run that started something and did not end healthy. Restore first; then quarantine, log, alert and clearing
-    `in-progress`, each in its own `try`, in that order, none able to stop the next. `in-progress` is cleared only after the quarantine line is
-    on disk, so a failed write leaves the next run to treat the digest as interrupted. The alert goes to stderr too, and the exit is never 0."""
+    """G2: the one exit of a run that started something and did not end healthy. Restore first; a restore that did not answer True stops the candidate's
+    services (R1.1); then quarantine, log, alert and clearing `in-progress`, each in its own `try`. `in-progress` is cleared only by a restore that answered
+    True, or with no `current` once the candidate is stopped, and only after the quarantine line is on disk; every other exit keeps it. The exit is never 0."""
+    cur = run.get("cur") if run else None
     try:
-        ok = bool(restore_fn())
+        res = restore_fn()
     except Exception:
-        ok = False
+        res = False
+    ok = res is True or (res is not False and not isinstance(res, str) and bool(res))
+    stopped = True
+    if not ok:
+        stopped = stand_down(project, ctx, _keep_ref(project, ctx, cur))
     name = "rolled-back" if ok else "rollback-unhealthy"
     q_ok = True
     if reason:
@@ -691,18 +1025,17 @@ def unwind(project, ctx, digest, restore_fn, reason=None, why=None, run=None):
         rel.log(ctx, project, name, digest)
     except Exception:
         pass
+    shown = name if ok else ("not-stopped" if not stopped else (res if isinstance(res, str) else name))
     try:
-        rel.alert(ctx, project, name)
+        rel.alert(ctx, project, shown)
     except Exception:
         pass
-    ctx.err("deploy: " + name)
-    if q_ok:
+    ctx.err("deploy: " + shown)
+    if q_ok and (ok or (not cur and stopped)):
         try:
             _unlink(ctx, project, "in-progress")
         except OSError:
             pass
-    elif run is not None:
-        run["held"] = True
     return 1
 
 
@@ -711,19 +1044,13 @@ def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None, reason="un
     def back():
         if cur is None:
             if project == "prod" and owns:  # a first prod deploy that ups Caddy and fails puts Caddy back on edge's `current` (S23); the outcome stays unhealthy
-                from lib import edge
-                try:
-                    ptr = rel.load_pointer(ctx, "edge", "current")
-                except Refusal:
-                    ptr = None
-                if ptr:
-                    edge.restore(ctx, ptr, wait_healthy=False)
+                _caddy_back(project, ctx)
             return False
-        return restore(project, ctx, cur, owns, probe)
+        return _restore_cur(project, ctx, cur, probe=probe)
     return unwind(project, ctx, digest, back, reason, why, run)
 
 
-def restore(project, ctx, ptr, owns=None, probe=None):
+def restore(project, ctx, ptr, owns=None, probe=None, keep=False):
     """Bring a recorded release back up: its directory safely owned (F8), tree-hash re-check, the guard on its render, `up`, health.
     -> True when healthy. Edge is prod's alone (R9 strict): a prod rollback restores Caddy too, a staging one never names it."""
     rdir = rel.release_dir(ctx, ptr["digest"])
@@ -739,8 +1066,8 @@ def restore(project, ctx, ptr, owns=None, probe=None):
         return False
     try:
         images = stack.kinds(stack.refs(rdir))
-        pj = guard(project, ctx, rdir, images, restore=True)  # rollback renders and judges in memory; it writes only when the bytes differ (S36)
-        ej = guard("edge", ctx, rdir, images, restore=True) if owner else None  # both renders are judged before either `up`
+        pj = guard(project, ctx, rdir, images, restore=True, keep=keep)  # rollback renders and judges in memory; it writes only when the bytes differ (S36)
+        ej = guard("edge", ctx, rdir, images, restore=True, keep=keep) if owner else None  # both renders are judged before either `up`
     except Refusal:
         return False
     code, _, _ = _compose(ctx, stack.up_argv(pj, project))

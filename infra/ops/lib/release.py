@@ -76,8 +76,15 @@ def write(ctx, path, text, mode=0o644):
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, mode)
     with os.fdopen(fd, "w") as fh:
         fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
     os.chmod(tmp, mode)
     os.replace(tmp, path)
+    dfd = os.open(os.path.dirname(path) or ".", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
 
 
 def put(ctx, project, name, text):
@@ -140,10 +147,12 @@ def _quarantine_lines(ctx, project):
 
 def quarantine(ctx, project, digest, reason):
     """A `guard-<rule>` line adds a fourth field, the installed bundle id: it lifts once another bundle is installed (R8, S18)."""
-    prev, _ = _quarantine_lines(ctx, project)
+    prev, lines = _quarantine_lines(ctx, project)
     extra = ""
     if reason.startswith("guard-"):
         extra = " " + (bundle_id(ctx) or "-")
+    if any(d == digest and r == reason and s == extra.strip() for d, r, s in lines):
+        return  # idempotent per digest, reason and bundle id: a retried record adds no second line
     put(ctx, project, "quarantine", prev + "%s %s %s%s\n" % (digest, now_utc(ctx), reason, extra))
 
 

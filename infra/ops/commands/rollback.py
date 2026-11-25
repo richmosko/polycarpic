@@ -35,6 +35,9 @@ def run(args, ctx):
         except rel.Refusal:
             ctx.err("rollback: a state pointer is present but unparsable: stopped (state)")
             return 1
+        code = deploy.recovered_first(project, ctx, cur)
+        if code is not None:
+            return code
         if not cur or not prev:
             ctx.err("rollback: there is no previous release")
             return 4
@@ -71,6 +74,7 @@ def run(args, ctx):
         deploy._note(ctx, project, "rolled-back", cur["digest"])
         try:
             rel.clear_alert(ctx, project)
+            deploy._unlink(ctx, project, "in-progress")  # a healthy end clears the mark
         except Exception:
             pass
         return code

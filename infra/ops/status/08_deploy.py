@@ -22,6 +22,8 @@ def _one(ctx, project):
         cur = rel.load_pointer(ctx, project, "current") if os.path.isdir(d) else None
     except rel.Refusal:
         return Line("RED", "deploy", project, "state")
+    if os.path.lexists(os.path.join(d, "in-progress")) and (project == "edge" or not cur):
+        return Line("RED", "deploy", project, "interrupted or running; run the command again")
     if not cur:
         return Line("WAIT", "deploy", project, "not deployed")
     poll = ts.parse((ts.read_text(os.path.join(d, "last-poll"), limit=64) or "").strip())
