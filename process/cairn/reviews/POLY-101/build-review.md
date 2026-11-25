@@ -51,3 +51,8 @@ Reach if the hook were lost: any HTTP caller, for a new literal under `/callback
 | the describe (TLS mode) match dropped (`auth-row.mjs`) | `auth-row.test.ts`: 5 of 101. The two green cases are among them, since the title then counts twice; "one TLS mode only, run twice" itself stays passing |
 
 The first four were planted together, since each goes red in a different test file. Not reproduced: the container reds (RP's predicate and control, one-offs a and b); those stay qa-101's.
+
+## Final line: PASS at f18b6f70 (gate record d23be899)
+
+F1, F2, F3 and the TLS-mode case are closed. I read the tests and ran them green on the branch (`auth-row` and `aggregate` 233 / 233, `boundaries` 11 / 11, floor 11).
+The F1 to F3 reds are qa-101's, not reproduced by me. F4 is recorded with condition 11's residue, which stays open for the Principal. V8 still needs PR #158's own run green.
