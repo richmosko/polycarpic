@@ -372,6 +372,12 @@ def on_interrupt(project, ctx, run):
         pass
 
 
+def end_if_unreadable_stuck(run):
+    """A failed recovery whose mark names no digest cannot tell which candidate is the stuck one: the run ends here, before any candidate is looked up."""
+    if run["stuck"] and run["stuck_digest"] is None:
+        raise _Stop(1)
+
+
 def stuck_end(project, ctx, run=None):
     """A run that started stuck and did not end healthy: `rollback-unhealthy` is its last alert and its last stderr line, so nothing hides it;
     a candidate that could not be shown stopped is `not-stopped`, which is worse and stays."""
@@ -544,6 +550,7 @@ def _deploy_checked(project, ctx, first, existing_data, seen, run):
     cur = rel.load_pointer(ctx, project, "current")  # a damaged one is `state`: nothing safe to restore
     run["cur"], run["loaded"] = cur, True
     recover(project, ctx, cur, run)  # R1: before any check that can refuse, any record, the token or the network
+    end_if_unreadable_stuck(run)
     work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, project))
     run["work"] = work
     os.chmod(work, 0o700)

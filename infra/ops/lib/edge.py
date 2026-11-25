@@ -125,6 +125,7 @@ def _run(tag, ctx, seen, run):
     cur = rel.load_pointer(ctx, "edge", "current")
     run["cur"], run["loaded"] = cur, True
     deployer.recover("edge", ctx, cur, run)  # R1: before edge.env, Compose, the tag rules or any network call
+    deployer.end_if_unreadable_stuck(run)
     work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, "edge"))
     run["work"] = work
     os.chmod(work, 0o700)
