@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-101
 blocked_by: []
 assignee: devops-engineer
-paths: [.github/workflows/ci.yml, infra/ci/**, docs/INFRA/**, process/cairn/reviews/POLY-101/**, process/cairn/issues/POLY-101d.md]
+paths: [.github/workflows/ci.yml, infra/ci/**, docs/INFRA/**, process/cairn/reviews/POLY-101/**, process/cairn/issues/POLY-101d.md, scripts/layers/**, tests/layers/**, eslint.config.js]
 stage: implement
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 1

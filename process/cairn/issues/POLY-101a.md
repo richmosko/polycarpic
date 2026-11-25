@@ -1,7 +1,7 @@
 ---
 id: POLY-101a
 title: Route-policy row ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-101
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-101.md, process/cairn/reviews/POLY-101/**, doc
 stage: plan
 estimate.cost_usd: "3.00"
 estimate.gate_cycles: 1
+actual.cost_usd: "2.4142"
+actual.tokens: 2879989
+actual.gate_cycles: 1
+actual.wall_clock: 4
+ratio: "0.80"
 labels: []
 priority: null
 pr: null
