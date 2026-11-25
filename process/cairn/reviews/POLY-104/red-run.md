@@ -55,6 +55,14 @@ A pipe whose reader can leave before the writer is done, in a script with `pipef
 
 No standing lint added: a text rule would flag all of the low rows and need an allowlist about as long as the list. The fixes that remove the shape: capture the writer's output first and then match it (`out=$(cmd) …; grep -q x <<< "$out"`), or a reader that reads to the end (`awk` without `exit`; `grep -c … > /dev/null`). `grep … > /dev/null` alone is not one: GNU grep sees `/dev/null` and leaves at the first match, as with `-q` (devops-104).
 
+## F9: H25 false FAIL, the render user cannot read its HOME
+
+`provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
+
+Box suite: 214 run, 203 passed, 11 failed, all on the one false `FAIL H25`: the new `F9: provision-check H25 …` and ten existing tests that expect a clean H25 or its summary line. `F9 harness` passes (125 on a root 0700 HOME; the version on an owned or missing one).
+
+**The deploy's own render HOME** (`state/deploy/render-home`, `compose_guard._render_env`): `dirs.ensure` keeps it root 0755 by `chmod`, so uid 10020 can read it. Covered by `test_deploy_paths.py` (modes under umask 077, with fakes) and, for real, by the CI `deploy-real` job: `first-deploy staging` runs the G10 version question as uid 10020 on real Docker, which would refuse `render-env` on an unreadable HOME, and G1 there asserts `755 root:root`. No unit test asks as uid 10020. `deploy-real` was not run here. No red test added.
+
 ## F4, F6 and the drill (DR3)
 
 - **F4** (`test_provision.py`, 24 run): `polycarpic-ops provision` refuses `--bind-addr`, `--staging-allow`, `--acme-email`. Red: the forwarding test (1) and the bad-value test (22 subtests), which wants exit 2 with `provision: bad --<flag>` and nothing run. The signal test (4) is still red.

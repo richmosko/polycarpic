@@ -114,6 +114,21 @@ describe('provision.sh host stage (R5)', () => {
     ] as const) expect(fail(setup).length, label).toBeGreaterThan(0);
   });
 
+  // POLY-104 F9 (first real box): H25 made the render user's HOME as root (mktemp -d, 0700), so uid 10020 could not read it and the check read 'none'.
+  it('F9 harness: the fake compose, like the real one, fails for uid 10020 with a HOME it cannot search and answers with one it owns or that is not there', () => {
+    const ask = 'setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs -- docker compose version --short';
+    const r = run(`d=$(mktemp -d); HOME="$d" ${ask} 2>&1${rc}; chown 10020:10020 "$d"; HOME="$d" ${ask}; HOME=/nonexistent ${ask}`);
+    const want = readFileSync(join(ROOT, 'infra', 'deploy', 'compose-version'), 'utf8').trim();
+    expect(r.out.trim().split('\n').slice(-4), r.out + r.err).toEqual(['unknown flag: --short', 'rc=125', want, want]);
+    expect(r.out).toContain('/.docker/config.json: permission denied');
+  });
+
+  it('F9: provision-check H25 on a complete box asks the render user with a HOME that user can read, and passes', () => {
+    const r = run(`${b2Fixture({})}\n${CHECK}`, { image: COMPLETE });
+    expect(find(r.out, 'FAIL', 'H25')?.text, 'the render user answered nothing: its HOME is not readable by uid 10020').toBeUndefined();
+    expect(find(r.out, 'PASS', 'H25'), r.out.slice(-800)).toBeDefined();
+  });
+
   it('refuses a Docker key whose fingerprint differs: exit non-zero, says fingerprint, installs no docker package', () => {
     const r = run(`${ENTER} echo 0000000000000000000000000000000000000000 > /var/fake-state/docker-key-fpr; ${HOSTRUN} 2>&1${rc}; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^apt-get .*install.*docker-ce' || true`);
     expect(r.out).not.toMatch(/rc=0/);

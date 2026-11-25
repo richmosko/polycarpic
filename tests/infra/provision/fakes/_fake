@@ -102,6 +102,13 @@ case "$name" in
     exit 0 ;;
   docker)
     if [ "$1" = compose ] && [ "$2" = version ]; then
+      # POLY-104 F9 (measured on the box): the CLI reads $HOME/.docker/config.json first. A HOME the caller cannot search makes that a
+      # "permission denied" (not "no such file"), and the compose plugin is then not there: `unknown flag: --short`, exit 125.
+      case "$(LC_ALL=C stat "${HOME:-/nonexistent}/.docker/config.json" 2>&1)" in
+        *"Permission denied"*)
+          echo "WARNING: Error loading config file: open ${HOME}/.docker/config.json: permission denied" >&2
+          echo "unknown flag: --short" >&2; exit 125 ;;
+      esac
       # G10: the pinned Compose, asked as root and as the render user (uid 10020 reads its own answer); default: the pinned file's version
       want=$(tr -d '\n' < /repo/infra/deploy/compose-version 2>/dev/null || echo 5.7.1)
       f="$S/compose-version"; [ "$(id -u)" = 10020 ] && [ -s "$S/compose-version-render" ] && f="$S/compose-version-render"
