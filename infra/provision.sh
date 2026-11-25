@@ -34,7 +34,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" = 0 ] || die "run as root (sudo bash provision.sh ...)" 2
-unset CDPATH  # with it set, `cd` can resolve a relative path elsewhere, and this runs as root
+# with CDPATH set, `cd` can resolve a relative path elsewhere, and this runs as root
+unset CDPATH
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) || die "cannot resolve the directory of this script; nothing changed" 2
 cd / # G11: the caller's directory decides nothing
 
@@ -529,19 +530,19 @@ PY
 # only as a real directory (no link), owned by root, mode 0755 and empty; anything else is not used, and the stage stops with nothing changed.
 render_home() {
   local d=$STATE/deploy/render-home
+  rh=/
   if [ ! -e "$d" ] && [ ! -L "$d" ]; then
-    echo /
     return 0
   fi
   if [ -L "$d" ] || [ ! -d "$d" ] || [ "$(stat -c '%u %a' "$d")" != "0 755" ] || [ -n "$(ls -A "$d")" ]; then
     return 1
   fi
-  echo "$d"
+  rh=$d
 }
 
 stage_database() {
   case "$project" in prod | staging) ;; *) usage ;; esac
-  local root=$ETC/secrets pairs=() roles_sql rh
+  local root=$ETC/secrets pairs=() roles_sql
   [ "$project" = staging ] && root=$ETC/staging-secrets
   roles_sql=$here/roles.sql
   [ -f "$roles_sql" ] || roles_sql=$here/../packages/db/sql/roles.sql
@@ -551,7 +552,7 @@ stage_database() {
   # poly_backup has a password only where the backup service exists (prod).
   [ "$project" = prod ] && pairs+=(poly_backup:backup/db_password_backup)
 
-  rh=$(render_home) || die "render-path: $STATE/deploy/render-home is not a real directory owned by root, mode 0755 and empty; nothing changed"
+  render_home || die "render-path: $STATE/deploy/render-home is not a real directory owned by root, mode 0755 and empty; nothing changed"
   local dc=(docker compose -p "polycarpic-$project" --project-directory "$rh" --env-file /dev/null)
   "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
