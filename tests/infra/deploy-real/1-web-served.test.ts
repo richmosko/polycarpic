@@ -204,7 +204,7 @@ suite('T-real 1b: the running web container serves the real app', () => {
 
 // POLY-160 R5 (C20, C23, C24), the literal restart: Postgres restarts under the running web, auth and worker. None of the three restarts or crashes, health answers 200 again, and the worker's next job.run is ok.
 // [red if: survive() is removed from a pool: the process ends on the unhandled client error and Docker restarts it (StartedAt and RestartCount change)]
-// The three `db.connection_lost.*` lines are not asserted: a client that was idle at the restart is dropped by the pool silently (R5), and only a checked-out one is reported; that is not decidable from outside.
+// Each service's own `db.connection_lost.<pool>` line is asserted (app, auth, worker): the `connect` listener is on idle clients too, so the restart is reported (build review B6). The line carries a type and a code only.
 suite('T-real 1c: Postgres restarts under the running services', () => {
   const sleep = (s: number) => root(['sleep', String(s)]);
   const pg = (sql: string) => exec('postgres', ['psql', '-U', 'postgres', '-d', 'polycarpic', '-X', '-Atc', sql]).out.trim();
@@ -244,6 +244,11 @@ suite('T-real 1c: Postgres restarts under the running services', () => {
       if (!ok) sleep(3);
     }
     expect(ok, 'the worker\'s next job.run after the restart is ok').toBe(true);
+    for (const [s, pool] of [['web', 'app'], ['auth', 'auth'], ['worker', 'worker']] as const) {
+      const lost = lines(s).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }).filter((j) => j.event === `db.connection_lost.${pool}`);
+      expect(lost.length, `${s} reported the lost connection for the ${pool} pool`).toBeGreaterThanOrEqual(1);
+      for (const j of lost) expect(Object.keys(j.err ?? {}).every((k) => k === 'type' || k === 'code'), `${s}: ${JSON.stringify(j.err)}`).toBe(true);
+    }
     for (const s of ['web', 'auth', 'worker']) expect(lines(s).join('\n'), `${s}'s logs hold no password`).not.toContain(user.password || 'no-password-recorded');
   }, 15 * 60_000);
 });

@@ -315,6 +315,7 @@ describe('the database restarted under a running web (POLY-160 R5)', () => {
   it('health 200, database down: 503, database up on the same port: 200 again; same pid, no process.crash, a bounded log, the password in no output  [red if: survive() is removed from a pool]', async () => {
     const pid = web.proc.pid;
     expect((await ask('/api/v1/health')).status).toBe(200);
+    expect((await ask('/dashboard', { headers: { cookie: cookie() } })).status, 'a page\'s own query goes through the pool just before the outage').toBe(200);
     const before = web.lines().length;
     await web.proxy!.down();
     await wait(5500); // the health memo
@@ -329,6 +330,14 @@ describe('the database restarted under a running web (POLY-160 R5)', () => {
     expect(web.lines().filter((l) => l.event === 'process.crash')).toEqual([]);
     expect(web.lines().length - before).toBeLessThan(40); // a bounded number of lines over the outage
     expect(web.out()).not.toContain('qa-poly_app');
+    // B6: the built bundle's own copy of pool.ts reports through main.ts's registration (the globalThis slot): a warn line for the app pool, a type and a code only
+    const lost = web.lines().filter((l) => l.event === 'db.connection_lost.app');
+    expect(lost.length, 'web reports the lost connection for the app pool').toBeGreaterThanOrEqual(1);
+    for (const l of lost) {
+      expect(l.level).toBe('warn');
+      expect(Object.keys(l.err ?? {}).every((k) => k === 'type' || k === 'code'), JSON.stringify(l.err)).toBe(true);
+      expect(JSON.stringify(l)).not.toMatch(/password|detail|client|poly_app/i);
+    }
   }, 120_000);
 });
 

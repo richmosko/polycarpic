@@ -123,6 +123,14 @@ describe('the database lost under the auth service (POLY-160 R5)', () => {
       for (let i = 0; i < 30 && status >= 500; i++) { status = (await session()).status; if (status >= 500) await new Promise((r) => setTimeout(r, 500)); }
       expect(status, 'the same request is a client error again').toBe(first);
       expect(lines.join('\n')).not.toContain('qa-poly_auth');
+      // B6: the registration in main.ts: one warn line for the auth pool, carrying a type and a code only (no message, no detail, no client)
+      const lost = lines.flatMap((l) => l.split('\n')).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } }).filter((j) => j.event === 'db.connection_lost.auth');
+      expect(lost.length, 'the connection loss is reported for the auth pool').toBeGreaterThanOrEqual(1);
+      for (const j of lost) {
+        expect(j.level).toBe('warn');
+        expect(Object.keys(j.err ?? {}).sort().every((k) => k === 'type' || k === 'code'), JSON.stringify(j.err)).toBe(true);
+        expect(JSON.stringify(j)).not.toMatch(/password|detail|client|poly_auth/i);
+      }
     } finally {
       await svc?.close();
       await proxy.kill().catch(() => undefined);
