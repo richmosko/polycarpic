@@ -147,3 +147,26 @@ Section L: no objection to 1, 3, 4, 5 (staging), 6, 7. Item 2 has its approver (
 - **R1.3b, "listed in a readable quarantine file"** means held by `quarantined()`'s rule, lift included. A digest with a `guard-` or `held-` line that lifted, and that then went healthy, is a good `current`: refusing to restore it would turn one failed deploy into an outage. *Test:* a lifted line on `current`, mark present: restored. *Mutant:* a plain search of the file.
 
 R1.8 as written installs no handlers; I expect the lead's line that keeps SIGHUP and SIGTERM, with the at-build checks above.
+
+## Exemptions ruled
+
+Both tests read in full on the tip after `dd913697`; nothing run. Two edits are allowed, and one more test pair must move with the first. No other assertion in either file may change under this ruling.
+
+### 1. `test_deploy_unwind_more.py`, the saved pair over a changed environment: the assertion changes, split in two
+
+The old case used a changed `environment` value as its way to make a save needed. S36's condition makes exactly that a refusal. The rule it stood for (a needed save fails, a sound saved pair serves) is kept by case (b).
+
+- **(a) the same hook (`S36_NEW` in `web`'s `environment`), disk full for saves.** New assertions, all: `rc == 1`; last stderr line `deploy: rollback-unhealthy`; no `up` after the candidate's names `x1`'s render; `x1`'s saved pair has the same bytes; the mark is still there; `x2` is in `quarantine`; `web`, `auth`, `worker` of `x2` are stopped and Postgres is not; the alert is RED. A second form: an **existing** value changed, not a key added. Edge: `edge.env`'s allowlist changed, as my S36 condition says.
+- **(b) the positive case.** The hook changes a key **outside `environment`** that the guard lets pass and the correction keeps; the test shows the fresh bytes differ from the saved ones (an assertion, or the case proves nothing) and that a save was attempted and failed. Then the old line as it stands: `self.restored(r, x1, "the saved pair is used")`. If qa finds no such key, tell me; (b) is not dropped.
+- **The two tests beside it (hash fails, sidecar differs) take (b)'s hook.** With `S36_NEW` they would now be `rollback-unhealthy` for the environment alone and pass with the hash check gone. Their assertions do not change.
+
+Must be red: (a) with the environment comparison dropped from the failed-save path, and with it comparing keys only; (b) with the saved-pair fallback removed (every needed save that fails is refused); the hash and sidecar tests with `pair_ok` dropped, shown red **after** the hook moves.
+
+### 2. `test_deploy_hang.py`, leftover mark twice: the fixture changes, the rule stays
+
+The report is right. The first run recovers, then deploys `x2` healthy, so `x2` is `current` when the second mark is planted: the old second half is a mark on the running digest, quarantined, which is fault M10 itself. The rule (first time tried again, second time banned) is unchanged and must be shown on a digest that never went healthy. It also wrote `interrupted` by hand, so it never showed the tool writing it.
+
+- **First half, as today, plus:** after the run `current` is `x2` (it was tried again), the mark is gone, `x2` not in `quarantine`.
+- **Second half, on a new digest `x3`** (`current` is `x2`): plant the mark `x3` with **no candidate offered**; deploy. `x3` is not in `quarantine`; the tool itself wrote `interrupted` = `x3`; `current` is `x2`, and its render is the last `up`; the mark is gone. Plant the mark `x3` again; offer `x3`; deploy. `quarantine` has exactly one line for `x3`, reason `interrupted`; no `up` names `x3`'s render; `current` is `x2`; the mark is gone. No line of `interrupted` is written by the test.
+
+Must be red: the record never quarantines (a third try of `x3`); the first time quarantines; `interrupted` not written; the mark unlinked before the record. The mark-names-`current` case is R1.3e's own test in `test_deploy_recover.py` and is not folded in here.
