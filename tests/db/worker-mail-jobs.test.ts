@@ -143,9 +143,24 @@ describe('R5.4 the drain against the database: one row sends one mail, a failure
 
 // POLY-160 R5 (C23, C24): the database lost under the worker's schedule. The run in flight is a `job.run` with outcome error, the schedule goes on, and the next run after the database is back is ok.
 // The process does not end (an unhandled client error would fail this file's run). [red if: survive() is removed from the worker pool; the per-client line is covered by the web and wrappers cases]
+// A TCP forwarder in front of Postgres with down()/up() on the same port (kept here: this area's test files may not import another area's helper).
+async function startProxy(host: string, port: number) {
+  const net = await import('node:net');
+  const socks = new Set<import('node:net').Socket>();
+  const make = () => net.createServer((c) => {
+    const up = net.connect(port, host);
+    for (const x of [c, up]) { socks.add(x); x.on('close', () => socks.delete(x)); x.on('error', () => x.destroy()); }
+    c.pipe(up); up.pipe(c);
+  });
+  let server = make();
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const own = (server.address() as import('node:net').AddressInfo).port;
+  const down = async () => { for (const x of socks) x.destroy(); if (server.listening) await new Promise<void>((r) => server.close(() => r())); };
+  return { port: own, kill: down, down, up: async () => { if (server.listening) return; server = make(); await new Promise<void>((r, j) => server.once('error', j).listen(own, '127.0.0.1', () => r())); } };
+}
+
 describe('the database lost under the worker (POLY-160 R5)', () => {
   it('a drain run while the database is away logs job.run outcome error; the next run once it is back logs ok; the schedule never stops', async () => {
-    const { startProxy } = await import('./helpers/web-server');
     const { dbEnv } = await import('./helpers/api');
     const dbm: any = await import('../../packages/db/src/index.ts');
     const { startSchedule } = await import('../../apps/worker/src/jobs/schedule.ts');

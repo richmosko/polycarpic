@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cloneMigrated, dbEnv, freshDb } from './helpers/api';
-import { startProxy } from './helpers/web-server';
+import net from 'node:net';
 
 // the service's JSON log lines, collected (pino writes to the descriptor, not process.stdout.write); the real stream is kept so the output stays visible
 const sunk = vi.hoisted(() => ({ lines: [] as string[] }));
@@ -14,6 +14,21 @@ vi.mock('../../packages/config/src/log.ts', async (orig) => {
   const m = (await orig()) as any;
   return { ...m, createLogger: (o: any) => m.createLogger({ ...o, stream: new Writable({ write(c, _e, cb) { sunk.lines.push(String(c)); process.stdout.write(c); cb(); } }) }) };
 });
+
+// A TCP forwarder in front of Postgres with down()/up() on the same port (kept here: the auth area's test files may not import another area's helper).
+async function startProxy(host: string, port: number) {
+  const socks = new Set<net.Socket>();
+  const make = () => net.createServer((c) => {
+    const up = net.connect(port, host);
+    for (const x of [c, up]) { socks.add(x); x.on('close', () => socks.delete(x)); x.on('error', () => x.destroy()); }
+    c.pipe(up); up.pipe(c);
+  });
+  let server = make();
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const own = (server.address() as net.AddressInfo).port;
+  const down = async () => { for (const x of socks) x.destroy(); if (server.listening) await new Promise<void>((r) => server.close(() => r())); };
+  return { port: own, kill: down, down, up: async () => { if (server.listening) return; server = make(); await new Promise<void>((r, j) => server.once('error', j).listen(own, '127.0.0.1', () => r())); } };
+}
 
 const SECRET = 'qa-auth-main-secret-0123456789abcdef0123456789abcdef';
 const dir = mkdtempSync(join(tmpdir(), 'poly152-main-'));
