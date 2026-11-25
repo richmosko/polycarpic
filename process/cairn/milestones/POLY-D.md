@@ -12,4 +12,4 @@ ga: false
 
 **Definition of done:** closes with the `POLY-V1` major, or earlier if the Principal retires it; every issue in it is done or moved by then.
 
-**Issues:** POLY-79 (tracker and worktree tooling follow-ups, the umbrella; add items there rather than filing one issue each).
+**Issues:** POLY-79 (tracker and worktree tooling follow-ups, the umbrella; add items there rather than filing one issue each), POLY-131 (layer lint follow-ups), POLY-143 (CI and test-time follow-ups; the picomatch audit exemption's test fails after 2026-12-17).

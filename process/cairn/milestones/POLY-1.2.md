@@ -12,6 +12,6 @@ ga: false
 
 **Definition of done (tags v1.2.0):** to be written when the milestone is scheduled. Each issue carries its own acceptance criteria until then.
 
-**Stories:** POLY-81 (Admin view; PRD, ARCH and SECURITY define it before any build work starts).
+**Stories:** POLY-81 (Admin view; PRD, ARCH and SECURITY define it before any build work starts), POLY-92 (home-box `.local` sign-in; POLY-120 is blocked by it).
 
 **Operations:** POLY-120 (home box first deploy; blocked by POLY-97 and POLY-98, needs OQ-INFRA-2, -3 and -10 answered), POLY-121 (Vercel + Neon target; blocked by POLY-96 and POLY-99, needs the ARCH §7.6 two-project split, which is not yet filed).

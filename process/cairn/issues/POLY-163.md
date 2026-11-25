@@ -2,7 +2,7 @@
 id: POLY-163
 title: Edge limits before prod
 status: backlog
-milestone: POLY-M1
+milestone: POLY-M6
 parent: null
 blocked_by: []
 assignee: devops-engineer

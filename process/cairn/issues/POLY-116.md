@@ -4,14 +4,14 @@ title: Restore drill (GA gate)
 status: backlog
 milestone: POLY-1.0
 parent: null
-blocked_by: [POLY-99, POLY-105]
+blocked_by: [POLY-99, POLY-105, POLY-158]
 assignee: devops-engineer
 paths: [infra/drill.sh, process/cairn/reviews/**, .github/workflows/**]
 labels: [ops, backup, ga-gate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 DECISIONS 2026-11-06 / INFRA §6.7: the first passing drill against real backup objects, run off the box with the read key and the age key from the password manager, plus the bad-migration path of §6.4 timed end to end against the 60-minute RTO (Principal Q8, 2026-11-08). A drill not run in 45 days raises an issue and an email.

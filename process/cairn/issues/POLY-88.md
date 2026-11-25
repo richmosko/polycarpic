@@ -50,3 +50,7 @@ From POLY-100 (2026-11-24, Principal's decision in process/DECISIONS.md): the pr
 ### @team-lead — 2026-11-24
 
 Two criteria removed here and done in POLY-161 (its ruling R11, `process/cairn/reviews/POLY-161/ruling.md`): "No SvelteKit route is served by the image before POLY-86's signed-out guard is in" and "The image build stage runs `vite build` with dev dependencies and copies only `apps/web/build` forward". The startup zone check and the served health path moved there too. What stays here is the two providers.
+
+### @team-lead — 2026-11-24
+
+From the M1 regroup (2026-11-25, architect's review): the first criterion (each button completes sign-in on staging) can only be shown after POLY-104. The code is built and tested before that; the staging proof is the last step and sits on M1's critical path (POLY-160's staging gates, POLY-104, this issue's staging proof, POLY-106). The Principal registers the Google and GitHub OAuth apps; needed by about 2026-12-01 for the M1 target.

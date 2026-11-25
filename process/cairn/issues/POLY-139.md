@@ -2,7 +2,7 @@
 id: POLY-139
 title: Sign-in and Sessions screens
 status: backlog
-milestone: POLY-M1
+milestone: POLY-1.0
 parent: null
 blocked_by: []
 assignee: ux-designer
@@ -10,7 +10,7 @@ labels: [design]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-21
+updated: 2026-11-24
 ---
 
 POLY-86 shipped placeholder pages for `/sign-in` and Settings → Sessions because DESIGN has no screen for either (ruling follow-up 1; verdict follow-up 14).

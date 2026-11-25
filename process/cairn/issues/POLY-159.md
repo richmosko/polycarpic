@@ -2,7 +2,7 @@
 id: POLY-159
 title: Daily off-box bucket check
 status: backlog
-milestone: POLY-M1
+milestone: POLY-M6
 parent: null
 blocked_by: [POLY-104]
 assignee: devops-engineer
@@ -10,7 +10,7 @@ labels: [infra, security, backup]
 priority: null
 pr: null
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 A scheduled job outside the box lists the backup bucket once a day and pings the alert service, so an uploader that reports `verified` without uploading is seen within a day rather than at the monthly drill (POLY-99 ruling §D3; seceng's ruling on TB-12 in `process/cairn/reviews/POLY-99/ruling-review.md`). Filed by the Principal's decision of 2026-11-23 (`process/DECISIONS.md`, D3). It gates the first real household data, as the Healthchecks alarm does, and does not wait on POLY-103. It needs a real bucket, so it follows POLY-104.

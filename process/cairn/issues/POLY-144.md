@@ -2,7 +2,7 @@
 id: POLY-144
 title: In-app instance invite
 status: backlog
-milestone: POLY-M1
+milestone: POLY-1.0
 parent: null
 blocked_by: [POLY-89, POLY-137, POLY-142, POLY-150, POLY-151]
 assignee: null
@@ -10,7 +10,7 @@ labels: [story, auth]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-16
+updated: 2026-11-24
 ---
 
 A signed-in user invites a new person to the instance from the app, by email, without inviting them to any group entity. The invitee gets an account with only their own Person, exactly as POLY-142's plain `polycarpic user invite <email>` gives from the command line. Mandatory per the Principal (2026-11-13, POLY-142 kickoff): "there should be an email invite option that doesn't include inviting a new user to a group Entity", and "the mechanism should be an email invite with the link embedded". The reason given: nobody sees the CLI's stdout except perhaps during initial setup.

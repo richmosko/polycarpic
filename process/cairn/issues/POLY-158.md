@@ -2,7 +2,7 @@
 id: POLY-158
 title: Rollback: copy back into prod
 status: backlog
-milestone: POLY-M1
+milestone: POLY-M6
 parent: null
 blocked_by: [POLY-100]
 assignee: devops-engineer
@@ -10,7 +10,7 @@ labels: [infra, security, backup]
 priority: null
 pr: null
 created: 2026-11-23
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 The box-side route from a pre-migration backup back into prod (POLY-99 ruling §L1, the former `restore-apply`). POLY-99 stops at a throwaway cluster on the laptop, so the 60-minute bad-migration recovery has no built route back. Design decided by the Principal on 2026-11-23 (`process/DECISIONS.md`, D2): the laptop decrypts and streams the restore over ssh into a temporary scratch cluster on the box. seceng reviews the ruling and the build.

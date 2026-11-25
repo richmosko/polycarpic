@@ -2,7 +2,7 @@
 id: POLY-131
 title: Layer lint follow-ups
 status: backlog
-milestone: POLY-M1
+milestone: POLY-D
 parent: null
 blocked_by: [POLY-82]
 assignee: backend-lead
@@ -11,7 +11,7 @@ labels: [enabler]
 priority: P3
 pr: null
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-24
 ---
 
 Umbrella for the non-blocking findings from the architect's POLY-82 review (verdict comment on POLY-82 @ 173952f). One loop for the batch, not one issue each; add later layer-lint nits here.
