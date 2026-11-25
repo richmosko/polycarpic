@@ -11,7 +11,7 @@ labels: [auth]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 Login and Sign up offer Continue with Google and Continue with GitHub beside email and password. Sign in with Apple is deferred to the native iOS milestone (Principal, 2026-11-08) and has its own issue (POLY-122). Providers only authenticate an invited user; they never create an account without an invitation and never skip the second step. Each provider asserts a verified email as SECURITY C-05 pins it.
@@ -24,8 +24,6 @@ Login and Sign up offer Continue with Google and Continue with GitHub beside ema
 - [ ] OAuth access and refresh tokens are stored encrypted and the ID token is not persisted.
 - [ ] Linking a provider to an existing account requires a signed-in session and the same verified email.
 - [ ] C-05: Google uses email_verified; GitHub reads /user/emails (primary and verified) with read:user and user:email; a test per provider.
-- [ ] No SvelteKit route is served by the image before POLY-86's signed-out guard is in (POLY-128 ruling R4).
-- [ ] The image build stage runs `vite build` with dev dependencies and copies only `apps/web/build` forward; `.dockerignore` gains `**/.svelte-kit`, `apps/web/build` and `apps/web/tests` (POLY-128 ruling R11).
 
 ## Comments
 
@@ -48,3 +46,7 @@ From POLY-137 (ruling follow-up; SECURITY R-24): BetterAuth sets no timeout on t
 ### @team-lead — 2026-11-23
 
 From POLY-100 (2026-11-24, Principal's decision in process/DECISIONS.md): the production web server and image build (vite build, the first mount of the server and /api/v1/health, the startup zone check) are split out of this issue into POLY-161, ahead of POLY-104. Remove those criteria here when POLY-161 starts.
+
+### @team-lead — 2026-11-24
+
+Two criteria removed here and done in POLY-161 (its ruling R11, `process/cairn/reviews/POLY-161/ruling.md`): "No SvelteKit route is served by the image before POLY-86's signed-out guard is in" and "The image build stage runs `vite build` with dev dependencies and copies only `apps/web/build` forward". The startup zone check and the served health path moved there too. What stays here is the two providers.
