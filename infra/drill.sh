@@ -101,7 +101,10 @@ else
   if [ -n "$dr1" ]; then res FAIL DR1 "$dr1"; else res PASS DR1 "every chosen object has one version and no hide marker (set $SET_TS, $(awk 'END { print NR }' "$VERS") versions listed)"; fi
   if [ "$DR2_BAD" = 1 ]; then res FAIL DR2 "a download does not match its sha256 sibling"; else res PASS DR2 "every download matches its sha256 sibling"; fi
   if [ "$DR11_BAD" = 1 ]; then res FAIL DR11 "the time inside an archive does not match its name's TS (a replayed file?)"; else res PASS DR11 "the time inside each archive matches its name's TS (replay check)"; fi
-  if plain_stream "$GLOBALS_PLAIN" | grep -aqE 'PASSWORD|SCRAM-SHA-256\$'; then res FAIL DR3 "the globals file carries a role password or hash"; else res PASS DR3 "the globals file carries no PASSWORD and no SCRAM-SHA-256\$"; fi
+  # grep counts, so it reads to the end (-q, or output to /dev/null, leaves at the first match and kills the stream); a stream that fails is a FAIL
+  if ! dr3_hits=$(plain_stream "$GLOBALS_PLAIN" | { grep -acE 'PASSWORD|SCRAM-SHA-256\$' || [ $? = 1 ]; }); then res FAIL DR3 "the globals file could not be read to the end"
+  elif [ "$dr3_hits" != 0 ]; then res FAIL DR3 "the globals file carries a role password or hash"
+  else res PASS DR3 "the globals file carries no PASSWORD and no SCRAM-SHA-256\$"; fi
 
   # ---- two scratch restores (DR4 and the comparisons)
   if restore_dump; then SC_DUMP=$SC; else SC_DUMP=''; fi

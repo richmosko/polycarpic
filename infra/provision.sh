@@ -274,6 +274,12 @@ data_dirs() {
     ensure_dir "$DATA/$d" 0700 999:999
     [ "$(stat -c %a "$DATA/$d")" = 700 ] || chmod 0700 "$DATA/$d"
   done
+  # Caddy's certificate store and config (edge.yml), for uid 10010. A missing bind source would be made by Docker as root:root 0755, which Caddy
+  # cannot write while its health check still passes; one made that way is repaired, its contents kept (POLY-104 F6).
+  for d in caddy caddy-config; do
+    ensure_dir "$DATA/$d" 0700 10010:10010
+    [ "$(stat -c %a "$DATA/$d")" = 700 ] || { chmod 0700 "$DATA/$d"; change "mode of $DATA/$d set to 700"; }
+  done
   ensure_dir "$DATA/spool" 0755 0:0
   acl_dir "$DATA/spool/wal" 999:999
   acl_dir "$DATA/spool/dump" 10004:10004

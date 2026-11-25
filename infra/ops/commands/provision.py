@@ -8,6 +8,12 @@ DOMAIN = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,
 BUCKET = re.compile(r"[a-z0-9-]{6,50}")
 ENDPOINT = re.compile(r"https://s3\.[a-z0-9-]+\.backblazeb2\.com")
 OPS_CONF = "/etc/polycarpic/ops.conf"
+# edge.env's three flags, no wider than provision.sh's edge_env accepts: Caddy substitutes them before it parses the Caddyfile
+EDGE = (
+    ("--bind-addr", re.compile(r"[0-9]{1,3}(\.[0-9]{1,3}){3}")),
+    ("--staging-allow", re.compile(r"[0-9a-fA-F:./]+(,[0-9a-fA-F:./]+)*")),
+    ("--acme-email", re.compile(r"""(?:(?![@{}"'\\])[!-~])+@(?:(?![@{}"'\\])[!-~])+""")),
+)
 
 
 def add_arguments(parser):
@@ -18,15 +24,16 @@ def add_arguments(parser):
     parser.add_argument("--b2-bucket")
     parser.add_argument("--b2-endpoint")
     parser.add_argument("--project")
+    for flag, _ in EDGE:
+        parser.add_argument(flag)
     plain = parser.parse_args
 
     def checked(argv=None, namespace=None):
         argv = list(argv or [])
         # a value starting with '-' would be read as an option: refuse it with the named message (B3)
-        if any(a == "--mail-from" and b.startswith("-") for a, b in zip(argv, argv[1:])):
-            parser.error("provision: bad --mail-from")
-        if any(a == "--b2-endpoint" and b.startswith("-") for a, b in zip(argv, argv[1:])):
-            parser.error("provision: bad --b2-endpoint")
+        for flag in ["--mail-from", "--b2-endpoint"] + [f for f, _ in EDGE]:
+            if any(a == flag and b.startswith("-") for a, b in zip(argv, argv[1:])):
+                parser.error("provision: bad " + flag)
         return plain(argv, namespace)
 
     parser.parse_args = checked
@@ -55,9 +62,14 @@ def run(args, ctx):
     if args.stage == "database" and args.project is None:
         return _bad(ctx, "--stage database needs --project prod|staging")
 
+    edge = [(flag, getattr(args, flag[2:].replace("-", "_"))) for flag, _ in EDGE]
+    for (flag, value), (_, pattern) in zip(edge, EDGE):
+        if value is not None and not pattern.fullmatch(value):
+            return _bad(ctx, "bad " + flag)
+
     argv = ["/bin/bash", ctx.bundle("infra/provision.sh")]
-    for flag, value in (("--stage", args.stage), ("--target", args.target), ("--domain", args.domain), ("--b2-endpoint", args.b2_endpoint), ("--mail-from", args.mail_from),
-                        ("--project", args.project)):
+    for flag, value in [("--stage", args.stage), ("--target", args.target), ("--domain", args.domain), ("--b2-endpoint", args.b2_endpoint), ("--mail-from", args.mail_from),
+                        ("--project", args.project)] + edge:
         if value is not None:
             argv += [flag, value]
     code = ctx.run_inherit(argv)
