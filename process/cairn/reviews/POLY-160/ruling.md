@@ -211,7 +211,9 @@ devops-engineer: `infra/ops/**`, `infra/provision.sh`, `infra/provision-check.sh
 
 ## L. For the lead
 
-1. **Paths:** R5 touches `apps/{web,auth,worker}/src/main.ts` (C22): add them to POLY-160 and POLY-160e, or guard-push refuses. The alternative is `pool.ts` alone, silent. Recommend C22.
+Items 2 to 6 were decided as recommended in `process/DECISIONS.md` (2026-11-25). **One difference:** that entry has a box fault after `up` quarantined with no lift; seceng's C16 names that a wrong fix, so R3 makes it `held-`, which lifts with another installed bundle. Say so if you want it for good.
+
+1. **Paths (open):** R5 touches `apps/{web,auth,worker}/src/main.ts` (C22): add them to POLY-160 and POLY-160e, or guard-push refuses. The alternative is `pool.ts` alone, silent. Recommend C22.
 2. **One residue:** SIGKILL or a power cut during `first-deploy` or `edge-deploy` leaves the release running until the command is rerun, `status` RED: nothing polls those two. Closing it needs a boot-time unit. Recommend accepting it as a row in SECURITY, with you as approver on record; seceng must agree before R-32 closes.
 3. **Edge:** Caddy of an edge release whose restore fails, or that never had a `current`, is stopped. Your lines name `web`, `auth`, `worker`; I read the gate's words as covering it. Recommend yes: only staging is behind it before prod.
 4. **A different digest may deploy while stuck (R1.4).** Recommend yes; it narrows POLY-100 G6's "stops the run".
