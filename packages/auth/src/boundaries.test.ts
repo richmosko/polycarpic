@@ -66,6 +66,16 @@ describe('lint', () => {
     const messages = await lint('packages/auth/src/options.ts', `import { drizzleAdapter } from '@better-auth/drizzle-adapter';\nexport const a = drizzleAdapter;\n`);
     expect(messages.map((m) => `${m.ruleId}: ${m.message}`).join('\n')).toMatch(/no-restricted-imports: .*drizzleAdapter is refused in packages\/auth/);
   }, 60_000);
+  it('refuses a subpath import of @better-auth/drizzle-adapter  [red if: the adapter\'s /* pattern is gone]', async () => {
+    const messages = await lint('packages/auth/src/options.ts', `import { drizzleAdapter } from '@better-auth/drizzle-adapter/relations-v2';\nexport const a = drizzleAdapter;\n`);
+    expect(messages.map((m) => `${m.ruleId}: ${m.message}`).join('\n')).toMatch(/no-restricted-imports: .*drizzleAdapter is refused in packages\/auth/);
+  }, 60_000);
+  it('refuses a dynamic import() of @better-auth/drizzle-adapter, bare and subpath  [red if: the adapter leaves the banned specifiers]', async () => {
+    for (const spec of ['@better-auth/drizzle-adapter', '@better-auth/drizzle-adapter/relations-v2']) {
+      const messages = await lint('packages/auth/src/options.ts', `export const a = () => import('${spec}');\n`);
+      expect(messages.map((m) => `${m.ruleId}: ${m.message}`).join('\n'), spec).toMatch(/poly\/no-banned-specifier: /);
+    }
+  }, 60_000);
   it('refuses a pg import in packages/auth  [red if: the layers rule does not cover auth]', async () => {
     expect((await lint('packages/auth/src/routing-pool.ts', `import pg from 'pg';\nexport const a = pg;\n`)).length).toBeGreaterThan(0);
   }, 60_000);

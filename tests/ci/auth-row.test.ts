@@ -14,7 +14,7 @@ const RP = 'tests/db/auth-route-policy.test.ts';
 const POOL = 'tests/db/auth-routing-pool.test.ts';
 const SOURCES = [LINT, RP, POOL];
 // Floors are the counts a real run reports (the db battery's and the lint row's JSON; `vitest list` does not expand describe.each). Raising a suite does not need an edit here; lowering a floor does.
-const FLOOR: Record<string, number> = { [LINT]: 9, [RP]: 43, [POOL]: 40 };
+const FLOOR: Record<string, number> = { [LINT]: 11, [RP]: 43, [POOL]: 40 };
 
 const LIVE = 'every HTTP route of the instance is in AUTH_ROUTES and every entry is live, naming the path  [red if: a plugin or version adds a route unclassified, or the map keeps a dead entry]';
 const MODES = ['route policy, real-domain mode', 'route policy, private-ca mode'];
@@ -52,12 +52,12 @@ function tree(sources: Record<string, string | null> = {}): string {
   }
   return root;
 }
-type Opt = { env?: Record<string, string>; args?: string[]; sources?: Record<string, string | null>; raw?: string | null; at?: (root: string, file: string) => string; list?: [string, A[]][] };
+type Opt = { env?: Record<string, string>; args?: string[]; sources?: Record<string, string | null>; raw?: string | null; at?: (root: string, file: string) => string; list?: [string, A[]][]; fileStatus?: Record<string, string> };
 function run(mode: string, results: Results, o: Opt = {}) {
   const root = tree(o.sources);
   const report = join(root, 'report.json');
   const list = o.list ?? Object.entries(results);
-  const json = JSON.stringify({ success: true, testResults: list.map(([f, a]) => ({ name: (o.at ?? ((r, x) => join(r, x)))(root, f), status: 'passed', assertionResults: a })) });
+  const json = JSON.stringify({ success: true, testResults: list.map(([f, a]) => ({ name: (o.at ?? ((r, x) => join(r, x)))(root, f), status: o.fileStatus?.[f] ?? 'passed', assertionResults: a })) });
   if (o.raw !== null) writeFileSync(report, o.raw ?? json);
   const env = { VITEST_JSON: report, ...(mode === 'db' ? { DB_AUTH: 'true' } : {}), ...(o.env ?? {}) };
   const r = spawnSync('node', [join(root, 'infra/ci/auth-row.mjs'), ...(o.args ?? [mode])], { cwd: tmpdir(), encoding: 'utf8', env: { PATH: process.env.PATH ?? '', ...env } });
@@ -76,7 +76,7 @@ describe('auth-row.mjs: green on a good report', () => {
   it('lint: boundaries.test.ts passed at its floor -> 0, one line naming the file and counts (V8)', () => {
     const r = run('lint', good('lint'));
     green(r);
-    expect(r.stdout).toContain(`auth-row: ${LINT} 9 passed (floor 9)`);
+    expect(r.stdout).toContain(`auth-row: ${LINT} 11 passed (floor 11)`);
   });
   it('db: RP and POOL passed at their floors -> 0, a line each; a skip in another battery file is not this row\'s business', () => {
     const r = run('db', good('db'));
@@ -103,6 +103,9 @@ describe('auth-row.mjs: ran is not skipped', () => {
     it(`${file}: one passing test below the floor -> red`, () => {
       const res = { ...good(mode), [file]: passing(file).slice(0, -1) };
       red(run(mode, res), file, String(FLOOR[file]));
+    });
+    it(`${file}: the file's own status is failed while every assertion passed (a hook or a collection error) -> red`, () => {
+      red(run(mode, good(mode), { fileStatus: { [file]: 'failed' } }), file, "the file's status is failed");
     });
     it(`${file}: emptied -> red`, () => { red(run(mode, { ...good(mode), [file]: [] }), file); });
     it(`${file}: absent from the report (renamed or filtered out) -> red`, () => {
@@ -204,7 +207,7 @@ describe('auth-row.mjs: fails closed', () => {
 describe('auth-row.mjs: its table', () => {
   it('ROWS names the three files by exact path, with the measured floors  [red if: a floor is lowered or a file dropped]', async () => {
     const m = (await import(ci('auth-row.mjs'))) as { ROWS: Record<string, { file: string; floor: number }[]> };
-    expect(Object.fromEntries(Object.entries(m.ROWS).map(([k, v]) => [k, v.map((x) => [x.file, x.floor])]))).toEqual({ lint: [[LINT, 9]], db: [[RP, 43], [POOL, 40]] });
+    expect(Object.fromEntries(Object.entries(m.ROWS).map(([k, v]) => [k, v.map((x) => [x.file, x.floor])]))).toEqual({ lint: [[LINT, 11]], db: [[RP, 43], [POOL, 40]] });
   });
   it('imports node built-ins only', () => {
     const src = readFileSync(ci('auth-row.mjs'), 'utf8');
