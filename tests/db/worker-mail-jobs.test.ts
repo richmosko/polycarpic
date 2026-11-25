@@ -140,3 +140,42 @@ describe('R5.4 the drain against the database: one row sends one mail, a failure
     expect(Number(must(`SELECT extract(epoch FROM (usable_at - clock_timestamp())) / 3600 FROM app.method_hold WHERE user_id = '${u.id}'`, e.db).rows[0]![0])).toBeGreaterThan(23.9);
   });
 });
+
+// POLY-160 R5 (C23, C24): the database lost under the worker's schedule. The run in flight is a `job.run` with outcome error, the schedule goes on, and the next run after the database is back is ok.
+// The process does not end (an unhandled client error would fail this file's run). [red if: survive() is removed from the worker pool; the per-client line is covered by the web and wrappers cases]
+describe('the database lost under the worker (POLY-160 R5)', () => {
+  it('a drain run while the database is away logs job.run outcome error; the next run once it is back logs ok; the schedule never stops', async () => {
+    const { startProxy } = await import('./helpers/web-server');
+    const { dbEnv } = await import('./helpers/api');
+    const dbm: any = await import('../../packages/db/src/index.ts');
+    const { startSchedule } = await import('../../apps/worker/src/jobs/schedule.ts');
+    const { drainMail } = await import('../../apps/worker/src/jobs/mail.ts');
+    const base = dbEnv('poly_worker', e.db);
+    const proxy = await startProxy(base.DATABASE_HOST!, Number(base.DATABASE_PORT));
+    await dbm.close();
+    dbm.configure({ app: dbEnv('poly_app', e.db), auth: dbEnv('poly_auth', e.db), worker: { ...base, DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(proxy.port) }, operator: dbEnv('poly_operator', e.db) });
+    const seen: Array<{ outcome: unknown }> = [];
+    const log = {
+      info: (ev: string, f?: any) => { if (ev === 'job.run') seen.push({ outcome: f?.outcome }); },
+      error: (ev: string, f?: any) => { if (ev === 'job.run') seen.push({ outcome: f?.outcome }); },
+    };
+    const mailer = { send: async () => undefined } as any;
+    const until = async (want: string, from: number, ms = 20_000) => {
+      for (let t = 0; t < ms; t += 100) { if (seen.slice(from).some((s) => s.outcome === want)) return; await new Promise((r) => setTimeout(r, 100)); }
+      throw new Error(`no job.run ${want} within ${ms} ms; saw ${JSON.stringify(seen)}`);
+    };
+    const sched = startSchedule([{ name: 'mail.drain', everyMs: 300, run: () => drainMail({ mailer, origin: 'https://app.qa.test' }) }], log);
+    try {
+      await until('ok', 0);
+      await proxy.down();
+      await until('error', seen.length);
+      await proxy.up();
+      await until('ok', seen.length);
+    } finally {
+      sched.stop();
+      await proxy.kill().catch(() => undefined);
+      await dbm.close();
+      dbm.configure({ app: dbEnv('poly_app', e.db), auth: dbEnv('poly_auth', e.db), worker: dbEnv('poly_worker', e.db), operator: dbEnv('poly_operator', e.db) });
+    }
+  }, 60_000);
+});

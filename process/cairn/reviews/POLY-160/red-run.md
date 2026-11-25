@@ -28,3 +28,12 @@ The signal test installs its own raising handlers first, so a build with no hand
 | `tests/db/web-server.test.ts` (down/up) | green on the pool build; red with `survive()` a no-op (verified, reverted) | the file now starts web through the proxy |
 
 **For seceng-160:** `test_deploy_unwind_more.py::test_a_restore_that_must_save_and_cannot_uses_the_saved_pair_when_its_hash_holds_and_its_bytes_pass_the_guard` changes an environment value and expects the saved pair to serve; under the S36 condition that becomes a refusal. Left untouched; `test_deploy_s36_env.py` carries the new ruling and its positive case. Needs your ruling before it is edited.
+
+## Auth and worker outage lines; C21 "during COMMIT"
+
+| File | Red | Notes |
+|---|---|---|
+| `tests/db/auth-service-main.test.ts` (new describe) | green on the pool build; red with `survive()` a no-op (verified, reverted): unhandled client error fails the run | database down via the proxy: the request is a 5xx with `auth.request_failed`, then the same request is a client error again after `up()`. The logger's lines are collected by mocking `createLogger`'s stream (pino writes to the descriptor, not `process.stdout.write`) |
+| `tests/db/worker-mail-jobs.test.ts` (new describe) | green on the pool build; red with `survive()` a no-op (verified, reverted). Removing only the per-client `connect` line stays green here: the schedule's clients are idle between runs, the web and wrappers cases cover the checked-out path | `job.run` outcome `error` while down, `ok` again after `up()`, schedule not stopped |
+
+**C21 "during COMMIT": tried, cannot be timed.** `withSession` sends COMMIT in the same tick as the callback's return; there is no hook between the callback and the COMMIT write, so a loss cannot be placed inside it from a test. Tried: dropping the client's socket from the callback just before it returns (that is the "before COMMIT" case written), and a deferred constraint trigger with `pg_sleep` to widen the COMMIT (a loss during it needs a second connection killing the backend: `pg_terminate_backend`, which tests/ci forbids outside the serial project, and the client-socket drop lands before or after the COMMIT bytes, never reliably within). The two cases that stand: no query in flight (before COMMIT) and mid-query. seceng-160 rules at the build review whether they stand for it.
