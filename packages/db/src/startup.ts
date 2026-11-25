@@ -5,6 +5,8 @@
 import journal from '../migrations/meta/_journal.json' with { type: 'json' };
 import { appPool, authPool, close, configure, workerPool } from './pool.ts';
 
+export { onConnectionLost, type LostConnection } from './pool.ts';
+
 export class SchemaBehindError extends Error {
   constructor(detail: string) {
     super(`database schema is behind this image: ${detail}. Run migrate.`);
