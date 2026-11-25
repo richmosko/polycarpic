@@ -2,7 +2,15 @@
 
 Architect. Checklist pre-registered with the ruling, before any test was written. Judged once, at gate `e4451ac9` (product tip `35908f5b`).
 
-**Verdict: CHANGES REQUESTED, four items, all small and none in the product.** Re-judged for these alone: A1, A3, A5, A9, A10, S9 in A14.
+**Verdict: PASS WITH FOLLOW-UPS, at `95ddd3c0`.** First judged CHANGES REQUESTED at `e4451ac9` for C1 to C4 below; re-judged for those alone (A1, A3, A5, A9, A10, S9 in A14). No product file changed since `35908f5b`, so the other rows stand; after `95ddd3c0` only records.
+
+- **C1 met** (`b2359604`): each connect is compared with the log's own `zone.unverified` time; qa records it red on a listen moved before the check; green in CI's `db` job on Linux, log read. The 50 ms before that line is covered by the second assertion.
+- **C2 met** (`b2359604`): the step is run and recorded; `unit` green.
+- **C3 met** (`3eb1a089`).
+- **C4 met** (`95ddd3c0`, `image-check-reds.md`): 15 plants with their messages. Of the tool names only `rolldown` and `@sveltejs/kit` were planted; picomatch alone is isolated in `audit-exemption.test.ts`, not in this script; `/packages.json` is read, not isolated. Accepted.
+- **CI run 45535390085 @ `95ddd3c0`:** all ten jobs success. Read in the logs: `db` 1468 passed, 1 skipped (S6's measurement); T-real 24 of 24. `image` 719 s, `deploy-real` 422 s, both under 840. This meets the condition in seceng's `build-review.md`.
+
+The first finding:
 
 | # | Owner | Open | Closes when |
 |---|---|---|---|
@@ -25,19 +33,19 @@ Then one CI run, every job green, at the final sha, with the `image` and `deploy
 
 | # | Axis | Passes when | Result | Evidence |
 |---|---|---|---|---|
-| A1 | Criterion 1: built and mounted | R1 and R3 as ruled; `image.sh check`'s new assertions green on the CI image and each shown red; T-real 1 and 2 | **open: C4** | built, mounted and served as ruled (read; run 45533753986 T-real). No record of `image.sh check` turned red: `gate.md` has Dockerfile mutants only |
+| A1 | Criterion 1: built and mounted | R1 and R3 as ruled; `image.sh check`'s new assertions green on the CI image and each shown red; T-real 1 and 2 | met (C4 was open) | built, mounted and served as ruled (read; run 45533753986 T-real). `image-check-reds.md` @ `95ddd3c0` |
 | A2 | Criterion 2: health, one listener | health through the real server; `public-health.ts` and its test gone, no reference left in product, tests/ci or `changes.mjs`; the socket-list check red on a planted second listener | met | `public-health` gone (grep of apps, packages, infra, tests, docs: none); exact sockets in the container; red on a planted 3001 (`gate.md`) |
-| A3 | Criterion 3: zone before listen | R7's table, each row driven; a spawned `main.ts` refuses with exit 1 and `zone.refused` and 3000 never opened; a silent resolver starts within 5 s plus margin | **open: C1** | product order read: `verifyZone` is awaited before the import and the listen. The test of it is red in CI |
+| A3 | Criterion 3: zone before listen | R7's table, each row driven; a spawned `main.ts` refuses with exit 1 and `zone.refused` and 3000 never opened; a silent resolver starts within 5 s plus margin | met (C1 was open) | product order read: `verifyZone` is awaited before the import and the listen. B9 green in run 45535390085, red on the listen-first mutant (`gate.md`) |
 | A4 | Criterion 4: T-real | a CI run at the gate's product sha, counts read in the log, no skip; trigger rows pinned | met | run 45533753986 @ `35908f5b`, log read: 4 files, 24 of 24, no skip; `ROWS` pinned |
-| A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | **open: C3** | both criteria are still in `POLY-88.md` at `e4451ac9` |
+| A5 | Criterion 5: POLY-88 | the two criteria and the comments of R11 removed or pointed here | met (C3 was open) | `3eb1a089` |
 | A6 | R6: what is served | crawl over the manifest red on an unguarded new route and on a prefix `isPublic`; seceng's review has no open item | met | crawl read; prefix and planted route 8 findings red; `build-review.md` @ `aaf80fbd` |
 | A12 | R13: `safeNext` | every row of addendum 1 red on today's module or on its mutant; the two Chromium cases green | met | 44 refused and 9 kept rows; 4 Chromium cases red on the old module; e2e 84 of 84 in the same CI run |
 | A13 | R14, B2: the bundle's packages | list exact in the stage and the final image, red on both plants and on picomatch | met | three plants red; list exact in the stage (T-real image) and in `image.sh check` (qa, local). B35: accepted, below |
-| A14 | seceng S1 to S10, R15 | each shown as its row says; S6 and S7 with their measured values | met, but S9 needs C4 | S7 at most 153 of 384 MiB, host reading; S6 not bounded (160 s): POLY-163. S1, S4, S10 not shown red, accepted by seceng; I agree |
+| A14 | seceng S1 to S10, R15 | each shown as its row says; S6 and S7 with their measured values | met | S7 at most 153 of 384 MiB, host reading; S6 not bounded (160 s): POLY-163. S1, S4, S10 not shown red, accepted by seceng; I agree |
 | A7 | R4: limits and Host | each limit driven, not read; 421 and 400 asserted with bodies; positive case through the public host | met | 10, 30, 60 s driven; 512 counted by the server; Host and probe read. The check interval and the 125 s are not driven |
 | A8 | R5: logging | a real 500 (database down) and a planted `console.error(object)` leave no request or error text; red without `handleError` and without the guard, separately | met | `handleError` away: red; guard away with a planted call: red (`gate.md`) |
-| A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | **not met** | run 45533753986: `db` and `unit` failed; `image` still running when read; `deploy-real` 456 s; no `image` time yet |
-| A10 | qa gate, seceng build review | signed, no open blocker | signed; seceng's CI condition open | `gate.md` @ `e4451ac9`; `build-review.md` @ `aaf80fbd` |
+| A9 | Whole CI run; times | every job green; `image` and `deploy-real` seconds recorded, each under 840 | met | run 45535390085 @ `95ddd3c0`: ten jobs success; `image` 719 s, `deploy-real` 422 s |
+| A10 | qa gate, seceng build review | signed, no open blocker | met | `gate.md` @ `e4451ac9`; `build-review.md` @ `aaf80fbd` |
 | A11 | Documents | ARCH §7.4 and §7.8 (mine), INFRA, SECURITY C-76 say what is, with no history | ARCH met; INFRA diff read in part; SECURITY by seceng | `docs/` at `e4451ac9` |
 
 ## Assertions that would pass a wrong build
