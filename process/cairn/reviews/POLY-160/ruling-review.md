@@ -138,3 +138,12 @@ The whole amended ruling read; nothing run. The 13 are met but for #4 (change 1)
 - POLY-165 holds by name: prod's Caddy on a failed prod restore, the backup set per `check-config-timeout` retry, the boot-time recovery.
 
 Section L: no objection to 1, 3, 4, 5 (staging), 6, 7. Item 2 has its approver (`process/DECISIONS.md` @ `7f13c96f`, staging only). The first sentence's difference (held, not banned for good): I support R3.
+
+### After the delta read: ruling @ `f7670869`, and S36
+
+**Both changes are met** (R1.6, R1.9; R1, R2 to R5's text read, nothing run). Two build conditions, no further ruling round:
+
+- **S36: change.** It is the same fault by another door: with the disk full, a restore under the pinned Compose starts saved bytes with the old `edge.env` values, the allowlist included. An interrupted deploy on a full disk is a case this loop fixes on purpose, so it is not rare here. The cost is one call of a comparison R1.6 builds anyway. *Condition:* wherever the failed-save path falls back to the saved pair (every restore: recovery, unwind and `rollback`), every service's `environment` in it equals the fresh corrected render's, key and value, else the refusal `state` (the restore is not ok, and R1.3c follows). R1.6's one comparison function serves both. *Test:* `ENOSPC` on the save, `edge.env`'s allowlist changed since: Caddy is not upped with the old value; unchanged values: upped from the saved pair as today. *Mutant:* the comparison dropped from this path only. An existing S36 assertion that changes is listed at red.
+- **R1.3b, "listed in a readable quarantine file"** means held by `quarantined()`'s rule, lift included. A digest with a `guard-` or `held-` line that lifted, and that then went healthy, is a good `current`: refusing to restore it would turn one failed deploy into an outage. *Test:* a lifted line on `current`, mark present: restored. *Mutant:* a plain search of the file.
+
+R1.8 as written installs no handlers; I expect the lead's line that keeps SIGHUP and SIGTERM, with the at-build checks above.
