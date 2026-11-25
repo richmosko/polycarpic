@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { connect, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
-import { createLogger } from '@poly/config/log';
+import { createLogger } from '../../packages/config/src/log.ts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ROOT } from './helpers/pg';
 import { ask, startWeb, type Web } from './helpers/web-server';
@@ -15,7 +15,8 @@ afterEach(async () => { for (const w of started.splice(0)) await w.stop(); });
 const run = async () => { const w = await startWeb(); started.push(w); return w; };
 
 const rssMiB = (pid: number): number => Number(spawnSync('ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' }).stdout.trim()) / 1024;
-const record = (k: string, v: unknown) => { mkdirSync(join(ROOT, 'temp'), { recursive: true }); appendFileSync(join(ROOT, 'temp/161-measurements.json'), JSON.stringify({ at: new Date().toISOString(), [k]: v }) + '\n'); };
+const TEMP = join(ROOT, 'temp'); // a directory, not a file edge for the db filter's import closure
+const record = (k: string, v: unknown) => { mkdirSync(TEMP, { recursive: true }); appendFileSync(join(TEMP, '161-measurements.json'), JSON.stringify({ at: new Date().toISOString(), [k]: v }) + '\n'); };
 const HOST = 'localhost:5173';
 const PAD = 'a'.repeat(7000);
 
@@ -113,6 +114,7 @@ describe('R4: the timers, driven (B16)', () => {
       const t0 = Date.now();
       const sock = connect(port, '127.0.0.1');
       let closed = false;
+      sock.on('data', () => {}); // a socket nobody reads never sees the server's 408 or its FIN, and never closes
       sock.on('error', () => { closed = true; });
       sock.on('close', () => { closed = true; resolve({ closed, ms: Date.now() - t0 }); });
       sock.on('connect', () => sock.write(bytes));
