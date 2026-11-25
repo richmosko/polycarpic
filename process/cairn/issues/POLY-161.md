@@ -1,7 +1,7 @@
 ---
 id: POLY-161
 title: Web server in the release image
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
@@ -9,7 +9,7 @@ assignee: frontend-lead
 paths: [process/cairn/issues/POLY-161.md, process/cairn/issues/POLY-88.md, process/cairn/reviews/POLY-161/**, apps/web/**, packages/config/**, infra/**, .github/workflows/**, Dockerfile, .dockerignore, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, package.json, pnpm-lock.yaml, packages/*/package.json, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, process/STATE.md, process/DECISIONS.md]
 labels: [app, deploy]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/154
 created: 2026-11-23
 updated: 2026-11-24
 ---
@@ -35,3 +35,7 @@ From the POLY-162 loop (2026-11-24), all about `apps/web/src/ops/public-health.t
 ### @team-lead — 2026-11-24
 
 Feature started. Branch: `feature/poly-161-web-server-release-image`. This loop has a ruling stage: the image serves the whole web app for the first time. Order: architect ruling with its pre-registered checklist (a), seceng's review of the ruling (b), then tests (c), the build in apps/web (d) and the image and CI (e), seceng's build review (b), verdict (f).
+
+### @team-lead — 2026-11-24
+
+PR opened: https://github.com/richmosko/polycarpic/pull/154. Validate is complete: qa gate `process/cairn/reviews/POLY-161/gate.md` (full at 4971dc28, delta at 35908f5b); seceng final PASS (ecd8f6f0); architect PASS WITH FOLLOW-UPS at 95ddd3c0 (43ce99c0); CI run 45535390085 on the branch and the PR's own run 45537403400 green on all ten jobs. Merging via PR #154 under the Principal's instruction of 2026-11-25 ("Merge when done"). Closing.
