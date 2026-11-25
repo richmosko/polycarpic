@@ -100,6 +100,11 @@ On a dead handle `getSetCookie()` equals exactly the clearing line, all attribut
 
 Not re-run at this sha (nothing they cover changed since `4971dc28`): the full `tests/db` battery, e2e, `web-server-start.test.ts` (its Chromium case needs the browser the db job now installs: it passed locally at `4971dc28`; CI at the tip is its first run with the install).
 
+## C1, C2 (verdict @ 994ba84a)
+
+- C1: the B9 case sampled 3000 every 300 ms and failed any success before `startWeb` saw `web.started`, but the listen legitimately comes right after the zone check's own log line, so a sample in that gap read as a violation. Each sample is now stamped when its answer arrives and compared with the `ts` of `zone.unverified`: samples before it (more than 3 required) all refused, and every successful connect is at or after it. Red on a build with the zone check moved after the listen (`main.ts` mutated; B9 case red, restored); green 3 of 3 for the file locally.
+- C2: `tests/image/dockerfile.test.ts` wants `**/.env*`. The step the first gate missed, CI's `tests/config` (`vitest run -c tests/config/vitest.config.ts`, holds `tests/image`), is now run: 100 passed, 15 skipped (existing), 5 files.
+
 ## Not covered
 
 - B38 shown red (above). B35's "floors per side": the plugin writes one union, so a per-side floor needs a change in `bundle-packages.mjs` (devops); the test holds a total floor and the three plants.

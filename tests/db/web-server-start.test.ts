@@ -77,15 +77,21 @@ describe('the zone check runs before the server listens (A3)', () => {
   it('while the resolvers are held silent, 3000 refuses connections; it opens only once the bound (5 s) has passed  [red if: the listen comes first (B9)]', async () => {
     const t0 = Date.now();
     const p = startWeb({ preload: [PRELOAD], env: { ...REAL, ...plan('silent', 'silent') } });
-    const seen: boolean[] = [];
+    // every sample is stamped when its answer arrives: a connect that succeeds after the zone check's own log line is legitimate (the listen comes right after it),
+    // one that succeeds before it is the listen coming first
+    const seen: { ok: boolean; at: number }[] = [];
     let w: Web | undefined;
-    const timer = setInterval(() => { void opened().then((o) => seen.push(o)); }, 300);
+    const timer = setInterval(() => { void opened().then((o) => seen.push({ ok: o, at: Date.now() })); }, 300);
     w = await p;
     clearInterval(timer);
     started.push(w);
     const took = Date.now() - t0;
-    expect(seen.length).toBeGreaterThan(3);
-    expect(seen.every((o) => o === false), 'no connect succeeded while held').toBe(true);
+    const zoneAt = Date.parse(w.lines().find((l) => l.event === 'zone.unverified')!.ts as string);
+    expect(Number.isFinite(zoneAt), 'zone.unverified has a time').toBe(true);
+    const before = seen.filter((x) => x.at < zoneAt - 50);
+    expect(before.length, 'samples taken while the zone check was held').toBeGreaterThan(3);
+    expect(before.every((x) => !x.ok), 'no connect succeeded before the zone check logged its answer').toBe(true);
+    expect(seen.filter((x) => x.ok).every((x) => x.at >= zoneAt), 'every successful connect is later than zone.unverified').toBe(true);
     expect(took).toBeGreaterThanOrEqual(4500);
     expect(took).toBeLessThan(30_000);
     expect(events(w)).toContain('zone.unverified');

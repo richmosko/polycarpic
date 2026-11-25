@@ -93,7 +93,7 @@ describe('Dockerfile (static)', () => {
 
 describe('.dockerignore', () => {
   const ign = () => readFileSync(join(ROOT, '.dockerignore'), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  for (const want of ['.git', '**/node_modules', 'temp', 'docs', 'process', 'prototype', 'tests', '.claude', '**/*.test.*', '**/*.spec.*', 'packages/secrets/**/*.test.*', 'packages/secrets/**/*.spec.*', '.env*', '**/secrets']) {
+  for (const want of ['.git', '**/node_modules', 'temp', 'docs', 'process', 'prototype', 'tests', '.claude', '**/*.test.*', '**/*.spec.*', 'packages/secrets/**/*.test.*', 'packages/secrets/**/*.spec.*', '**/.env*', '**/secrets']) {
     it(`excludes ${want}`, () => expect(ign()).toContain(want));
   }
 });
