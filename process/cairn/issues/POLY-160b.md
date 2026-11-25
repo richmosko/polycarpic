@@ -1,7 +1,7 @@
 ---
 id: POLY-160b
 title: Deploy follow-ups security review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, pro
 stage: review
 estimate.cost_usd: "10.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "2.7106"
+actual.tokens: 3033154
+actual.gate_cycles: 3
+actual.wall_clock: 16
+ratio: "0.27"
 labels: []
 priority: null
 pr: null
