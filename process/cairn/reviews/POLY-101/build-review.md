@@ -39,3 +39,15 @@ Reach if the hook were lost: any HTTP caller, for a new literal under `/callback
 - **F2.** `auth-row.mjs` checks the file's own `status`, and every case in `auth-row.test.ts` sends `passed`, so nothing covers that line. vitest exits non-zero on such a file anyway. (read; mutant not run)
 - **F3.** Run one mutant per REQUIRED entry of condition 6 and record it, since the red run calls those cases green already and promises mutants in gate.md.
 - **F4.** The `.fails` scan is textual: `it['fails']` or a destructured alias passes. A mistake guard; deliberate edits are condition 11.
+
+## Five reds reproduced (single Edit changes, plain vitest, undone by Edit, tree clean after)
+
+| Mutant | Went red |
+|---|---|
+| the two `better-auth/adapters/drizzle` lines deleted (`generate.mjs`) | `boundaries.test.ts`: 1 of 9, "refuses drizzleAdapter" |
+| only `failed` counted as not passed (`auth-row.mjs`) | `auth-row.test.ts`: 13 of 101, the skipped, todo, pending and disabled cases |
+| `DISPATCH_BASE` not passed to `evaluate` (`aggregate.mjs`) | `aggregate.test.ts`: both based-dispatch cases |
+| `DB_AUTH: 'false'` in the `db` step (`ci.yml`) | `ci-workflow.test.ts`: the db step pin |
+| the describe (TLS mode) match dropped (`auth-row.mjs`) | `auth-row.test.ts`: 5 of 101. The two green cases are among them, since the title then counts twice; "one TLS mode only, run twice" itself stays passing |
+
+The first four were planted together, since each goes red in a different test file. Not reproduced: the container reds (RP's predicate and control, one-offs a and b); those stay qa-101's.
