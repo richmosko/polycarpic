@@ -7,6 +7,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const LIVE = 'every HTTP route of the instance is in AUTH_ROUTES and every entry is live, naming the path  [red if: a plugin or version adds a route unclassified, or the map keeps a dead entry]';
 
+const CONTROL = 'route policy control: a synthetic plugin (POLY-101)';
+const CONTROL_TITLES = [
+  'the predicate names both synthetic routes against AUTH_ROUTES, and nothing once both are listed  [red if: the predicate filters on isAction, or names nothing]',
+  'both synthetic routes answer 404 while unlisted, and each of the two refusals holds on its own  [red if: the hook lets an unlisted path through, or the handler passes a path no template matches]',
+];
+
 // `floor` is the least number of passed tests in the file. `required` names tests that must be among them, by exact title and
 // outermost describe, each exactly once.
 export const ROWS = {
@@ -14,10 +20,13 @@ export const ROWS = {
   db: [
     {
       file: 'tests/db/auth-route-policy.test.ts',
-      floor: 1,
-      required: ['real-domain', 'private-ca'].map((mode) => ({ describe: `route policy, ${mode} mode`, title: LIVE })),
+      floor: 26,
+      required: [
+        ...['real-domain', 'private-ca'].map((mode) => ({ describe: `route policy, ${mode} mode`, title: LIVE })),
+        ...CONTROL_TITLES.map((title) => ({ describe: CONTROL, title })),
+      ],
     },
-    { file: 'tests/db/auth-routing-pool.test.ts', floor: 1, required: [] },
+    { file: 'tests/db/auth-routing-pool.test.ts', floor: 19, required: [] },
   ],
 };
 
