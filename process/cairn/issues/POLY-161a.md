@@ -1,7 +1,7 @@
 ---
 id: POLY-161a
 title: Web server ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-161
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-161.md, process/cairn/reviews/POLY-161/**, pro
 stage: plan
 estimate.cost_usd: "12.00"
 estimate.gate_cycles: 2
-labels: []
+actual.cost_usd: "5.1101"
+actual.tokens: 8151604
+actual.gate_cycles: 3
+actual.wall_clock: 12
+ratio: "0.43"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-24
