@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, process/cairn/issues/POLY-160e.md, packages/db/**, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, layers.json, eslint.config.js]
+paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, process/cairn/issues/POLY-160e.md, packages/db/**, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, layers.json, eslint.config.js, apps/*/src/main.ts]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2

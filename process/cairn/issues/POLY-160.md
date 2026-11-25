@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-100]
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-160.md, process/cairn/issues/POLY-165.md, process/cairn/issues/POLY-104.md, process/cairn/reviews/POLY-160/**, infra/**, .github/workflows/**, Dockerfile, packages/db/**, packages/*/package.json, apps/*/package.json, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, .gitignore, process/STATE.md, process/DECISIONS.md]
+paths: [process/cairn/issues/POLY-160.md, process/cairn/issues/POLY-165.md, process/cairn/issues/POLY-104.md, process/cairn/reviews/POLY-160/**, infra/**, .github/workflows/**, Dockerfile, packages/db/**, packages/*/package.json, apps/*/package.json, tests/**, docs/INFRA/**, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, layers.json, eslint.config.js, scripts/layers/**, .gitleaksignore, .gitignore, process/STATE.md, process/DECISIONS.md, apps/*/src/**, apps/*/tests/**]
 labels: [ops, deploy, security]
 priority: null
 pr: null

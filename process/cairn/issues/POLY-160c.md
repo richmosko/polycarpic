@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-160
 blocked_by: []
 assignee: qa-engineer
-paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, process/cairn/issues/POLY-160c.md, tests/**, packages/db/src/**/*.test.ts, packages/db/tests/**, infra/ci/**, .github/workflows/**, package.json, pnpm-lock.yaml]
+paths: [process/cairn/issues/POLY-160.md, process/cairn/reviews/POLY-160/**, process/cairn/issues/POLY-160c.md, tests/**, packages/db/src/**/*.test.ts, packages/db/tests/**, infra/ci/**, .github/workflows/**, package.json, pnpm-lock.yaml, apps/*/tests/**, apps/*/src/**/*.test.ts]
 stage: execute
 estimate.cost_usd: "15.00"
 estimate.gate_cycles: 3
