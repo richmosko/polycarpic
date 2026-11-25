@@ -404,11 +404,22 @@ fi
 report H25 "compose version" "$h25" "sudo bash provision.sh --stage host ... installs and holds it; remove /root/.docker/cli-plugins by hand"
 
 # ------------------------------------------------------------------ H24 shared deploy directories (POLY-100 G1)
-h24=''
+h24='' rh_bad=''
 for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/deploy; do
   if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
   else [ "$(stat -c '%a %u' "$d")" = "755 0" ] || h24="$h24 $d is $(stat -c '%a %u' "$d") (want 755, owned by root);"; fi
 done
+# The render home (POLY-160 R7): absent is `/` (as the ops tool does); one that exists is used only as a real directory, owned by root, mode 0755 and empty.
+rh=/
+rd=/var/lib/polycarpic/state/deploy/render-home
+if [ -e "$rd" ] || [ -L "$rd" ]; then
+  if [ -L "$rd" ] || [ ! -d "$rd" ] || [ "$(stat -c '%u %a' "$rd")" != "0 755" ] || [ -n "$(ls -A "$rd")" ]; then
+    h24="$h24 $rd is a link, not a directory, not root 0755 or not empty (render-path);"
+    rh_bad=1
+  else
+    rh=$rd
+  fi
+fi
 report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... creates them; a link or a file in the way must be removed by hand"
 
 # ------------------------------------------------------------------ H9 service gids
@@ -552,17 +563,23 @@ done < <(getent passwd)
 report H15 "operator access" "$h15" "remove the extra account or its authorized_keys; the sudoers drop-in is written by cloud-init (infra/hetzner/cloud-init.yaml)"
 
 # ------------------------------------------------------------------ database checks
-dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null "$@"; }
+dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory "$rh" --env-file /dev/null "$@"; }
 running() { dc "$1" ps --status running --services < /dev/null 2> /dev/null | grep -qx postgres; }
 q() { local proj=$1; shift; dc "$proj" exec -T postgres psql -X -tA -U postgres -d polycarpic -c "$1" < /dev/null 2>&1; }
 up_prod=0 up_staging=0
-running prod && up_prod=1
-running staging && up_staging=1
+if [ -z "$rh_bad" ]; then
+  running prod && up_prod=1
+  running staging && up_staging=1
+fi
 
 # per_project <id> <what> <fix> <function> [projects...]: run the function for each running project.
 per_project() {
   local id=$1 what=$2 fix=$3 fn=$4; shift 4
   local probs='' waiting='' proj up out
+  if [ -n "$rh_bad" ]; then
+    fail "$id" "$what" "the render home is unusable (H24), so Postgres cannot be asked" "$fix"
+    return
+  fi
   for proj in "$@"; do
     up=$up_prod; [ "$proj" = staging ] && up=$up_staging
     if [ "$up" = 1 ]; then
@@ -604,7 +621,7 @@ d3_probe() { # svc mode -> PROBE_OUT, PROBE_RC. The password is read inside the 
   case "$svc" in
     web)
       local wid
-      wid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q web < /dev/null 2> /dev/null | head -1)
+      wid=$(docker compose -p polycarpic-prod --project-directory "$rh" --env-file /dev/null ps -q web < /dev/null 2> /dev/null | head -1)
       if [ -z "$wid" ]; then PROBE_OUT="no running web container of polycarpic-prod"; PROBE_RC=125; return; fi
       net="container:$wid" ;;
     backup) net=polycarpic-prod_backup-net ;;
@@ -625,7 +642,7 @@ if [ "$2" = replication ]; then psql "$1" -tAc IDENTIFY_SYSTEM; else psql "$1" -
 d3() {
   local out='' svc mode first pgid t0 t1
   # The probe runs the image the running postgres container uses: no default tag, nothing pulled.
-  pgid=$(docker compose -p polycarpic-prod --project-directory /var/lib/polycarpic/state/deploy/render-home --env-file /dev/null ps -q postgres < /dev/null 2> /dev/null | head -1)
+  pgid=$(docker compose -p polycarpic-prod --project-directory "$rh" --env-file /dev/null ps -q postgres < /dev/null 2> /dev/null | head -1)
   PROBE_IMAGE=$([ -n "$pgid" ] && docker inspect --format '{{.Config.Image}}' "$pgid" 2> /dev/null)
   if [ -z "$PROBE_IMAGE" ]; then echo " cannot read the image of the running postgres container;"; return; fi
   t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -652,7 +669,9 @@ d3() {
   printf '%s %s provision-check-d3 %s\n' "$t0" "$t1" "$([ -z "$out" ] && echo ok || echo failed)" >> "$STATE/jobs.log" 2> /dev/null || true
   echo "$out"
 }
-if [ "$up_prod" = 1 ]; then
+if [ -n "$rh_bad" ]; then
+  fail D3 "backup login reach" "the render home is unusable (H24), so Postgres cannot be asked" "fix H24 first"
+elif [ "$up_prod" = 1 ]; then
   per_project D3 "backup login reach" "compare pg_hba.conf and the compose networks with INFRA §2.2 and SECURITY C-79; db_password_backup belongs to the backup service only" d3 prod
 else
   wait_ D3 "backup login reach" "waits for Postgres of prod to run"

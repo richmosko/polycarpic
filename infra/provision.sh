@@ -34,6 +34,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" = 0 ] || die "run as root (sudo bash provision.sh ...)" 2
+unset CDPATH  # with it set, `cd` can resolve a relative path elsewhere, and this runs as root
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) || die "cannot resolve the directory of this script; nothing changed" 2
 cd / # G11: the caller's directory decides nothing
 
 # Service gids (F6, POLY-146). The same set the compose files mount secrets for.
@@ -159,7 +161,7 @@ install_docker() {
 # the downgrade and held flags for that one package; a version the repository does not list stops, and a newer one is never taken instead.
 install_compose() {
   local file want have cand
-  file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deploy/compose-version"
+  file="$here/deploy/compose-version"
   want=$(tr -d '[:space:]' < "$file" 2> /dev/null || true)
   [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "$file does not hold one version N.N.N; nothing installed"
   have=$(dpkg-query -W -f='${Version}' docker-compose-plugin 2> /dev/null || true)
@@ -323,8 +325,7 @@ ops_endpoint() {
 
 # The backup and uploader units are installed, not enabled: the first deploy enables the timers once images.env exists.
 install_units() {
-  local here src u reload=0
-  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  local src u reload=0
   src=$here/backup/systemd
   for u in polycarpic-backup.service polycarpic-backup.timer polycarpic-uploader.service polycarpic-uploader.timer; do
     [ -f "$src/$u" ] || die "$src/$u not found"
@@ -524,11 +525,24 @@ for pair in sys.argv[2:]:
 PY
 }
 
+# The project directory of every compose call of the database stage (POLY-160 R7). No render home yet: `/`, as the ops tool does; one that exists is used
+# only as a real directory (no link), owned by root, mode 0755 and empty; anything else is not used, and the stage stops with nothing changed.
+render_home() {
+  local d=$STATE/deploy/render-home
+  if [ ! -e "$d" ] && [ ! -L "$d" ]; then
+    echo /
+    return 0
+  fi
+  if [ -L "$d" ] || [ ! -d "$d" ] || [ "$(stat -c '%u %a' "$d")" != "0 755" ] || [ -n "$(ls -A "$d")" ]; then
+    return 1
+  fi
+  echo "$d"
+}
+
 stage_database() {
   case "$project" in prod | staging) ;; *) usage ;; esac
-  local root=$ETC/secrets pairs=() roles_sql here
+  local root=$ETC/secrets pairs=() roles_sql rh
   [ "$project" = staging ] && root=$ETC/staging-secrets
-  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   roles_sql=$here/roles.sql
   [ -f "$roles_sql" ] || roles_sql=$here/../packages/db/sql/roles.sql
   [ -f "$roles_sql" ] || die "roles.sql not found next to this script"
@@ -537,7 +551,8 @@ stage_database() {
   # poly_backup has a password only where the backup service exists (prod).
   [ "$project" = prod ] && pairs+=(poly_backup:backup/db_password_backup)
 
-  local dc=(docker compose -p "polycarpic-$project" --project-directory "$STATE/deploy/render-home" --env-file /dev/null)
+  rh=$(render_home) || die "render-path: $STATE/deploy/render-home is not a real directory owned by root, mode 0755 and empty; nothing changed"
+  local dc=(docker compose -p "polycarpic-$project" --project-directory "$rh" --env-file /dev/null)
   "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 
