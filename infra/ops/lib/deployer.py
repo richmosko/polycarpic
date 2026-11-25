@@ -179,7 +179,7 @@ def stand_down(project, ctx, keep_ref=None):
                 except (TimeoutError, OSError):
                     pass  # an image that cannot be read is stopped
                 try:
-                    ctx.run(["docker", "stop", "--time", "30", cid], timeout=STOP_CLIENT)
+                    ctx.run(["docker", "stop", "-t", "30", cid], timeout=STOP_CLIENT)
                 except (TimeoutError, OSError):
                     pass
             ok = ok and all(cid in kept for cid in _listing(ctx, cproject, svc))
