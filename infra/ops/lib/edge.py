@@ -77,7 +77,7 @@ def deploy(tag, ctx):
                 if run["work"]:
                     rel.remove_tree(run["work"])
         if run["stuck"] and not run["healthy"]:
-            return deployer.stuck_end("edge", ctx)
+            return deployer.stuck_end("edge", ctx, run)
         return code
     finally:
         os.close(fd)
@@ -186,6 +186,8 @@ def _unhealthy(ctx, digest, cur, run=None, reason="unhealthy", why=None):
 
 def _promote(ctx, rdir, digest, tag, commit, cur, run):
     deployer.commit("edge", ctx, cur, dict(digest=digest, tag=tag, commit=commit), run)
+    if run.get("rescued"):
+        return deployer.after_commit("edge", ctx)
     return 0 if deployer.settle("edge", ctx, rdir, digest) else 1
 
 

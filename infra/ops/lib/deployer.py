@@ -292,7 +292,7 @@ def recover(project, ctx, cur, run):
     if res is not True:
         stopped = stand_down(project, ctx, _keep_ref(project, ctx, cur))
         _stuck_records(project, ctx, res if isinstance(res, str) else "rollback-unhealthy", digest, stopped)
-        run["stuck"], run["stuck_digest"] = True, digest
+        run["stuck"], run["stuck_digest"], run["not_stopped"] = True, digest, not stopped
         return "stuck"
     if digest is None:
         err = Refusal("state")
@@ -370,13 +370,15 @@ def on_interrupt(project, ctx, run):
         pass
 
 
-def stuck_end(project, ctx):
-    """A run that started stuck and did not end healthy: `rollback-unhealthy` is its last alert and its last stderr line, so nothing hides it."""
+def stuck_end(project, ctx, run=None):
+    """A run that started stuck and did not end healthy: `rollback-unhealthy` is its last alert and its last stderr line, so nothing hides it;
+    a candidate that could not be shown stopped is `not-stopped`, which is worse and stays."""
+    name = "not-stopped" if run and run.get("not_stopped") else "rollback-unhealthy"
     try:
-        rel.alert(ctx, project, "rollback-unhealthy")
+        rel.alert(ctx, project, name)
     except Exception:
         pass
-    ctx.err("deploy: rollback-unhealthy")
+    ctx.err("deploy: " + name)
     return 1
 
 
@@ -439,6 +441,7 @@ def commit(project, ctx, cur, new, run):
         if named and named["digest"] == ptr["digest"]:
             run["committed"] = True
             run["healthy"] = True
+            run["rescued"] = True  # a save raised: the records are not trusted, the next run settles
             return ptr
         try:
             if old_prev:
@@ -505,7 +508,7 @@ def _deploy(project, ctx, first, existing_data):
             if run["work"]:
                 rel.remove_tree(run["work"])
     if run["stuck"] and not run["healthy"]:
-        return stuck_end(project, ctx)
+        return stuck_end(project, ctx, run)
     return code
 
 
@@ -969,6 +972,8 @@ def _edge_up(ctx, judged, digest):
 
 def _healthy(project, ctx, rdir, digest, tag, sha, cur, run):
     commit(project, ctx, cur, dict(digest=digest, tag=tag, commit=sha), run)
+    if run.get("rescued"):
+        return after_commit(project, ctx)
     return 0 if settle(project, ctx, rdir, digest) else 1
 
 
