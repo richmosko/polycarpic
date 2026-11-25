@@ -84,6 +84,22 @@ On a dead handle `getSetCookie()` equals exactly the clearing line, all attribut
 
 `tests/infra/web-stage.test.ts` pins `.dockerignore` as patterns: `**/.env*`, `**/.svelte-kit`, `apps/web/build`, `apps/web/tests` present, the root-only `.env*` absent, no `.env` re-include; five mutants. It is red at `176f89b1` because devops-161's fix (`15a0832a`) is not on the branch yet.
 
+## Delta gate at `35908f5b` (F1, F2, F6, D1a, B38, B39, Chromium in the db job on top of `4971dc28`)
+
+| Step | Result | Time |
+|---|---|---|
+| build; `eslint packages apps scripts/layers` | ok | 4 s; 2 s |
+| `vitest run tests/layers` | 568 passed | 21 s |
+| `turbo run typecheck` | 20 of 20 | 5 s |
+| `tests/ci` | 743 passed | 90 s |
+| `tests/infra` (includes the F2 pin: 6 more cases, green on `aca1ddc5`) | 663 passed, 3 skipped (existing) | 26 s |
+| web unit | 343 passed | 12 s |
+| `tests/db/web-server.test.ts` | 31 of 31 (F1 exact-one-cookie included) | 12 s |
+| image build; `image.sh check` | ok, exit 0 | |
+| T-real in the container, image built at this sha | 24 of 24 (`1-web-served` 7, including B38 and F1) | 301 s |
+
+Not re-run at this sha (nothing they cover changed since `4971dc28`): the full `tests/db` battery, e2e, `web-server-start.test.ts` (its Chromium case needs the browser the db job now installs: it passed locally at `4971dc28`; CI at the tip is its first run with the install).
+
 ## Not covered
 
 - B38 shown red (above). B35's "floors per side": the plugin writes one union, so a per-side floor needs a change in `bundle-packages.mjs` (devops); the test holds a total floor and the three plants.
