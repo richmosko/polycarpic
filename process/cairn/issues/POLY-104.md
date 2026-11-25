@@ -11,7 +11,7 @@ labels: [ops, verification]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -61,3 +61,7 @@ Correction to my comment above (2026-11-23): the rule "create the `app.` DNS rec
 ### @team-lead — 2026-11-23
 
 From POLY-100 (seceng advisory A19, `process/cairn/reviews/POLY-100/ruling-review.md`): the deploy's render step parses a release's compose files on the box that runs prod, as the unprivileged render user with no network, but with no memory cap. A cap was left out of POLY-100 because nobody has measured whether `docker compose config` runs correctly under one. Measure it on the first staging box (the render under a memory limit, on all three files), then add the cap with its test in the next ops loop. Until then a hostile or malformed release could exhaust memory during the render; it cannot read secrets or reach the network there.
+
+### @team-lead — 2026-11-24
+
+From the POLY-161 loop (2026-11-25, `process/cairn/reviews/POLY-161/verdict.md` @ 43ce99c0): Caddy in front of the real web server is unproven until this deploy. The end-to-end deploy test reaches web on 3000 inside the box and never through Caddy, so the first staging deploy is where the sign-in pages, the static files, the `no-store` and `nosniff` headers Caddy sets, the client address, and the allowlist with basic auth are first seen together. Not before this issue: POLY-160's pool error listener (a database restart takes web, auth and the worker down until compose restarts them). Prod is not opened to the internet before POLY-163.
