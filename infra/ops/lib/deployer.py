@@ -15,6 +15,7 @@ from lib.release import Refusal
 LOCK = "/run/polycarpic/deploy.lock"
 BACKUP_TIMEOUT = 65 * 60
 MIGRATE_TIMEOUT = 30 * 60
+CHECK_CONFIG_TIMEOUT = 120
 DATA = "/srv/polycarpic"
 EDGE_ENV = "/etc/polycarpic/edge.env"
 STALE = 3600
@@ -48,7 +49,7 @@ def locked(project, ctx, first, wait=0, existing_data=False):
         if first:
             ctx.err("deploy: the deploy lock was not got in %d minutes" % (wait // 60))
             return 4
-        rel.log(ctx, project, "busy")
+        _note(ctx, project, "busy")
         return 0
     try:
         try:
@@ -101,7 +102,11 @@ def mark_transient(ctx, project):
 
 
 def clear_transient(ctx, project):
-    _unlink(ctx, project, "transient-since")
+    """Never raises (R4.2): a file that cannot be removed is one stderr line, and the run goes on."""
+    try:
+        _unlink(ctx, project, "transient-since")
+    except Exception:
+        ctx.err("deploy: could not clear transient-since")
 
 
 # ---- F2, R1: an interrupted run (power loss, systemd's kill, Ctrl-C) is found by `in-progress`, which is kept by default
@@ -453,7 +458,10 @@ def _note(ctx, project, *fields):
     try:
         rel.log(ctx, project, *fields)
     except Exception:
-        pass
+        try:
+            ctx.err("deploy: could not write a log line")
+        except Exception:
+            pass
 
 
 def _internal(project, ctx, err, digest, run):
@@ -510,7 +518,7 @@ def _handled(project, ctx, first, existing_data, seen, run):
         except Exception as err:
             return _internal(project, ctx, err, seen["digest"], run)
     except rel.Transient as err:
-        rel.log(ctx, project, "transient", str(err))
+        _note(ctx, project, "transient", str(err))
         mark_transient(ctx, project)
         if first:  # F7: a foreground first deploy says why it did nothing
             ctx.err("deploy: transient: %s" % err)
@@ -520,7 +528,7 @@ def _handled(project, ctx, first, existing_data, seen, run):
         if run["committed"]:
             return after_commit(project, ctx)
         if run["up"]:  # G2: a refusal after the first `up` is not a clean refusal: the old release comes back first
-            return _rollback_auto(project, ctx, seen["digest"], run["cur"], run["owns"], run["probe"], reason=err.name if err.quarantine else None, why=err.name, run=run)
+            return _rollback_auto(project, ctx, seen["digest"], run["cur"], run["owns"], run["probe"], reason=err.name if err.quarantine else "held-" + err.name, why=err.name, run=run)
         return refuse(project, ctx, err, seen["digest"])
     except _Stop as stop:
         return stop.code
@@ -756,14 +764,17 @@ def _remove_oneoff(ctx, name):
         raise Refusal("oneoff-stuck", True)
 
 
-def _oneoff(ctx, project, judged, svc, command, timeout=600):
-    """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released."""
+def _oneoff(ctx, project, judged, svc, command, timeout=600, timeout_refusal=None):
+    """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released. A client timeout
+    is the refusal `timeout_refusal` when one is named (no quarantine), else the answer 124 as before."""
     name = stack.oneoff_name(project, svc)
     _remove_oneoff(ctx, name)  # a stale one that will not go: a later run refuses while it exists
     try:
         return ctx.run(stack.run_argv(judged, project, svc, command), timeout=timeout)
     except TimeoutError:
         _remove_oneoff(ctx, name)
+        if timeout_refusal:
+            raise Refusal(timeout_refusal)
         return 124, "", "timeout"
 
 
@@ -874,7 +885,7 @@ def _premigration(project, ctx):
 
 def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, run):
     for svc in stack.APP_SERVICES:
-        code, _, _ = _oneoff(ctx, project, judged[project], svc, [svc, "check-config"])
+        code, _, _ = _oneoff(ctx, project, judged[project], svc, [svc, "check-config"], timeout=CHECK_CONFIG_TIMEOUT, timeout_refusal="check-config-timeout")
         if code != 0:
             raise Refusal("check-config", True)
     code, out, err = _oneoff(ctx, project, judged[project], "migrate", ["migrate", "--plan"])

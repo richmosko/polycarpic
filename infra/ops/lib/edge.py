@@ -103,7 +103,7 @@ def _handled(tag, ctx, seen, run):
                 return 1
             return _unhealthy(ctx, seen["digest"], run["cur"], run, why="internal")
     except rel.Transient as err:
-        rel.log(ctx, "edge", "transient", str(err))
+        deployer._note(ctx, "edge", "transient", str(err))
         deployer.mark_transient(ctx, "edge")
         ctx.err("edge-deploy: transient: %s" % err)  # F7: a foreground command says why it did nothing
         return 1
@@ -111,7 +111,7 @@ def _handled(tag, ctx, seen, run):
         if run["committed"]:
             return deployer.after_commit("edge", ctx)
         if run["up"]:  # G2: a refusal after the first `up` restores first
-            return _unhealthy(ctx, seen["digest"], run["cur"], run, reason=err.name if err.quarantine else None, why=err.name)
+            return _unhealthy(ctx, seen["digest"], run["cur"], run, reason=err.name if err.quarantine else "held-" + err.name, why=err.name)
         return deployer.refuse("edge", ctx, err, seen["digest"])
     except deployer._Stop as stop:
         return stop.code
@@ -238,7 +238,7 @@ def rollback(ctx):
         code = deployer.recovered_first("edge", ctx, cur)
         if code is not None:
             return code
-        if not cur or not prev:
+        if not cur or not prev or prev["digest"] == cur["digest"]:
             ctx.err("rollback: there is no previous edge release")
             return 4
         try:  # G2: restore first, then the records
@@ -264,7 +264,11 @@ def rollback(ctx):
             rel.save_pointer(ctx, "edge", "previous", cur)
             deployer.link_current(ctx, "edge", rel.release_dir(ctx, prev["digest"]))
         except Exception:
-            ctx.err("rollback: the previous release is up but the pointers could not be written")
+            try:
+                rel.alert(ctx, "edge", "rollback-pointers")
+            except Exception:
+                pass
+            ctx.err("rollback: the previous release is up but the pointers could not be written; free space and run rollback again")
             return 1
         deployer._note(ctx, "edge", "rolled-back", cur["digest"])
         try:
