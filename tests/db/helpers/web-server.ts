@@ -1,8 +1,8 @@
 // POLY-161c: the real artefact under test: `apps/web/src/main.ts` spawned against Postgres, serving the built app (`apps/web/build`) on 3000.
 // A missing build FAILS here, with its own message; it never skips (verdict B31). Port 3000 is fixed in the product, so a suite that
 // starts this server runs where 3000 is free (one file, one server).
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, readlinkSync } from 'node:fs';
 import { request } from 'node:http';
 import net from 'node:net';
 import { join } from 'node:path';
@@ -24,13 +24,57 @@ export interface Web {
   lines: () => Array<Record<string, any>>;
   exited: Promise<number | null>;
   db: string;
+  proxy: DbProxy | undefined;
+  statusPort: number;
   stop: () => Promise<void>;
 }
 
 export const port3000Free = () => new Promise<boolean>((res) => { const s = net.createServer().once('error', () => res(false)).listen(3000, '0.0.0.0', () => s.close(() => res(true))); });
 export const freePort = () => new Promise<number>((res, rej) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => res(p)); }); s.on('error', rej); });
 
+/** A TCP forwarder in front of Postgres: `kill()` makes the database unreachable for a running web (existing sockets destroyed, new ones refused). */
+export interface DbProxy { port: number; kill: () => Promise<void> }
+export async function startProxy(host: string, port: number): Promise<DbProxy> {
+  const socks = new Set<net.Socket>();
+  const server = net.createServer((c) => {
+    const up = net.connect(port, host);
+    for (const s of [c, up]) { socks.add(s); s.on('close', () => socks.delete(s)); s.on('error', () => s.destroy()); }
+    c.pipe(up); up.pipe(c);
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  return {
+    port: (server.address() as net.AddressInfo).port,
+    kill: async () => { for (const s of socks) s.destroy(); await new Promise<void>((r) => server.close(() => r())); },
+  };
+}
+
+/** The TCP LISTEN sockets of one process as `addr:port`, from /proc where it exists, else lsof. Throws when neither works. */
+export function listeners(pid: number): string[] {
+  const proc = `/proc/${pid}/net/tcp`;
+  if (existsSync(proc)) {
+    const inodes = new Set<string>();
+    for (const f of readdirSync(`/proc/${pid}/fd`)) { try { const l = readlinkSync(`/proc/${pid}/fd/${f}`); const m = /^socket:\[(\d+)\]$/.exec(l); if (m) inodes.add(m[1]!); } catch { /* gone */ } }
+    const out: string[] = [];
+    for (const file of [proc, `/proc/${pid}/net/tcp6`]) {
+      if (!existsSync(file)) continue;
+      for (const line of readFileSync(file, 'utf8').split('\n').slice(1)) {
+        const c = line.trim().split(/\s+/);
+        if (c.length < 10 || c[3] !== '0A' || !inodes.has(c[9]!)) continue;
+        const [a, p] = c[1]!.split(':');
+        const ip = a!.length === 8 ? a!.match(/../g)!.reverse().map((h) => parseInt(h, 16)).join('.') : `v6:${a}`;
+        out.push(`${ip}:${parseInt(p!, 16)}`);
+      }
+    }
+    return out.sort();
+  }
+  const r = spawnSync('lsof', ['-nP', '-a', '-p', String(pid), '-iTCP', '-sTCP:LISTEN', '-Fn'], { encoding: 'utf8' });
+  if (r.status !== 0 && r.stdout === '') throw new Error(`no /proc and lsof failed: ${r.stderr}`);
+  return r.stdout.split('\n').filter((l) => l.startsWith('n')).map((l) => l.slice(1).replace(/^\*:/, '0.0.0.0:')).sort();
+}
+
 export interface StartOpts {
+  /** Put a killable forwarder between web and Postgres; `web.proxy` is it. */
+  proxy?: boolean;
   /** Extra or overriding environment. */
   env?: Record<string, string>;
   /** `--import` preloads. */
@@ -47,7 +91,10 @@ export async function startWeb(o: StartOpts = {}): Promise<Web> {
   if (!(await port3000Free())) throw new Error('port 3000 is not free: another process holds it (the suite needs the fixed port)');
   const db = o.db ?? cloneMigrated();
   const statusPort = await freePort();
-  const env = { PATH: process.env.PATH!, ...dbEnv('poly_app', db), APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: ORIGIN, STATUS_PORT: String(statusPort), ...o.env };
+  const dbe = dbEnv('poly_app', db);
+  const proxy = o.proxy ? await startProxy(dbe.DATABASE_HOST!, Number(dbe.DATABASE_PORT)) : undefined;
+  if (proxy) { dbe.DATABASE_HOST = '127.0.0.1'; dbe.DATABASE_PORT = String(proxy.port); }
+  const env = { PATH: process.env.PATH!, ...dbe, APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: ORIGIN, STATUS_PORT: String(statusPort), ...o.env };
   const args = ['--experimental-strip-types', ...(o.preload ?? []).flatMap((p) => ['--import', p]), join(ROOT, 'apps/web/src/main.ts')];
   const proc = spawn('node', args, { env, cwd: ROOT });
   let out = '';
@@ -56,8 +103,8 @@ export async function startWeb(o: StartOpts = {}): Promise<Web> {
   const lines = () => out.split('\n').filter((l) => l.startsWith('{')).flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
   const exited = new Promise<number | null>((r) => proc.once('exit', (c) => r(c)));
   const web: Web = {
-    proc, out: () => out, lines, exited, db,
-    stop: async () => { if (proc.exitCode === null && proc.signalCode === null) { proc.kill('SIGKILL'); await exited; } },
+    proc, out: () => out, lines, exited, db, proxy, statusPort,
+    stop: async () => { if (proc.exitCode === null && proc.signalCode === null) { proc.kill('SIGKILL'); await exited; } await proxy?.kill().catch(() => {}); },
   };
   const until = o.until === undefined ? 'web.started' : o.until;
   const limit = o.timeoutMs ?? 60_000;
@@ -69,7 +116,7 @@ export async function startWeb(o: StartOpts = {}): Promise<Web> {
   return web;
 }
 
-export interface Reply { status: number; headers: Record<string, string | string[] | undefined>; body: string; raw: Buffer }
+export interface Reply { status: number; headers: Record<string, string | string[] | undefined>; rawHeaders: string[]; body: string; raw: Buffer }
 /** One request to 127.0.0.1:3000 through node:http, so Host can be set. */
 export function ask(path: string, o: { method?: string; host?: string | null; headers?: Record<string, string>; body?: string | Buffer; port?: number } = {}): Promise<Reply> {
   return new Promise((resolve, reject) => {
@@ -77,7 +124,7 @@ export function ask(path: string, o: { method?: string; host?: string | null; he
     const r = request({ host: '127.0.0.1', port: o.port ?? 3000, path, method: o.method ?? 'GET', headers, setHost: false }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (d) => chunks.push(Buffer.from(d)));
-      res.on('end', () => { const raw = Buffer.concat(chunks); resolve({ status: res.statusCode ?? 0, headers: res.headers, body: raw.toString('utf8'), raw }); });
+      res.on('end', () => { const raw = Buffer.concat(chunks); resolve({ status: res.statusCode ?? 0, headers: res.headers, rawHeaders: res.rawHeaders, body: raw.toString('utf8'), raw }); });
     });
     r.on('error', reject);
     if (o.body !== undefined) r.write(o.body);
