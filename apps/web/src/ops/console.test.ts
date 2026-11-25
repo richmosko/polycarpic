@@ -42,7 +42,7 @@ describe('guardConsole: every output method', () => {
   it.each(METHODS)('console.%s with a canary string and a canary object prints nothing of it  [red if: this method is not replaced]', (m) => {
     const body = `
       const o = { k: ${JSON.stringify(CANARY)} };
-      try { console.${m}(${JSON.stringify(CANARY)}, o); console.${m}(${JSON.stringify(CANARY)}); console.${m}(false, ${JSON.stringify(CANARY)}); console.${m}([{ k: ${JSON.stringify(CANARY)} }]); } catch {}
+      for (const args of [[${JSON.stringify(CANARY)}, o], [${JSON.stringify(CANARY)}], [false, ${JSON.stringify(CANARY)}], [[{ k: ${JSON.stringify(CANARY)} }]]]) { try { console.${m}(...args); } catch {} }
     `;
     const guarded = child(body, true);
     expect(guarded.stdout + guarded.stderr).not.toContain(CANARY);
@@ -51,7 +51,7 @@ describe('guardConsole: every output method', () => {
 
   it('un-guarded control: the same calls DO print the canary  [red if: the child prints nothing for any reason]', () => {
     for (const m of ['log', 'error', 'warn', 'info', 'debug', 'dir', 'table']) {
-      const r = child(`console.${m}(${JSON.stringify(CANARY)}, { k: ${JSON.stringify(CANARY)} }); console.${m}([{ k: ${JSON.stringify(CANARY)} }]);`, false);
+      const r = child(`try { console.${m}(${JSON.stringify(CANARY)}, { k: ${JSON.stringify(CANARY)} }); } catch {} try { console.${m}([{ k: ${JSON.stringify(CANARY)} }]); } catch {}`, false);
       expect(r.stdout + r.stderr, m).toContain(CANARY);
     }
   });
