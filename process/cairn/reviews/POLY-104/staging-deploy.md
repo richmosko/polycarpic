@@ -78,7 +78,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 F18, the cause: the capability was **measured** on the released image (caddy `sha256:36dff3bb…`); that it is what the kernel refused follows from capabilities(7), and qa reproduced the same error before the fix with a local build of the unfixed Dockerfile, started by a real `compose up` of `edge.yml`'s settings (`red-run.md`). `edge-deploy` takes `edge.yml` and the Caddy image from the tag's release, not from the operator tool. The edge quarantine is per digest, so nothing needs clearing: a rebuilt Caddy gives a new digest.
 | F19 | after 13 | `restart --staging caddy` is refused with `restart: unknown service caddy; available: auth, caddy, postgres, web, worker`: the message lists the service it refuses. The refusal itself is right (staging has no Caddy). The list is built from every long-running service, not from those the project allows. | measured; cause from code | open (wording) |
-| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | sent to seceng |
+| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | seceng: Medium, with a control (`security-review.md`, "Core dumps go to apport"); does not gate PR 1, required before prod; not built |
 
 ## Security review of the F11 fix (seceng)
 
@@ -170,7 +170,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-98 9 | `jobs.log` under the real backup and uploader | Prod |
 | POLY-98 10 | CI `provision` job time at the PR head | PR 1's CI run (not a box measurement) |
 | POLY-99 | spool ACLs on real LUKS ext4 | Done, by use (box measurements, 8) |
-| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20), with seceng |
+| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20; seceng's control before prod) |
 | POLY-99 | backup and uploader units under real systemd | Prod (installed, not enabled) |
 | POLY-99 | `docker compose run`'s timeout and `rm -f` | **Not run** |
 | POLY-99 | `secrets/host/` and the ownership of `jobs.log` and `last-upload` | Done as far as `provision-check` reads them; the move from the old path does not occur on a new box |
