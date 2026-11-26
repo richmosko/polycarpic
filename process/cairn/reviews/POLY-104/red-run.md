@@ -152,6 +152,18 @@ Two defects on the test side, found here:
 
 Box suite: 252 run, 252 passed. CI's `shellcheck -x` command: exit 0. `vitest.config.ts`: 687 passed, 3 skipped.
 
+## F18: Caddy cannot exec under `edge.yml`'s settings (ruling: seceng-104, fix A)
+
+`tests/infra/image/caddy-compose-edge.test.ts` (+ `file-caps.py`): a real `docker compose up` of `infra/compose/edge.yml`. The override changes only the two data directories (named volumes, `10010:10010` 0700, `nocopy`), the secret file's host path (`0:10010` 0440), the two network names and the host side of the ports. A test reads the running container's user, read-only root, `CapDrop`, `SecurityOpt` and tmpfs back against the file. The capability check reads `docker export` (merged filesystem) of the Caddy, Postgres and app images; its control finds `usr/bin/caddy` in the official Caddy base image.
+
+**Red on today's images:** 9 run, 5 passed, 4 failed. The container loops on `exec /usr/bin/caddy: operation not permitted`, the box's error: `starts and stays up`, `answers on 8443`, `keeps its certificate authority in /data`, and `caddy: none` fail. Passing today: both controls, the settings read-back, and the `postgres` and app scans (regression guards). The tools image, not named by the ruling, was scanned once by hand: none; no test.
+
+**With fix A applied locally** (`XCADDY_SETCAP=0` on the `xcaddy build` line, then reverted, not committed): 9 of 9 pass. So `XCADDY_SETCAP=0` removes the attribute in the pinned builder, and no further edge defect showed behind F18 in this setup.
+
+**Not exercised:** ports 80 and 443 on a real address (`POLY_BIND_ADDR`, `userland-proxy: false`), certificates from a real CA (`POLY_TLS` as an e-mail; here `internal`), the box's real `POLY_STAGING_ALLOW`, live upstreams (502 stands in), the compose healthcheck's own schedule (its command is run by hand), and an `edge-deploy` through the ops tool. Run on a Mac only (Compose 5.7.0, CI pins 5.7.1): the volumes carry real Linux ownership there, the secret file's does not.
+
+**CI:** the existing `image` job (`vitest.image.config.ts` already takes `tests/infra/image/*.test.ts`; changes to `infra/caddy` or `infra/compose` turn it on). Locally the file takes 57 s with the Caddy, Postgres and app image layers cached (a Caddy compile from cold adds about 40 s). The job builds all three before its container tests, so I estimate 30 to 60 s added (unmeasured on the runner).
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
