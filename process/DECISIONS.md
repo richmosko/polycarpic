@@ -1067,3 +1067,22 @@ Add new decisions ABOVE this comment, newest first.
 - Detect "BetterAuth changed" by parsing manifests (misses transitive packages; path matching does not).
 - Leave F1 to F3 as follow-ups (three small tests; cheaper now than a second loop).
 **Approved by:** team-lead, under the Principal's delegation of 2026-11-25; open to reversal.
+
+### 2026-11-26 — POLY-104: first staging box; decisions taken on the real deploy
+**Decision:** The Principal delegated POLY-104 on 2026-11-25 ("approved to go with your rec's. drive to completion and merge"); every item here is open to reversal. Records: `process/cairn/reviews/POLY-104/` (`staging-deploy.md`, `red-run.md`, `security-review.md`).
+- **Host key accepted as first seen, staging box only.** The runbook's console comparison could not be done (no boot-log scrollback), and the alternative offered needed a root password reset. Reach: an attacker already on the network path at the first connection could have stood in for the box. A working method is required before the prod box (OQ-INFRA-12, POLY-165).
+- **Staging is IPv4-only, with no AAAA record.** The code binds one IPv4 address; an AAAA would break Let's Encrypt HTTP-01 and IPv6 clients. The acceptance line reads "22, 80, 443 on IPv4; 22 only on IPv6". IPv6 service needs its own ruling (OQ-INFRA-13).
+- **Caddy ships from a signed `edge-<n>` tag, not from a first prod release.** Prod is not due before v1.0 and staging cannot be served without Caddy.
+- **The release-signing key is separate, passphrase-protected and never loaded in the agent.** The Principal signs each tag by hand, so no session on the machine can sign a release.
+- **`credential_keyring` on staging is a hand-made random placeholder.** The runbook's `init-keyring` was never built; staging never reads the file. The real command must exist before prod.
+- **`gh` is installed from the release tarball with pinned sha256 values for the tarball and the binary** (seceng ruling). An apt repository would let whoever holds its signing key put any version on the box as root.
+- **Caddy is built with no file capability** (seceng ruling), instead of adding NET_BIND_SERVICE back in `edge.yml`. The hardening stays as strict; the guard still accepts no capability on the one internet-facing service.
+- **Two PRs for one issue.** The edge is released only from `main`, so the Caddy fix has to merge before the front door can be deployed and scanned. PR 1 carries the fixes and leaves the issue open; PR 2 carries the box record after `edge-2` and closes it.
+- **Fixed in this loop rather than deferred:** the drill's fail-open check, install.sh's exit code and checkout, staging secret groups, the symlink refusals, provision-check's staging database row.
+- **Not done here:** CI's deploy test still builds its own secrets layout and fakes `gh`, so the box ran the first real attestation check; the public CAA answer is wider than the pinned set while Cloudflare's Universal SSL is on (OQ-INFRA-14).
+**Alternatives considered:**
+- Rebuild the box to redo the host-key check (cost: a second provisioning run for a staging box holding no real data).
+- Give staging an AAAA and bind IPv6 now (a design change with its own guard and firewall rules).
+- `cap_add: [NET_BIND_SERVICE]` (loosens the policy for every later edge release).
+- Hold everything for a single PR (impossible: the fix cannot reach the box from a branch).
+**Approved by:** the Principal for the host-key acceptance ("accept it", 2026-11-25); team-lead for the rest, under the Principal's delegation of 2026-11-25; open to reversal.
