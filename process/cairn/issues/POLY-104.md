@@ -1,7 +1,7 @@
 ---
 id: POLY-104
 title: First staging deploy
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
@@ -9,19 +9,19 @@ assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/**, docs/SECURITY/**, docs/ARCH/**, infra/**, tests/infra/**, process/cairn/issues/POLY-104.md]
 labels: [ops, verification]
 priority: null
-pr: https://github.com/richmosko/polycarpic/pull/159
+pr: https://github.com/richmosko/polycarpic/pull/160
 created: 2026-11-08
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
 
 ## Acceptance criteria
 
-- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26).
-- [ ] provision-check passes.
-- [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer.
-- [ ] The review file lists every doc correction, and INFRA v1.2 lands them.
+- [x] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26). — process/cairn/reviews/POLY-104/staging-deploy.md: "`edge-2` on the box" (staging `healthy` at 47fb1fbc, `status` GREEN; full TCP scans: IPv4 from the home network and from hel1, IPv6 from hel1 with controls before and after)
+- [x] provision-check passes. — process/cairn/reviews/POLY-104/staging-deploy.md: "Box results" and "`edge-2` on the box" (exit 3, no FAIL, `HOST CHECKS PASSED; 6 checks wait for the first deploy`: the staging-only result; the six are prod's)
+- [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer. — OQ-INFRA-7 answered (process/cairn/reviews/POLY-104/staging-deploy.md: "Open questions"); OQ-INFRA-8 answered for §7.1 steps 1–13 and 15 on staging, the rest deferred to POLY-164, POLY-105, POLY-116, POLY-120, POLY-121 and POLY-165 as INFRA names them; OQ-INFRA-9 deferred to POLY-164 (staging has no heartbeat)
+- [x] The review file lists every doc correction, and INFRA v1.2 lands them. — process/cairn/reviews/POLY-104/staging-deploy.md: "Doc corrections (INFRA)" and "Wording to fix"; landed in docs/INFRA/index.html (1.3.47)
 
 ## Comments
 
@@ -81,3 +81,11 @@ Acceptance line 1 amended (architect condition C1, lead decision F7 under the Pr
 ### @team-lead — 2026-11-25
 
 PR 1 of 2: https://github.com/richmosko/polycarpic/pull/159. CI green on e3d32c98 (deploy-real 684 s with the changed fake gh, image 713 s of 1200, provision 229 s, lint 223 s; architect condition C2 met). Merging PR 1; the issue stays in-progress for edge-2, the outside scans and PR 2.
+
+### @team-lead — 2026-11-26
+
+PR 2 opened: https://github.com/richmosko/polycarpic/pull/160. It carries the record from `edge-2` on and closes the issue. Awaiting CI.
+
+### @team-lead — 2026-11-26
+
+Validate passed (qa-104 green at 0654e4fa; architect APPROVE, C1 to C5 met; seceng: nothing found on `edge-2` blocks prod); merging via PR #160. Closing. One criterion closes part-deferred (OQ-INFRA-8 for the staging steps only, OQ-INFRA-9 not measured); carriers: POLY-164, POLY-165, POLY-105, POLY-116, POLY-120, POLY-121.

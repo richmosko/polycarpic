@@ -26,6 +26,21 @@ The part of POLY-160 that gates prod and real data, not staging. Split out by th
 - [ ] The weekly re-scan of the published image reads the bundle's package list; bits-ui becomes a dev dependency so `svelte` leaves the runtime install.
 - [ ] The lesser findings: H7, H10, one-off containers "gone" by listing, the deploy test's rollback lower bound, the CI sweep's absent-input case.
 - [ ] `self-update` installs the ops bundle from the attested release, or gets its own issue with the reason; the provision CI time is re-measured.
+- [ ] **From POLY-104, before the first prod deploy** (each described in `process/cairn/reviews/POLY-104/staging-deploy.md` under its F number, and in `security-review.md` → "Must be true before a prod box"):
+  - [ ] F1: the box's SSH host key is verified out-of-band or the box is rebuilt, a method for a new server exists (OQ-INFRA-12), and the key is pinned under the host name too. The Principal decides which.
+  - [ ] F7: prod is IPv4-only or gets IPv6 on the web ports (OQ-INFRA-13), the Principal's decision; the Hetzner firewall's IPv6 80/443 rules follow it; UDP is scanned from outside.
+  - [ ] F13: `init-keyring`, `keyring-fingerprint` and `restore-keyring` are built; the staging placeholder is replaced.
+  - [ ] F14: the public CAA answer equals the pinned set and `dns-check.py` compares the public answer (OQ-INFRA-14).
+  - [ ] F16: a real `gh attestation verify` runs outside the box with the C-83 negative cases, at every gh pin bump; F15: CI's floating `gh` is pinned or accepted with a reason.
+  - [ ] F11, F16–F18: tests may fake a third party, never our own outputs. `deploy-real` takes the secrets layout from `provision.sh` (shared `infra/provision-lib.sh`), and `tests/infra/` carries a stand-in register: each fake, what it replaces, where the real one runs.
+  - [ ] F12: a missing mounted secret is refused before `check-config`, naming the file, with no quarantine.
+  - [ ] F22: the maintenance page and `polycarpic-ops lockdown` are built, or INFRA §8.11's hand commands are run once and recorded.
+  - [ ] F25b: every `main` build recreates Postgres at deploy, prod included. The Principal decides: keep the digest when its inputs are unchanged, or accept and state it in INFRA §4.6.
+  - [ ] F17: where the first-run backup measurements run is decided by the Principal. POLY-105 gates POLY-106, which gates the first prod deploy, yet only prod has a backup service: staging gets one for the measurement, or the order becomes prod deploy, POLY-105, then real household data.
+  - [ ] Recovery for a lost release-signing key is decided (a second enrolled key, or a recorded re-enrolment step).
+- [ ] **From POLY-104, not gating prod:** F21 (a command that applies a changed staging allow address to a running Caddy, and a provision-check drift row); F23 (`servers { protocols h1 h2 }` with the next `edge-<n>`); F24 (upstream failures leave no Caddy log line: decide with monitoring, POLY-103); F25a (start guards wait a bounded time for an unreachable database and log it apart from schema-behind); F19 (`restart --staging caddy` wording); F11 S2/S3; provisioning installs or checks `git`; the A19 render memory cap and its test; `set-secret github_read_token`'s closing message.
+- [ ] **From POLY-104, INFRA §8's commands:** each is run once on staging or marked prod-only: `rollback`, a renamed secret (9d), `docker compose run`'s timeout and `rm -f`, and `lockdown` once F22 builds it. The prod-only ones are run under POLY-164.
+- [ ] **From POLY-104, measurements not taken on the box:** a renamed secret as the container sees it (9d); the planted DNS record against `dns-check.py`; the address `auth` records for a session (M12); `docker compose run`'s timeout and `rm -f`; certificate renewal; Caddy across a reboot while running; the "Prod" and "Not run" rows of the record's inherited-measurements table.
 
 ## Comments
 
