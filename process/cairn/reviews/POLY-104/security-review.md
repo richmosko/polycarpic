@@ -32,6 +32,24 @@ Reviewer: seceng-104. Branch `feature/poly-104-first-staging-deploy` at `0fa0873
 | The public CAA answer is wider than the pinned set (F14, OQ-INFRA-14) | open | Not accepted. While Universal SSL is on, Cloudflare's issuers and an `issuewild` mean CAA does not narrow issuance. This is part of R-27's defence (a sibling certificate plants a cookie). C-90 now states it is not in force. | **Before prod:** the public answer equals the pinned set (Universal SSL off; the records are DNS-only), and `dns-check.py` compares the public answer from two resolvers. |
 | CI never runs a real `gh attestation verify` (F16) | open | Not accepted as standing. A wrong verify that refuses is safe; one that passes when it should not, like CVE-2025-25204 (exit 0 with no match), would be seen nowhere before the box. | **Before prod:** a check outside the box runs the pinned gh against a real attested digest, plus the negative cases C-83 lists (another workflow, another repo, a branch other than `main`, another commit: each refused). The same check runs at every gh pin bump. |
 
+## Core dumps go to apport (measured on the box)
+
+`/proc/sys/kernel/core_pattern` is `|/usr/share/apport/apport … -- %E`. The four staging containers have core size soft 0 / hard 0, and `/var/crash` is empty.
+
+The limits are not the control. core(5) says a piped pattern is not bound by a core limit of 0 (read, not measured). So a crash in `web`, `auth`, `worker` or `postgres` hands that process's memory to apport, running as root on the host. That memory can hold session tokens, database passwords, keyring keys and, on prod, ledger rows.
+
+Whether apport then writes it to `/var/crash` for a process in a container is unmeasured. apport also has a record of root-level bugs in handling crashes from other namespaces.
+
+**Severity: Medium.** The memory can hold secrets and data, it would land on the root disk outside the encrypted data volume, and root parses input from a crashing container.
+
+**Control.**
+- `provision --stage host` purges the `apport` package (its service rewrites `core_pattern` at boot).
+- It writes `/etc/sysctl.d/50-polycarpic-core.conf` with `kernel.core_pattern=|/bin/false` and `fs.suid_dumpable=0`, then applies it.
+- **provision-check** gets a new row that FAILs unless `/proc/sys/kernel/core_pattern` reads exactly `|/bin/false`, `fs.suid_dumpable` is 0, and no `apport` package is installed. It reads the live `/proc` value, not the file.
+- The row must be shown red on today's box value.
+
+**Gate.** It does not gate PR 1: staging holds fake data and staging secrets only, nothing has crashed, and prod is not on this box. It is on the before-prod list (item 9). It is cheap, so it should land with PR 2 or the first follow-up.
+
 ## Must be true before a prod box
 
 1. The host key is verified out-of-band, or the box is rebuilt with a verified one, by a method that puts no private key where containers can read it (F1, C-71).
@@ -42,6 +60,7 @@ Reviewer: seceng-104. Branch `feature/poly-104-first-staging-deploy` at `0fa0873
 6. The outside scans in PR 2 show exactly 22, 80 and 443 on IPv4, and 22 only on IPv6 (C-70, F7). There is an IPv6 decision for prod (OQ-INFRA-13).
 7. Recovery for a lost release key is decided.
 8. CI's floating gh in `build.yml` and `release-lookup.sh` is pinned or accepted with a reason. It decides nothing on the box, but release.yml's mirror check uses it.
+9. No core dump leaves a crashing process: apport is purged, `kernel.core_pattern=|/bin/false`, `fs.suid_dumpable=0`, and the provision-check row passes on the box.
 
 ## SECURITY doc edits (1.21.4)
 
