@@ -25,7 +25,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.3.46</span>
+    <span><strong>Version:</strong> 1.3.47</span>
     <span><strong>Last updated:</strong> 2026-11-25</span>
   </div>
 </header>
@@ -608,8 +608,8 @@ laptop$ git tag -v v1.0.0     # from v1.0; before then use main</code></pre>
       <p class="expect">Expect: without <code>--type</code> it prints the 4 vCPU / 8 GB shared x86 plans and exits 2 (Hetzner renames its plans, §2.1); pick one and run it again. It refuses to run while <code>HCLOUD_TOKEN</code> is set: use the context of step 5. It prints <code>IPv4: &lt;address&gt;</code> and <code>IPv6: &lt;prefix&gt;::1 (network &lt;prefix&gt;/64)</code>: Hetzner reports the /64 network, and the server's own address is <code>&lt;prefix&gt;::1</code>, which is the one every <code>--ipv6</code> and AAAA record below uses. The server gets one firewall with three rules; each rule lists IPv4 and IPv6 sources together, so three rules cover both families. It ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, use <code>nbg1</code> (Nuremberg): same country, same prices, and the backup bucket is unaffected. If it prints anything about opening ports other than 22, 80, 443, stop.</p>
       <p><strong>Then remove the token (SECURITY C-78).</strong> It can rebuild the server, move the volume or open the rescue console, so it does not stay on your laptop:</p>
       <pre class="cmd"><code>laptop$ hcloud context delete polycarpic
-laptop$ ls ~/.config/hcloud</code></pre>
-      <p class="expect">Expect: the context is deleted and the directory holds no token. Then, in the Hetzner console, Security → API tokens, delete the token. The next run of <code>create.sh</code> (or §8.10) starts with a freshly generated one.</p></li>
+laptop$ python3 infra/operator/laptop-check.py</code></pre>
+      <p class="expect">Expect: the context is deleted and the check ends <code>LAPTOP CHECK PASSED</code>: no context, no <code>HCLOUD_TOKEN</code>, and no token in <code>hcloud</code>'s config file. The file itself (<code>~/.config/hcloud/cli.toml</code>) can remain after the context is deleted; its being there is not a failure. Then, in the Hetzner console, Security → API tokens, delete the token. The next run of <code>create.sh</code> (or §8.10) starts with a freshly generated one.</p></li>
     <li><strong>Point your DNS at it.</strong> If the domain's name servers are not yet Cloudflare's: add the domain to a free Cloudflare account, copy the two name servers it gives you into the registrar's "name servers" setting (the registrar stays the registrar), and wait until Cloudflare shows the zone Active (minutes to a day). Then, with a Cloudflare token limited to this zone (DNS edit), write the records from the repository, using the IPv4 address of step 7. Do not pass <code>--ipv6</code>: the web ports answer on IPv4 only, so there must be no <code>AAAA</code> record.
       <pre class="cmd"><code>laptop$ python3 infra/operator/dns-records.py --ipv4 &lt;address&gt;
 laptop$ python3 infra/operator/dns-check.py --ipv4 &lt;address&gt;

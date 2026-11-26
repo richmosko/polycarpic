@@ -181,6 +181,7 @@ From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed th
   - **TCP over IPv4**, same options, 87 s: 22, 80 and 443 open, 65532 filtered. It agrees with M11.
   - **UDP over IPv4 and over IPv6** (`-sU -Pn -p- --max-retries 1 --min-rate 1500`): all 65535 ports `open|filtered (no-response)` on both. No port answered. A UDP scan cannot tell a dropped probe from an open, silent port, so this shows no UDP service that replies, and no more.
 - **The Cloud Firewall, read through the API** (2026-11-26, with a new token made for the run): one firewall, `polycarpic`, applied to 1 server; 3 inbound rules, each **TCP** (22, 80, 443), each from `0.0.0.0/0` and `::/0`; no outbound rule; no UDP or ICMP rule.
+- **That token is gone (C-78).** Measured by the lead on the laptop, 2026-11-26: `hcloud context list` is empty and `hcloud server list` answers `no active context or token`; `~/.config/hcloud/cli.toml` remains, 20 bytes. The token's deletion in the Hetzner console is **the Principal's statement**, not measured. `infra/operator/laptop-check.py`, which also reads that file for a token, was not run.
 - **Not run:** M12.
 
 ## Open questions
@@ -279,6 +280,8 @@ PR 2, INFRA 1.3.43:
 | §7.1 step 11 | check the allow address before Caddy starts; no command applies a new one to a running Caddy | F21 |
 | §7.1 step 15 | the staging `curl` expects `401` (`403` from elsewhere), not `200`, and takes the staging name; SSH by name against a `known_hosts` that holds only the address | box result |
 | §7.1 step 15; §8.11 | `polycarpic-ops lockdown` and the maintenance page are not built; the commands by hand | F22 |
+| §7.1 step 7 (1.3.47) | the token check is `laptop-check.py` instead of listing the directory, which cannot show whether a file holds a token; `cli.toml` can remain (this form of the step was not run) | box result |
+| Open questions (1.3.44 to 1.3.46) | OQ-INFRA-8 names the issue carrying each unrun step; OQ-INFRA-9, -12, -13 and -14 point at their carriers; OQ-INFRA-11 names the first instance that has a backup | review of PR 2 |
 
 ## Wording to fix
 
