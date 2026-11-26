@@ -133,6 +133,15 @@ Either way the harness then writes the files provision does not generate (`plaid
 
 Four older helpers that count network calls now leave `gh --version` out.
 
+### Build-green at `00b5d14a`
+
+Box suite: 248 run, 248 passed. CI's `shellcheck -x` command: exit 0. `vitest.config.ts`: 687 passed, 3 skipped. `-p` runs: `test_deploy*` 398, `test_install*` 31, `test_provision*` 24, `test_dispatcher` 19, `test_status` 53, `test_lint` 9: all pass.
+
+Two defects on the test side, found here:
+
+- The box snapshot did not keep `/usr/local/bin`, so the installed `gh` was gone in every later test: 14 failed on the first run at `00b5d14a`, and three of the F15 reds at `d3923393` (rerun, replaced bytes, good gh kept) could not have gone green. The snapshot now keeps it.
+- **The CI `deploy-real` job would have failed:** its fake `gh` did not answer `--version` and rejects any call without the token, so every `first-deploy` would be refused `gh`. The fake now answers `--version` from the installed bundle's `gh-version`, before its token check. Read and compiled only: `deploy-real` needs the CI runner.
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
