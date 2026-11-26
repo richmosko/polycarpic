@@ -16,12 +16,14 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 |---|---|
 | Staging reaches healthy; the outside scan | healthy: **measured**. Scan: **waits for `edge-2`**; by the lead's decision (F7) it expects 22, 80 and 443 on IPv4 and 22 only on IPv6 |
 | `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566` |
-| OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the outside scan; 8 in progress; **9 not measured** |
+| OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the outside scan; 8 in progress; 9 recorded as deferred to prod, not measured |
 | This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.41. The issue's text says "INFRA v1.2"; the document is past that version |
 
 **Waits for `edge-2`** (nothing here has been seen on a box): Caddy starting at all (F18's fix); its writes to `caddy` and `caddy-config` (F6); a certificate from a real CA for `staging`; ports 80 and 443 on the real bind address with `userland-proxy: false`; the staging allowlist and basic auth; the client address Caddy passes on and the Caddy-to-`auth` probe; the sign-in pages, static files and the `no-store` and `nosniff` headers in front of the real `web`; the outside scans on IPv4 and IPv6, with `curl -sI` and the refused password login; the runbook's Ctrl-C line on a real `edge-deploy`.
 
-**Not recorded in the run notes, to be confirmed or marked not run by the lead:** the Hetzner API token's deletion after step 7 (C-78); steps 1 to 6 as run (tools, keys, backup bucket, token, clone); the age recipient of step 10 (`provision-check` passes, and it checks that there is exactly one); a reboot of the box.
+**From the lead, outside the run notes:** after the server was created (step 7) the Principal deleted the Hetzner API token and the lead deleted the `hcloud` context from the laptop (C-78, 2026-11-25). The age recipient (step 10) was written from `~/polycarpic-backup.key.public` before the host stage. Steps 1 to 6 ran before step 7; the run notes hold no entry for them, so no difference from the runbook is recorded for them, and none is ruled out.
+
+**Not run yet:** a reboot of the box.
 
 **Step 18 (first backup), named in the issue, cannot run on a staging-only box:** staging has no backup or upload service and is not backed up (F17). It waits for prod (POLY-105 has the first-run checks; OQ-INFRA-11 as worded expects a backup on the staging instance, which this design cannot run).
 
@@ -117,7 +119,7 @@ With operator tool `git-84dc7374d08f`:
 |---|---|
 | OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound rules, each covering IPv4 and IPv6. The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). The outside scans wait for `edge-2`. |
 | OQ-INFRA-8 | In progress. §7.1 was run through step 13 for staging, with the differences above. Step 15 waits for `edge-2`; step 18 cannot run on staging; steps 14, 16, 17 and 19 and all of §8 were not run. |
-| OQ-INFRA-9 | **Not measured.** No Healthchecks.io limit is recorded in this loop so far; `provision-check` shows `WARN H13` (no heartbeat configured). |
+| OQ-INFRA-9 | **Deferred to prod** (lead): staging has no heartbeat, so no Healthchecks.io limit was measured; `provision-check` shows `WARN H13`. |
 
 ## Measurements inherited from earlier loops
 
