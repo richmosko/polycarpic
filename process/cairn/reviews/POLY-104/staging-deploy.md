@@ -10,12 +10,12 @@ POLY-104 lands in two pull requests (lead's decision under the Principal's deleg
 2. The Principal signs `edge-2` on the new `main`; the lead deploys it and runs the outside checks. The new `main` build also deploys to staging by its timer.
 3. **PR 2**: the box record from `edge-2` on. It closes the issue.
 
-On the box now: staging is deployed and healthy (`status` GREEN); `provision-check` ends `HOST CHECKS PASSED; 6 checks wait for the first deploy` (exit 3), the staging-only result; the edge is not running (F18).
+On the box now (operator tool `git-064e7429baa2`, rebooted 2026-11-26 06:01Z): staging is deployed and healthy; `provision-check` ends `HOST CHECKS PASSED; 6 checks wait for the first deploy` (exit 3), the staging-only result, with `PASS H27`; the edge is not running (F18), so `status` shows RED for the two `cert` items and the edge deploy and nothing else.
 
 | Acceptance criterion | State at PR 1 |
 |---|---|
 | Staging reaches healthy; the outside scan | healthy: **measured**. Scan: **waits for `edge-2`**; by the lead's decision (F7) it expects 22, 80 and 443 on IPv4 and 22 only on IPv6 |
-| `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566` |
+| `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566`, and again with `git-064e7429baa2` after the reboot |
 | OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the outside scan; 8 in progress; 9 recorded as deferred to prod, not measured |
 | This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.42. The issue's text says "INFRA v1.2"; the document is past that version |
 
@@ -23,7 +23,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 **From the lead, outside the run notes:** after the server was created (step 7) the Principal deleted the Hetzner API token and the lead deleted the `hcloud` context from the laptop (C-78, 2026-11-25). The age recipient (step 10) was written from `~/polycarpic-backup.key.public` before the host stage. Steps 1 to 6 ran before step 7; the run notes hold no entry for them, so no difference from the runbook is recorded for them, and none is ruled out.
 
-**Still to run on the box without `edge-2`:** the planted DNS record (E6) and, after the core-dump control (F20) is installed, a reboot.
+**Not run, and not needing `edge-2`:** the planted DNS record (E6) and the renamed secret as a container sees it (box measurements, 9d). The rows marked "Not run" below are the full list.
 
 **Step 18 (first backup), named in the issue, cannot run on a staging-only box:** staging has no backup or upload service and is not backed up (F17). It waits for prod (POLY-105 has the first-run checks; OQ-INFRA-11 as worded expects a backup on the staging instance, which this design cannot run).
 
@@ -78,7 +78,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 F18, the cause: the capability was **measured** on the released image (caddy `sha256:36dff3bb…`); that it is what the kernel refused follows from capabilities(7), and qa reproduced the same error before the fix with a local build of the unfixed Dockerfile, started by a real `compose up` of `edge.yml`'s settings (`red-run.md`). `edge-deploy` takes `edge.yml` and the Caddy image from the tag's release, not from the operator tool. The edge quarantine is per digest, so nothing needs clearing: a rebuilt Caddy gives a new digest.
 | F19 | after 13 | `restart --staging caddy` is refused with `restart: unknown service caddy; available: auth, caddy, postgres, web, worker`: the message lists the service it refuses. The refusal itself is right (staging has no Caddy). The list is built from every long-running service, not from those the project allows. | measured; cause from code | open (wording) |
-| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | seceng: Medium, with a control (`security-review.md`, "Core dumps go to apport"); required before prod. By the lead's ruling it is in PR 1: the host stage purges apport and sets `kernel.core_pattern=\|/bin/false` and `fs.suid_dumpable=0`; `provision-check` H27 reads them live (INFRA 1.3.42). To be run on the box, before the reboot |
+| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | seceng: Medium, with a control (`security-review.md`, "Core dumps go to apport"); required before prod. By the lead's ruling it is in PR 1: the host stage purges apport and sets `kernel.core_pattern=\|/bin/false` and `fs.suid_dumpable=0`; `provision-check` H27 reads them live (INFRA 1.3.42). On the box: H27 failed on the old values, passed after the host stage, and the settings held over a reboot |
 
 ## Security review of the F11 fix (seceng)
 
@@ -130,6 +130,15 @@ From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed th
 9. a: `restart --staging web auth worker`: all healthy, exit 0. b: `restart --staging caddy`: refused, exit 2 (F19). c: `restart --staging postgres`: healthy, exit 0; 60 s later `web`, `auth` and `worker` were running with 0 restarts; `web` logged one `db.connection_lost` and no `process.crash`. d (the renamed secret): not run.
 10. The POLY-147 marker measurement: **PASS** (figures and setup in `marker-measure-vps.md`). The first attempt failed before measuring (no `git` in the client image). Afterwards the throwaway containers, network, trees and image were removed: only the four staging containers and the exited edge Caddy remain, and `provision-check` exits 3.
 
+### The core-dump control and the reboot
+
+2026-11-26, about 06:00Z.
+
+- Before installing: `apt-get -s purge apport` would remove only `apport` and `apport-core-dump-handler` (2.28.3-0ubuntu0.1); `fs.suid_dumpable` was 2.
+- Installed `git-064e7429baa2`. `provision-check` before the host stage: exit 1, `FAIL H27 core dumps: kernel.core_pattern is '|/usr/share/apport/apport …' (want '|/bin/false'); fs.suid_dumpable is '2' (want 0); the apport package is present`, one check failed: the row shown red on the box's own values.
+- Host stage: exit 0, 3 changes (`apport purged`; `wrote /etc/sysctl.d/50-polycarpic-core.conf`; `core dump settings applied (sysctl)`). Live: `core_pattern` `|/bin/false`, `suid_dumpable` 0, apport removed and purged (`dpkg` shows `un`). `provision-check`: `PASS H27`, exit 3, 6 checks waiting. No crash was provoked.
+- **Reboot** (booted again at 06:01:55Z; SSH back in about 20 s; the same host key, checked strictly): `/srv/polycarpic` mounted from `/dev/mapper/polycarpic-data`; no swap; the four staging containers healthy about a minute after boot; the stood-down edge Caddy still `Exited (255)` and not restarting; `polycarpic-deploy@staging.timer` enabled with a next run; both core-dump values held; `provision-check` exit 3, no `FAIL`, `PASS H27`, `WAIT` H12 and D1 to D5, `WARN H13`; `status` in 1.263 s, staging rows OK, RED only for the `cert` items and the edge deploy.
+
 ## Open questions
 
 | Id | Answer |
@@ -161,7 +170,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-97 (seceng F-D3) | the uploader's connect to Postgres's addresses expects a timeout or no route | Prod |
 | POLY-97 | `cx33` plan, stock by location | Done |
 | POLY-98 1 | sudo's `secure_path` reaches `/usr/local/sbin` | Done (`sudo polycarpic-ops` works) |
-| POLY-98 2 | `install.sh` over real ssh; a reboot, then `provision-check` from the bundle | `install.sh`: done. After a reboot: **not run** |
+| POLY-98 2 | `install.sh` over real ssh; a reboot, then `provision-check` from the bundle | Done: `install.sh`, and `provision-check` from the installed bundle after the reboot |
 | POLY-98 3 | `status` `cert` item through Caddy | `edge-2` for what staging shows; the prod name: prod |
 | POLY-98 4 | `status` `disk`, `app`, `backupdb`, `revokes`, `slots` within 15 s | Done: 1.127 s, with `disk`, `app`, `slots` and `revokes` OK; `backupdb`: prod |
 | POLY-98 5 | `cli user invite` live | Done on staging (box measurements, 7). Opening the link: `edge-2` |
@@ -171,7 +180,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-98 9 | `jobs.log` under the real backup and uploader | Prod |
 | POLY-98 10 | CI `provision` job time at the PR head | PR 1's CI run (not a box measurement) |
 | POLY-99 | spool ACLs on real LUKS ext4 | Done, by use (box measurements, 8) |
-| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20; the control is built, not yet run on the box) |
+| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` was a pipe to apport (F20), now `\|/bin/false`, also after a reboot |
 | POLY-99 | backup and uploader units under real systemd | Prod (installed, not enabled) |
 | POLY-99 | `docker compose run`'s timeout and `rm -f` | **Not run** |
 | POLY-99 | `secrets/host/` and the ownership of `jobs.log` and `last-upload` | Done as far as `provision-check` reads them; the move from the old path does not occur on a new box |
@@ -182,7 +191,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | Measured: all three render at every cap down to 24M; `prod` fails at 16M and below, so the cap is in force (box measurements, 6). The cap and its test: next ops loop |
 | POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | `edge-2` |
 | POLY-160 | the runbook's Ctrl-C line on a real `edge-deploy` | `edge-2` |
-| POLY-160 | stopped containers stay stopped over a reboot after a stand-down | **Not run** |
+| POLY-160 | stopped containers stay stopped over a reboot after a stand-down | Done: the edge Caddy stood down after F18 was still stopped after the reboot |
 | POLY-160 | `docker compose --project-directory` on Compose 5.7.1 with no render home | Done for the command form the tool then uses (`--project-directory /`, box measurements, 3). The render home exists on the box, so the tool's own choice of `/` was not seen. A database restart left `web`, `auth` and `worker` running (9c) |
 
 The 2026-11-23 comment about creating `app.` only after a prod deploy was withdrawn by the one after it. Prod is not opened to the internet before POLY-163.
