@@ -240,6 +240,20 @@ class SetSecret(OpsTest):
         self.assertEqual((r.rc, r.err), (4, "%s is not root:%d 0750: run provision\n" % (d, os.stat(str(d)).st_gid)))
         self.assertFalse(self.on_disk("worker", "resend_api_key").exists())
 
+    # POLY-104 F11: with the directory not there, the message names the gid it should have: the one the service runs as in THAT project's compose file
+    def test_the_gid_named_for_a_missing_directory_is_the_services_user_in_that_projects_compose_file(self):
+        from base import REPO
+        for project, staging, top in (("prod", False, "secrets"), ("staging", True, "staging-secrets")):
+            text = (REPO / "infra" / "compose" / (project + ".yml")).read_text()
+            users = {m.group(1): int(m.group(2)) for m in re.finditer(r'^  ([a-z]+):\n(?:(?:    .*)?\n)*?    user: "\d+:(\d+)"$', text, re.M)}
+            for svc, name in (("web", "plaid_secret"), ("auth", "resend_api_key")):  # `svc` is the first (or only) service that mounts it
+                with self.subTest(project=project, service=svc):
+                    d = self.host.p("/etc/polycarpic/%s/%s" % (top, svc))
+                    os.rmdir(str(d))
+                    r = self.put(name, "fxvalue", staging=staging)
+                    self.assertEqual((r.rc, r.err), (4, "%s is not root:%d 0750: run provision\n" % (d, users[svc])))
+                    self.host.mkdir("/etc/polycarpic/%s/%s" % (top, svc), 0o750)
+
     def test_a_missing_directory_exits_4(self):
         os.rmdir(str(self.host.p("/etc/polycarpic/secrets/worker")))
         r = self.put("resend_api_key", "fxvalue")

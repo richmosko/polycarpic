@@ -70,6 +70,26 @@ Red at `ebceb70b` (`tests/infra/ops/test_install_path.py`, 8 of 9 new cases fail
 
 `test_install*.py` 31 run, all passed; box `ops.test.ts` 23 of 23; `shellcheck -x` on `install.sh` exit 0; `vitest.config.ts` 677 passed, 3 skipped. Both outputs are now written to a temporary directory (removed on exit) and git's status checked before the first ssh.
 
+## F11: staging secrets in the prod gids
+
+The expected gid of each secret directory and file is the `user:` of its service in that project's compose file, read by the tests (a control asserts staging differs from prod for web, worker, migrate, operator and auth).
+
+Box suite: 222 run, 215 passed, 7 failed, all new `F11` tests; the `F11 control` passes.
+
+| Test | Red today |
+|---|---|
+| layout after a host stage | 11 staging paths in prod gids |
+| rerun over the old layout, set-secret files added | 15 paths left wrong; pinned too: values unchanged, a `change:` line, a second run changes nothing |
+| H6 on the right layout | false FAIL |
+| H6 on the old layout | PASS |
+| H6, one staging file (and one prod directory) wrong | the line lists the right paths instead, not the planted one |
+| H9: 999, 10001, 10010, 10101, 10107, 10110 as primary group or membership; 998, 10100, 10111 allowed | 101xx pass |
+| provision's account check, same ranges | runs with a 10101 account |
+
+`test_set_secret.py`: 32 run, 2 subtests failed: with a staging service directory missing, the message names 10001 and 10007 where staging.yml says 10101 and 10107. The prod subtests pass. `list-secrets` reads the group from the directory, so it calls the wrong layout `set`; not pinned.
+
+CI never ran provision's layout: `deploy-real/harness.ts` makes the staging secrets itself, in the 101xx gids.
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.

@@ -260,6 +260,95 @@ describe('provision.sh host stage (R5)', () => {
     expect(r.out.trim().split('\n').pop()).toBe('1');
   });
 
+  // ---- POLY-104 F11: a file secret keeps its host owner and no service has group_add, so a service reads its secrets only if the host group is its own
+  // gid. staging.yml runs web, worker, migrate, operator and auth as 101xx; provision gave staging-secrets the prod gids. The expected gids come from
+  // the compose files' `user:`, never from a table written here.
+  const usersOf = (...files: string[]): Record<string, number> => Object.fromEntries(files.flatMap((f) => {
+    const services = parse(readFileSync(join(ROOT, 'infra', 'compose', f), 'utf8'), { merge: true }).services as Record<string, { user?: string }>;
+    return Object.entries(services).filter(([, s]) => s.user).map(([n, s]) => [n, Number(s.user!.split(':')[1])]);
+  }));
+  const PROD_USERS = usersOf('prod.yml', 'edge.yml');
+  const STAGING_USERS = usersOf('staging.yml');
+  const STAGING_DIRS = ['auth', 'migrate', 'operator', 'postgres', 'web', 'worker'];
+  /** files set-secret (or a hand step) writes, which provision does not generate */
+  const LATER = ['web/plaid_secret', 'auth/resend_api_key', 'worker/resend_api_key', 'worker/credential_keyring'];
+  const SECRET_STAT = `cd /etc/polycarpic; stat -c '%n %a %u:%g' staging-secrets/* staging-secrets/*/* secrets/* secrets/*/*`;
+  /** every directory root:<its service's gid> 0750 and every file in it 0440 with the same group; -> the paths that are not, as `<path> <mode> <owner> (want …)` */
+  const wrongOwners = (stat: string): string[] => stat.split('\n').flatMap((l) => {
+    const m = /^(staging-secrets|secrets)\/([a-z]+)(\/[a-z0-9_]+)? (\d+) (\d+):(\d+)$/.exec(l);
+    if (!m || m[2] === 'host') return [];
+    const gid = (m[1] === 'secrets' ? PROD_USERS : STAGING_USERS)[m[2]!];
+    const want = `${m[3] ? '440' : '750'} 0:${gid}`;
+    return `${m[4]} ${m[5]}:${m[6]}` === want ? [] : [`${l} (want ${want})`];
+  });
+  /** the layout the old script left: the staging dirs and files in the PROD service gids, with the files set-secret adds */
+  const oldStaging = ['web', 'worker', 'migrate', 'operator', 'auth'].map((s) => `chgrp -R ${PROD_USERS[s]} /etc/polycarpic/staging-secrets/${s}`).join('; ');
+  const addLater = `for p in ${LATER.join(' ')}; do f=/etc/polycarpic/staging-secrets/$p; echo "typed-$p" > $f; chmod 0440 $f; chgrp "$(stat -c %g "$(dirname $f)")" $f; done`;
+  /** the right layout, planted by hand from the compose gids, so provision-check is judged apart from provision */
+  const rightStaging = STAGING_DIRS.map((s) => `chgrp -R ${STAGING_USERS[s]} /etc/polycarpic/staging-secrets/${s}`).join('; ');
+
+  it('F11 control: the compose files give staging web, worker, migrate, operator and auth gids that differ from prod, and postgres 999 in both', () => {
+    for (const s of ['web', 'worker', 'migrate', 'operator', 'auth']) expect(STAGING_USERS[s], s).not.toBe(PROD_USERS[s]);
+    expect([STAGING_USERS.postgres, PROD_USERS.postgres]).toEqual([999, 999]);
+  });
+
+  it('F11: every secret directory and generated file, prod and staging, has the group of its service\'s `user:` in that project\'s compose file', () => {
+    const r = run(SECRET_STAT, { image: HOST });
+    expect(r.out.split('\n').filter((l) => /^staging-secrets\/[a-z]+\/[a-z0-9_]+ /.test(l)).length, r.out + r.err).toBeGreaterThanOrEqual(STAGING_GEN.length);
+    expect(wrongOwners(r.out)).toEqual([]);
+  });
+
+  it('F11: a rerun repairs the old layout, the files set-secret wrote included, keeps every value, reports the change, and the next run changes nothing', () => {
+    const SUM = `(cd /etc/polycarpic; sha256sum staging-secrets/*/* secrets/*/* | sha256sum)`;
+    const r = run(`${oldStaging}; ${addLater}; ${SUM}; ${HOSTRUN} > /tmp/o 2>&1${rc}; ${SUM}; grep -c '^change: ' /tmp/o; ${HOSTRUN} > /tmp/o2 2>&1; grep -c '^change: ' /tmp/o2; echo ==; ${SECRET_STAT}`, { image: HOST });
+    const [head, stat] = r.out.split('==\n') as [string, string];
+    const [before, code, after, changes, again] = head.trim().split('\n');
+    expect(code, r.out + r.err).toBe('rc=0');
+    for (const p of LATER) expect(stat, p).toContain(`staging-secrets/${p} `);
+    expect(wrongOwners(stat)).toEqual([]);
+    expect(after, 'no secret value changed').toBe(before);
+    expect(Number(changes), 'the repair is reported').toBeGreaterThan(0);
+    expect(again, 'a second run changes nothing').toBe('0');
+  });
+
+  it('F11: provision-check passes H6 on the right staging layout, set-secret files included', () => {
+    const r = check(`${rightStaging}; ${addLater}`);
+    expect(find(r.out, 'FAIL', 'H6')?.text).toBeUndefined();
+    expect(find(r.out, 'PASS', 'H6'), r.out.slice(-800)).toBeDefined();
+  });
+
+  it('F11: provision-check FAILs H6 on the old layout (staging secrets in the prod gids), naming a directory and the gid it should have', () => {
+    failLine(check(`${oldStaging}; ${addLater}`), 'H6', ['/etc/polycarpic/staging-secrets/web', `0:${STAGING_USERS.web}`]);
+  });
+
+  it('F11: provision-check FAILs H6 on one staging file left in the prod gid, and on one prod directory in the staging gid', () => {
+    failLine(check(`${rightStaging}; ${addLater}; chgrp ${PROD_USERS.worker} /etc/polycarpic/staging-secrets/worker/credential_keyring`), 'H6', ['staging-secrets/worker/credential_keyring', `0:${STAGING_USERS.worker}`]);
+    failLine(check(`${rightStaging}; chgrp ${STAGING_USERS.web} /etc/polycarpic/secrets/web`), 'H6', ['/etc/polycarpic/secrets/web', `0:${PROD_USERS.web}`]);
+  });
+
+  // no host account other than root may hold a service gid: now both ranges
+  const RESERVED = [999, 10001, 10010, 10101, 10107, 10110];
+  const FREE = [998, 10100, 10111];
+  const holder = (gid: number, how: 'primary' | 'member') => (how === 'primary'
+    ? `groupadd -g ${gid} g${gid}; useradd -M -g ${gid} -s /usr/sbin/nologin held${gid}`
+    : `groupadd -g ${gid} g${gid}; useradd -M -s /usr/sbin/nologin held${gid}; usermod -aG g${gid} held${gid}`);
+
+  it('F11 H9: provision-check FAILs an account whose primary group or membership is any of 999, 10001-10010, 10101-10110, and passes just outside them', () => {
+    for (const gid of RESERVED) for (const how of ['primary', 'member'] as const) failLine(check(holder(gid, how)), 'H9', [`held${gid}`, String(gid)]);
+    const r = check(FREE.map((g) => `${holder(g, 'primary')}; usermod -aG g${g} polyops`).join('; '));
+    expect(find(r.out, 'PASS', 'H9'), r.out.slice(-800)).toBeDefined();
+  });
+
+  it('F11: provision refuses a box where an account holds a reserved gid, naming it, and runs with accounts just outside the ranges', () => {
+    for (const gid of [10101, 10110]) for (const how of ['primary', 'member'] as const) {
+      const r = run(`${holder(gid, how)}; ${HOSTRUN} 2>&1${rc}`, { image: HOST });
+      expect(r.out.trim().split('\n').pop(), `${gid} ${how}: ${r.out.slice(-400)}`).toBe('rc=1');
+      expect(r.out).toMatch(new RegExp(`held${gid}\\(.*${gid}`));
+    }
+    const ok = run(`${FREE.map((g) => holder(g, 'primary')).join('; ')}; ${HOSTRUN} 2>&1${rc}`, { image: HOST });
+    expect(ok.out.trim().split('\n').pop(), ok.out.slice(-400)).toBe('rc=0');
+  });
+
   it('state (POLY-99 R9): /var/lib/polycarpic/state root 0755; last-upload, jobs.log and spool.sha256 are root-written (0:0 0644, created empty); last-dump is gone', () => {
     const r = run(`stat -c '%n %a %u:%g %s' /var/lib/polycarpic/state /var/lib/polycarpic/state/*`, { image: HOST });
     expect(r.out).toMatch(/^\/var\/lib\/polycarpic\/state 755 0:0/m);
