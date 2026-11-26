@@ -634,9 +634,15 @@ per_project() {
   else pass "$id" "$what"; fi
 }
 
+# D1 wants what each project's postgresql.<project>.conf sets. Only archiving differs: prod ships its WAL, staging is not backed up (INFRA §6.1)
+# and has no spool, so archiving must be off there (POLY-104 F17).
 d1() {
-  local want='log_parameter_max_length=0 log_parameter_max_length_on_error=0 log_statement=ddl archive_mode=on archive_timeout=300 max_replication_slots=2 max_wal_senders=3 max_slot_wal_keep_size=2048 log_connections=on password_encryption=scram-sha-256 shared_preload_libraries= log_min_duration_statement=-1'
+  local want='log_parameter_max_length=0 log_parameter_max_length_on_error=0 log_statement=ddl max_replication_slots=2 max_wal_senders=3 max_slot_wal_keep_size=2048 log_connections=on password_encryption=scram-sha-256 shared_preload_libraries= log_min_duration_statement=-1'
   local rows out='' kv name
+  case "$1" in
+    staging) want="$want archive_mode=off archive_timeout=0" ;;
+    *) want="$want archive_mode=on archive_timeout=300" ;;
+  esac
   rows=$(q "$1" "SELECT name || '=' || setting FROM pg_settings WHERE name IN ('log_parameter_max_length','log_parameter_max_length_on_error','log_statement','archive_mode','archive_timeout','max_replication_slots','max_wal_senders','max_slot_wal_keep_size','log_connections','password_encryption','shared_preload_libraries','log_min_duration_statement')")
   for kv in $want; do
     name=${kv%%=*}
