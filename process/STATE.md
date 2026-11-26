@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-104-first-staging-deploy`
 - **Started:** 2026-11-25
 - **Goal:** Staging healthy on a real Hetzner box by INFRA §7.1, with only 22, 80 and 443 open, and every runbook correction landed in INFRA.
-- **Status:** In Progress — staging is deployed and healthy on the box. The issue lands in two PRs (`process/DECISIONS.md` 2026-11-26): PR 1 carries the fixes the box exposed; then the Principal signs `edge-2`, the lead deploys Caddy and runs the outside scans; PR 2 carries that record and closes the issue. The lead decides and merges under the Principal's delegation of 2026-11-25.
+- **Status:** In Review — staging and the shared Caddy (`edge-2`) are deployed and healthy on the box; the outside scans pass. PR 1 ([#159](https://github.com/richmosko/polycarpic/pull/159)) merged the fixes; PR 2 carries the record from `edge-2` on and closes the issue.
 
 _Standing context. POLY-101 (CI: auth route-policy row) merged 2026-11-25 via PR [#158](https://github.com/richmosko/polycarpic/pull/158) — ARCH 1.31.2, INFRA 1.3.32, SECURITY unchanged. A change to the auth or tenancy packages, or a BetterAuth bump by any path, cannot merge unless the route-policy test, the routing-pool test and the adapter lint ran and passed: a skipped, missing or expected-to-fail test is red, and a manual run with a `base` range can no longer turn `app` green. Not proved: a real newer BetterAuth was not installed. Put to the Principal on POLY-135 (`process/DECISIONS.md`, 2026-11-25): a pull request can edit its own gate. A flaky port in `tests/db/auth-service-main.test.ts` is filed on POLY-155. The record is `process/cairn/reviews/POLY-101/`._
 

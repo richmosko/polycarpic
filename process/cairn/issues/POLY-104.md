@@ -18,10 +18,10 @@ Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fak
 
 ## Acceptance criteria
 
-- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26).
-- [ ] provision-check passes.
-- [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer.
-- [ ] The review file lists every doc correction, and INFRA v1.2 lands them.
+- [x] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26). — process/cairn/reviews/POLY-104/staging-deploy.md: "`edge-2` on the box" (staging `healthy` at 47fb1fbc, `status` GREEN; full TCP scans: IPv4 from the home network and from hel1, IPv6 from hel1 with controls before and after)
+- [x] provision-check passes. — process/cairn/reviews/POLY-104/staging-deploy.md: "Box results" and "`edge-2` on the box" (exit 3, no FAIL, `HOST CHECKS PASSED; 6 checks wait for the first deploy`: the staging-only result; the six are prod's)
+- [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer. — OQ-INFRA-7 answered (process/cairn/reviews/POLY-104/staging-deploy.md: "Open questions"); OQ-INFRA-8 answered for §7.1 steps 1–13 and 15 on staging, the rest deferred to POLY-164, POLY-105, POLY-116, POLY-120, POLY-121 and POLY-165 as INFRA names them; OQ-INFRA-9 deferred to POLY-164 (staging has no heartbeat)
+- [x] The review file lists every doc correction, and INFRA v1.2 lands them. — process/cairn/reviews/POLY-104/staging-deploy.md: "Doc corrections (INFRA)" and "Wording to fix"; landed in docs/INFRA/index.html (1.3.47)
 
 ## Comments
 

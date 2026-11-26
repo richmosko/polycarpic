@@ -1086,3 +1086,16 @@ Add new decisions ABOVE this comment, newest first.
 - `cap_add: [NET_BIND_SERVICE]` (loosens the policy for every later edge release).
 - Hold everything for a single PR (impossible: the fix cannot reach the box from a branch).
 **Approved by:** the Principal for the host-key acceptance ("accept it", 2026-11-25); team-lead for the rest, under the Principal's delegation of 2026-11-25; open to reversal.
+
+### 2026-11-26 — POLY-104: the front door on the real box; what PR 2 decided
+**Decision:** Taken under the Principal's delegation of 2026-11-25; every item is open to reversal. Records: `process/cairn/reviews/POLY-104/` (`staging-deploy.md`, `security-review.md`, `verdict.md`).
+- **The IPv6 port scan was run from a temporary Hetzner server, not from a home or mobile line.** Two runs from a phone hotspot lost IPv6 part-way and were thrown out as invalid. The Principal approved the server and made a token for it ("go with the server", 2026-11-26); the server, its throwaway SSH key and the token were deleted after. The scanner sat inside Hetzner's network; the record says so.
+- **The Ctrl-C test of `edge-deploy` was sent by a script through a real terminal session**, not by hand: the lead's SSH session is not interactive. One interrupt, then the rerun recovered.
+- **Nothing found on `edge-2` was fixed in this loop.** Each needs a new signed edge release or is a design question: the HTTP/3 advert on Caddy's container port, no command that applies a changed staging allow address to a running Caddy, no Caddy log line for an upstream failure, the worker's "schema behind" message for an unreachable database. All are on POLY-165.
+- **Left to the Principal, on POLY-165:** the unverified host key before prod shares the box; IPv4-only or IPv6 for prod's web ports; whether a deploy may recreate Postgres each time (seceng: no security objection); where the first-run backup measurements run, since only prod has a backup service and POLY-105 gates the first prod deploy; the public CAA answer; recovery for a lost release key.
+- **One acceptance line closes part-deferred.** OQ-INFRA-8 is answered for the staging steps only and OQ-INFRA-9 not at all (staging has no heartbeat); INFRA names the issue that carries each rest.
+**Alternatives considered:**
+- A third hotspot run in chunks (75 minutes or more of tethering, no UDP scan).
+- A further `edge-3` in this loop for the HTTP/3 line (another build, signature and deploy for an advert of a closed port).
+- Hold the issue open until OQ-INFRA-8 is answered in full (it cannot be before prod, the home box and the Vercel topology exist).
+**Approved by:** the Principal for the scan server and its token; team-lead for the rest, under the Principal's delegation of 2026-11-25; open to reversal.
