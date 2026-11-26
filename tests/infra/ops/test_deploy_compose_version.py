@@ -16,7 +16,7 @@ def last(r):
 
 
 def network_calls(r):
-    return [c["argv"] for c in r.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git")]
+    return [c["argv"] for c in r.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git") and c["argv"] != ["gh", "--version"]]  # --version asks no network (POLY-104 F15)
 
 
 class Version(DeployTest):

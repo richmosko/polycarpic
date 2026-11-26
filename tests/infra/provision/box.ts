@@ -2,7 +2,7 @@
 // fakes first on PATH, and snapshots a provisioned box with `docker commit` so every planted-fault test starts from the same
 // state in a fraction of a second. No network, no credential: the fakes answer for hcloud, Docker, curl (Backblaze) and the volume.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -34,12 +34,31 @@ export function build() {
   if (built) return;
   const b = sh('docker', ['build', '-q', '-t', BOX, join(ROOT, 'tests', 'infra', 'provision')]);
   if (b.code !== 0) throw new Error(`docker build tests/infra/provision failed: ${b.err.slice(-600)}`);
+  makeGhFixture();
   built = true;
+}
+
+// POLY-104 F15: a stand-in gh release for the fake curl (/ghfix in the box) with its own two sha256 pins. The real pins name bytes the box cannot
+// download, so the fixture's `gh-sha256` is mounted over the repository's: every other line of the install and the check runs as written.
+const GH_PIN_FILE = join(ROOT, 'infra', 'deploy', 'gh-version');
+export const GH_VERSION = existsSync(GH_PIN_FILE) ? readFileSync(GH_PIN_FILE, 'utf8').trim() : '2.106.0';
+export const GHFIX = mkdtempSync(join(tmpdir(), 'poly104-gh-'));
+/** shell lines (in the box) that write a gh release tarball into `dir`; `marker` is a line of extra shell its bin/gh runs first */
+export const ghRelease = (dir: string, version: string, marker = '') => `v=${version}; d=$(mktemp -d); r=gh_\${v}_linux_amd64
+mkdir -p $d/$r/bin $d/$r/share/man/man1 ${dir}; echo licence > $d/$r/LICENSE; echo man > $d/$r/share/man/man1/gh.1
+printf '#!/bin/sh\\n%s\\n[ "$1" = --version ] && { echo "gh version %s (2026-09-01)"; echo "https://github.com/cli/cli/releases/tag/v%s"; exit 0; }\\necho "FAKE gh: unsupported $*" >&2; exit 99\\n' '${marker}' "$v" "$v" > $d/$r/bin/gh
+chmod 0755 $d/$r/bin/gh; tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C $d -cf - $r | gzip -n > ${dir}/$r.tar.gz
+(cd ${dir} && sha256sum $r.tar.gz) > ${dir}/gh-sha256; (cd $d && sha256sum $r/bin/gh) >> ${dir}/gh-sha256; chmod 0644 ${dir}/*`;
+function makeGhFixture() {
+  const r = sh('docker', ['run', '--rm', '-v', `${GHFIX}:/out`, BOX, 'bash', '-c', ghRelease('/out', GH_VERSION)]);
+  if (r.code !== 0) throw new Error(`making the gh fixture release failed: ${r.all.slice(-600)}`);
 }
 
 const PRE = 'source /harness/prelude.sh; cd /repo;';
 function mounts(): string[] {
-  return ['-v', `${ROOT}:/repo:ro`, '-v', `${join(ROOT, 'tests', 'infra', 'provision', 'fakes')}:/fakes:ro`];
+  const pins = join(ROOT, 'infra', 'deploy', 'gh-sha256'); // a read-only /repo has no place to mount onto until the file exists
+  return ['-v', `${ROOT}:/repo:ro`, '-v', `${join(ROOT, 'tests', 'infra', 'provision', 'fakes')}:/fakes:ro`, '-v', `${GHFIX}:/ghfix:ro`,
+    ...(existsSync(pins) ? ['-v', `${join(GHFIX, 'gh-sha256')}:/repo/infra/deploy/gh-sha256:ro`] : [])];
 }
 
 const SNAPS = new Set<string>();

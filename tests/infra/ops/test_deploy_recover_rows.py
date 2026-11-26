@@ -260,7 +260,7 @@ class EdgeRows(EdgeBase):
         self.assertTrue(configs, "the restore rendered edge before the env file was judged")
         self.assertEqual(last(r), "deploy: rollback-unhealthy", r.err)  # a restore that needs the file cannot start; the run ends there
         self.assertIn("refused edge-env", r.err)
-        self.assertEqual([c for c in r.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git")], [], "no network call")
+        self.assertEqual([c for c in r.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git") and c["argv"] != ["gh", "--version"]], [], "no network call")
 
     def allowlist_changed(self):
         self.world.render_hooks[("edge", False)] = lambda doc: doc["services"]["caddy"]["environment"].update(POLY_DOMAIN="example.org") or doc

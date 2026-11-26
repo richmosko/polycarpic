@@ -123,6 +123,16 @@ CI never ran it: `harness.ts` makes the staging secrets itself from its own tabl
 
 Either way the harness then writes the files provision does not generate (`plaid_secret`, `resend_api_key`, `credential_keyring`) with the group of the directory it finds, as `set-secret` does, drops its gid table, and adds the generated values to the leak sweep's list by reading them back. A wrong gid would then leave a real container unable to read its secret, which `first-deploy` should refuse (unmeasured). Recommend A. Not done.
 
+## F15: no `gh` on the box (form ruled by seceng-104: pinned release tarball)
+
+**Red.** Box suite: 248 run, 228 passed, 20 failed, all in `tests/infra/provision/gh.test.ts`. `test_deploy_gh.py`: 13 tests, 28 failures and 2 errors counting subtests; one passes, `no failed gh call puts its stderr anywhere` (today nothing of gh's stderr is logged; it guards the fix). `-p` runs of `test_deploy_compose_version` (9), `test_deploy_recover*` (38), `test_deploy_token*` (8), `test_deploy_flow` (11), `test_deploy_candidate` (21), `test_deploy_faults` (8), `test_deploy_edge*` (22), `test_install*` (31): all pass with the shared fixture changes.
+
+**Seam.** Pins `infra/deploy/gh-version` and `gh-sha256` (two `sha256sum` lines: `gh_<v>_linux_amd64.tar.gz`, then `gh_<v>_linux_amd64/bin/gh`), read from `$here/deploy/`, both in `install.sh` PATHS. The box serves a stand-in release at the real URL through the fake `curl` and mounts the stand-in's `gh-sha256` over the repository's (only once that file exists); the real hashes are never exercised, and no test checks them against GitHub's. A fake `dpkg` answers `amd64`. A case that needs other pins runs from a copy of `infra/`.
+
+**Pinned beyond the ruling:** `H26` never runs a `gh` whose hash is wrong (the check is root). At deploy: `gh --version` is the first `gh` call and gets no token; `rollback` asks nothing of gh; refusal `gh`, exit 4. A failed call prints a line with `gh`, its exit code and one of `401`, `403`, `404`, `rate limit`, `other`; the "no attestations", "verification failed" and "network" labels are not pinned. Not tested: a refused tarball with extra or hostile members beyond the one extracted.
+
+Four older helpers that count network calls now leave `gh --version` out.
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.

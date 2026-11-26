@@ -29,7 +29,7 @@ class EdgeRecover(EdgeBase):
 
         def wrapped(argv, stdin=None):
             if "up" in argv and seen["net"] is None and getattr(w, "runner", None) is not None:
-                seen["net"] = len([c for c in w.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git")])
+                seen["net"] = len([c for c in w.runner.calls if c["argv"] and c["argv"][0] in ("gh", "git") and c["argv"] != ["gh", "--version"]])
             return orig(argv, stdin)
         w._compose = wrapped
         return seen
