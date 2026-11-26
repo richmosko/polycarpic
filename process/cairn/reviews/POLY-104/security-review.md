@@ -57,19 +57,46 @@ Whether apport then writes it to `/var/crash` for a process in a container is un
 - Info: a later-sorting file in `sysctl.d` could set `core_pattern` again at boot. H27 reads the live value, so it would FAIL and not pass.
 - Box and qa runs are pending; I did not run them.
 
+## PR 2: `edge-2` on the box
+
+Sources: `staging-deploy.md` at `943d100b` ("`edge-2` on the box", F21 to F25) and the lead's run notes.
+
+What the box shows:
+- Caddy is up from a signed `edge-2`, with Let's Encrypt certificates written only by uid 10010 into its 0700 directories (M1 to M3).
+- The security headers are on served pages and on errors (M5 to M8).
+- Password SSH is refused (M10).
+- From another network, the allowlist judges the real client address and answers before the password; a forged `X-Forwarded-For` gets 403 (O1, O2).
+- The IPv4 full TCP scan shows 22, 80 and 443 only (M11).
+- The core-dump control holds over a reboot (F20).
+- Pending: the IPv6 full scan.
+- Not scanned: UDP.
+
+| Finding | Severity | Ruling | Blocks prod? |
+|---|---|---|---|
+| **F21.** No command applies a changed `edge.env` (the staging allow address among it) to a running Caddy | Low | Removing an address from the allowlist does not take effect until the next `edge-<n>`; staging's basic auth still stands behind it. Wanted: a command that re-renders and re-ups the **current** edge release from the current `edge.env` through the guard. Also a provision-check row that FAILs when the running Caddy's environment (`docker inspect`) differs from `edge.env`, so the gap is visible and not silent. Until both exist, the runbook says: to revoke an address, ship a new `edge-<n>`. | No. Prod has no allowlist. It is needed before staging holds anything real. |
+| **F23.** `alt-svc: h3=":8443"` on every response | Info | The advertised port cannot be reached (UDP is not published), clients fall back, and the internal port is disclosed. Ruled: `servers { protocols h1 h2 }` in the Caddyfile and in the lint's line list. Publishing 443/udp is refused: it adds a published port, a firewall rule and a guard rule for no need. | No. It rides the next `edge-<n>`, which prod's takeover needs anyway. |
+| **F24.** Caddy's log filter was not exercised on the box; an upstream failure leaves no Caddy line | Info | Leak side: the box shows no line written at all, so nothing leaked; `caddy-edge.test.ts` exercises the filter on a site without `handle_errors`, and that test is the evidence. This matches SECURITY §9 ("Caddy keeps no access log"). Detection side: an upstream that is down is seen by `status` and the health probes, not by Caddy's log, so it is a monitoring follow-up, not a control gap. | No |
+| **F25b.** Every new `main` build recreates Postgres, on prod too | none (availability) | Accepted, and it should stay. The weekly no-cache rebuild exists so that Debian security fixes reach the Postgres image (C-83). Keeping the running image when the digest changes would hold those fixes back. The prod backup runs before `up` (read: `deployer.py`, the `premigration` backup before `run["up"] = True`; not run on prod). INFRA §4.6 should say that a deploy restarts Postgres. F25a (an unreachable database logged as its own event) removes the confusion. | No |
+
+**None of F21, F23, F24 or F25b blocks prod.**
+
 ## Must be true before a prod box
 
-1. The host key is verified out-of-band, or the box is rebuilt with a verified one, by a method that puts no private key where containers can read it (F1, C-71).
+1. The host key is verified out-of-band, or the box is rebuilt with a verified one, by a method that puts no private key where containers can read it (F1, C-71). The laptop's `known_hosts` then pins the key under the host name as well as the address (M10).
 2. The public CAA answer equals the pinned set, and `dns-check.py` checks the public answer (F14).
 3. The C-83 negative cases are refused on staging with the real gh, and that check also runs outside the box (F16).
 4. The keyring commands are built, and prod's keyring is real, with distinct `key_id`s (F13, C-77).
-5. `edge-2` runs healthy under edge.yml: Caddy issues its certificate into the 0700 directories, and its capability sets read 0. This is shown in PR 2.
-6. The outside scans in PR 2 show exactly 22, 80 and 443 on IPv4, and 22 only on IPv6 (C-70, F7). There is an IPv6 decision for prod (OQ-INFRA-13).
+5. **Done:** `edge-2` runs healthy under edge.yml, and Caddy issues its certificates into the 0700 directories (M1 to M4). Its zero capability sets are shown in the image job, not read on the box.
+6. The outside scans show exactly 22, 80 and 443 on IPv4 (**done**, TCP, M11) and 22 only on IPv6 (**pending**). The Cloud Firewall's three rules are read and shown to be TCP only, because UDP was not scanned. There is an IPv6 decision for prod (OQ-INFRA-13).
 7. Recovery for a lost release key is decided.
 8. CI's floating gh in `build.yml` and `release-lookup.sh` is pinned or accepted with a reason. It decides nothing on the box, but release.yml's mirror check uses it.
-9. No core dump leaves a crashing process: apport is purged, `kernel.core_pattern=|/bin/false`, `fs.suid_dumpable=0`, and the provision-check row passes on the box.
+9. **Done:** no core dump leaves a crashing process. H27 failed on the old values, then passed, and held over a reboot (F20).
 
-## SECURITY doc edits (1.21.4)
+Follow-ups that do not block prod: F21 (apply `edge.env`, plus a drift row), F23 (h1/h2 only, in the next `edge-<n>`), F24 (upstream failures visible to monitoring), F25a, and F25b's INFRA §4.6 sentence.
+
+## SECURITY doc edits (1.21.5)
+
+- **§4 invitation link.** Caddy keeps no access log; the old text named one.
 
 - **§8 Signing.** The Principal signs release tags with a dedicated key that is never in an agent; no agent signs one.
 - **C-90.** `app` and `staging` have A records only (no AAAA while IPv4-only). A "Not in force" line says the public CAA answer is wider than the pinned set.

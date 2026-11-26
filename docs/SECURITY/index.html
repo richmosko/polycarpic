@@ -26,7 +26,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.21.4</span>
+    <span><strong>Version:</strong> 1.21.5</span>
     <span><strong>Last updated:</strong> 2026-11-26</span>
   </div>
 </header>
@@ -313,7 +313,7 @@ flowchart TB
         <li><strong>The invitation token.</strong> 32 bytes from the CSPRNG, carried as 43 characters of canonical base64url. Anything that does not decode to exactly 32 bytes and re-encode to the same string is not a token. Only <code>sha256</code> of the decoded bytes is stored (<code>invitation.token_hash</code>, exactly 32 bytes by a check constraint), and <code>poly_app</code> cannot select it. The plaintext is never stored or logged.
           <ul>
             <li>A <em>live</em> invitation is unclaimed, unrevoked and unexpired. Claiming binds it to one user, so it works once. A claimed invitation is no longer live, and a revoked one is refused. <code>revoked_at</code>, <code>claimed_user_id</code>, <code>claimed_at</code> and <code>accepted_at</code> are each set once and never change afterwards.</li>
-            <li>The link is <code>/sign-up?invitation=&lt;token&gt;</code>. That page answers with <code>Referrer-Policy: no-referrer</code> and <code>Cache-Control: no-store</code>, and it removes the token from the address bar once it has read it. The token reaches the server only in the sign-up request body. Caddy's access log drops the query string (INFRA).</li>
+            <li>The link is <code>/sign-up?invitation=&lt;token&gt;</code>. That page answers with <code>Referrer-Policy: no-referrer</code> and <code>Cache-Control: no-store</code>, and it removes the token from the address bar once it has read it. The token reaches the server only in the sign-up request body. Caddy keeps no access log, and its logger drops the query string from any URI it records (§9).</li>
             <li>Every refusal is the same 403 <code>invitation_required</code>: no token, a malformed, unknown, expired, revoked or claimed token, a token for another email, or a lock timeout. It carries no database text. The check runs before BetterAuth looks up the email, so a refusal never says whether an account exists. On the OAuth and magic-link routes, every refusal redirects to the same error target.</li>
           </ul></li>
         <li><strong>What proves the email.</strong> On <code>/sign-up/email</code>, the token is the proof: only the invitation it names is claimed, and the new account's email stays unverified. On <code>/callback/:id</code> and <code>/magic-link/verify</code>, there is no token, and an email the IdP verified, or the magic link, is the proof. A token-less sign-up claims every live invitation for that address, and the database refuses it unless <code>user.email_verified</code> is true. The route decides which mode applies, never a body field.</li>
