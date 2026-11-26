@@ -129,7 +129,7 @@ Either way the harness then writes the files provision does not generate (`plaid
 
 **Seam.** Pins `infra/deploy/gh-version` and `gh-sha256` (two `sha256sum` lines: `gh_<v>_linux_amd64.tar.gz`, then `gh_<v>_linux_amd64/bin/gh`), read from `$here/deploy/`, both in `install.sh` PATHS. The box serves a stand-in release at the real URL through the fake `curl` and mounts the stand-in's `gh-sha256` over the repository's (only once that file exists); the real hashes are never exercised, and no test checks them against GitHub's. A fake `dpkg` answers `amd64`. A case that needs other pins runs from a copy of `infra/`.
 
-**Pinned beyond the ruling:** `H26` never runs a `gh` whose hash is wrong (the check is root). At deploy: `gh --version` is the first `gh` call and gets no token; `rollback` asks nothing of gh; refusal `gh`, exit 4. A failed call prints a line with `gh`, its exit code and one of `401`, `403`, `404`, `rate limit`, `other`; the "no attestations", "verification failed" and "network" labels are not pinned. Not tested: a refused tarball with extra or hostile members beyond the one extracted.
+**Pinned beyond the ruling:** `H26` never runs a `gh` whose hash is wrong (the check is root). At deploy: `gh --version` is the first `gh` call and gets no token; `rollback` asks nothing of gh; refusal `gh`, exit 4. A failed call prints `gh: exit <n> (<label>)`; the eight labels are devops-104's allowlist (`http-401`, `http-403`, `http-404`, `rate-limit`, `no-attestations`, `verify-failed`, `network`, `other`), one sample stderr each. Not tested: a refused tarball with extra or hostile members beyond the one extracted.
 
 Four older helpers that count network calls now leave `gh --version` out.
 

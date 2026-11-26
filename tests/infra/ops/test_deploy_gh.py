@@ -161,8 +161,9 @@ class Redaction(Base):
     def test_a_failed_call_reports_its_exit_code_and_one_fixed_label(self):
         self.first()
         self.staging_candidate()
-        cases = (("HTTP 401: Bad credentials", "401"), ("HTTP 403: Resource not accessible by personal access token", "403"),
-                 ("HTTP 404: Not Found", "404"), ("API rate limit exceeded for user", "rate limit"), ("something nobody has seen " + MARK, "other"))
+        cases = (("HTTP 401: Bad credentials", "http-401"), ("HTTP 403: Resource not accessible by personal access token", "http-403"),
+                 ("HTTP 404: Not Found", "http-404"), ("API rate limit exceeded for user", "rate-limit"), ("no attestations found for subject", "no-attestations"),
+                 ("verification failed", "verify-failed"), ("error connecting to api.github.com", "network"), ("something nobody has seen " + MARK, "other"))
         for key in ("api", "run download", "attestation verify"):
             for text, label in cases:
                 with self.subTest(key=key, label=label):
@@ -173,8 +174,8 @@ class Redaction(Base):
                     before = self.state("staging", "deploy.log") or ""
                     r = self.deploy("staging")
                     said = r.err + r.out + (self.state("staging", "deploy.log") or "")[len(before):]
-                    hit = [l for l in said.splitlines() if "gh" in l and label in l and re.search(r"(?<![0-9:TZ-])7(?![0-9:TZ-])", l)]
-                    self.assertTrue(hit, "no line with gh, exit code 7 and %r:\n%s" % (label, said))
+                    want = "gh: exit 7 (%s)" % label
+                    self.assertTrue(want in said, "no %r:\n%s" % (want, said))
                     self.assert_clean(self.written(r), key)
 
     def test_gh_gets_a_closed_environment_on_every_call(self):
