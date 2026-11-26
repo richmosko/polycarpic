@@ -84,9 +84,9 @@ Read at `d936ab4e`: `staging-deploy.md` ("`edge-2` on the box", F21 to F25), `se
 
 The INFRA edit is devops-engineer's to make.
 
-**F25b and ARCH.** seceng accepts that every new `main` build recreates Postgres, because the rebuild is how Debian security fixes reach the image. ARCH §7's deploy-interruption text named only `web`, so ARCH 1.31.4 now says that the deploy also recreates `postgres` and that the app services restart while it starts. F21, F23 and F24 change nothing in ARCH.
+**F25b and ARCH.** Every new `main` build recreates Postgres. seceng's security view is to keep that, because the rebuild is how Debian security fixes reach the image; whether to keep the restart is the Principal's decision, on POLY-165. ARCH §7's deploy-interruption text named only `web`, so ARCH 1.31.4 now says that the deploy also recreates `postgres` and that the app services restart while it starts. F21, F23 and F24 change nothing in ARCH.
 
 **Verdict for PR 2: APPROVE WITH CONDITIONS.** It closes the issue once these are done:
 1. The IPv6 full scan shows 22 only, and the firewall rules are recorded as TCP only.
-2. The stand-in rule and register, M12, 9d, E6 and the §8 criterion are on POLY-165.
+2. The §8 criterion is on POLY-165. The stand-in rule and register, M12, 9d and E6 were filed at `38b21723`.
 3. INFRA's OQ-INFRA-8 cell names POLY-164, 105, 116, 120 and 121 as above.
