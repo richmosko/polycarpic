@@ -219,8 +219,8 @@ def _gh_env(work):
 
 # gh's stderr is never printed or logged (POLY-104 F15): it can echo URLs, API bodies, headers and terminal escapes. A failed call reports its exit
 # code and the first label of this list whose pattern matches; the label is the only thing taken from it.
-GH_LABELS = (("rate limit", r"rate limit"), ("http 401", r"HTTP 401\b"), ("http 403", r"HTTP 403\b"), ("http 404", r"HTTP 404\b"),
-             ("no attestations", r"no attestations? found"), ("verify failed", r"verification failed|failed to verify"),
+GH_LABELS = (("rate-limit", r"rate limit"), ("http-401", r"HTTP 401\b"), ("http-403", r"HTTP 403\b"), ("http-404", r"HTTP 404\b"),
+             ("no-attestations", r"no attestations? found"), ("verify-failed", r"verification failed|failed to verify"),
              ("network", r"dial tcp|no such host|connection (refused|reset)|network is unreachable|i/o timeout|TLS handshake timeout|error connecting to"))
 
 
