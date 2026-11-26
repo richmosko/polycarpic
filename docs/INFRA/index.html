@@ -25,7 +25,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.3.43</span>
+    <span><strong>Version:</strong> 1.3.44</span>
     <span><strong>Last updated:</strong> 2026-11-25</span>
   </div>
 </header>
@@ -1001,7 +1001,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>OQ-INFRA-4</td><td>B2: compliance-mode Object Lock on a bucket-default retention, the exact capability set of the put-only key (does rclone need <code>listBuckets</code>?), the lifecycle rule, and the cannot-delete, cannot-overwrite, cannot-shorten and cannot-change-bucket-retention tests with the put-only key (C-73), and the storage cap and alert</td><td>devops-engineer</td><td>Before the first backup (first drill) (<strong>POLY-105</strong>)</td></tr>
       <tr><td>OQ-INFRA-5</td><td>Container memory caps, plan size, volume size, disk and egress use</td><td>devops-engineer</td><td>After POLY-M1 lands, then at GA (<strong>POLY-117</strong>)</td></tr>
       <tr><td>OQ-INFRA-6</td><td>Neon restore window on the plan in use; Vercel Hobby limits at deploy time</td><td>devops-engineer</td><td>When the tertiary target is first stood up (<strong>POLY-121</strong>)</td></tr>
-      <tr><td>OQ-INFRA-8</td><td>Every command in §7 and §8 verified once on a real machine; the runbook is corrected wherever it differs</td><td>devops-engineer</td><td>First staging deploy (POLY-M1) (<strong>POLY-104</strong>)</td></tr>
+      <tr><td>OQ-INFRA-8</td><td>Every command in §7 and §8 verified once on a real machine; the runbook is corrected wherever it differs</td><td>devops-engineer</td><td>Each unrun step has a carrier. §7.1 steps 14, 16 and 17, and the §8 commands that only prod can run: <strong>POLY-164</strong>. §7.1 step 18 (with OQ-INFRA-11 reworded: staging has no backup): <strong>POLY-105</strong>. §7.1 step 19: <strong>POLY-116</strong>. The home box (§7.2, §7.3): <strong>POLY-120</strong>. Vercel and Neon (§7.4): <strong>POLY-121</strong>. The §8 commands not run on staging, among them rollback, a replaced secret as the running container sees it, <code>docker compose run</code>'s timeout and <code>rm -f</code>, and lockdown once it is built (§8.11): <strong>POLY-165</strong>.</td></tr>
       <tr><td>OQ-INFRA-9</td><td>Healthchecks.io free-tier limits (check count, minimum period and grace, ping-key behaviour, <code>/fail</code> handling)</td><td>devops-engineer</td><td>At account creation (<strong>POLY-104</strong>)</td></tr>
       <tr><td>OQ-INFRA-10</td><td>Prove an unattended TPM unlock of an encrypted <strong>root</strong> on Ubuntu 24.04 server: candidate A (installer LVM+LUKS2, Clevis tpm2 pin PCR 7, clevis-initramfs), then B (dracut, systemd-cryptenroll). Pass criteria: §7.2 step 6 checks 1 to 4 and step 7. If neither works, stop and return to SecEng and the Principal.</td><td>devops-engineer</td><td>First home-box deploy, before any real data (<strong>POLY-120</strong>)</td></tr>
       <tr><td>OQ-INFRA-11</td><td>The backup set on the real staging instance: <code>archive_command</code> with <code>gzip</code> and <code>age</code> keeps up and fails safe under real load, and the base recovers with the archived WAL there as it does on the scratch stack (where the row inserted after the base was present after recovery and no slot remained).</td><td>devops-engineer</td><td>First staging deploy that has a backup (before the first drill) (<strong>POLY-105</strong>)</td></tr>
