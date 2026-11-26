@@ -21,3 +21,4 @@ The first deploy of a `v1.*` release to prod. Filed at the POLY-M1 regroup (2026
 - [ ] Prod is opened to the internet only with POLY-163's edge limits in force; the outside-in scan is repeated against prod.
 - [ ] INFRA §7.1 is run on prod as written, with every command that differs recorded; real release attestation is verified on the box.
 - [ ] No real household data is loaded by this issue: that waits on the restore drill (POLY-116).
+- [ ] Carried from POLY-104 (staging could not run them): INFRA §7.1 steps 14, 16 and 17 (the prod keyring and first deploy, the bootstrap user, sign-up and second step); OQ-INFRA-9, the Healthchecks.io limits measured with the heartbeat configured; and the prod-only commands of INFRA §8, each run once and recorded.
