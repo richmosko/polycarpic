@@ -4,7 +4,7 @@ title: Backup + storage first-run checks
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-99, POLY-104, POLY-164]
+blocked_by: [POLY-99, POLY-104]
 assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/index.html]
 labels: [ops, verification, backup]
@@ -29,4 +29,4 @@ From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8): this is
 
 ### @team-lead — 2026-11-26
 
-Reworded from POLY-104's staging deploy (finding F17): staging has no backup or uploader service, so these measurements run on the first instance that has a backup, which is prod. `blocked_by` gains POLY-164 for that reason; INFRA's OQ-INFRA-11 says the same. The measurements still come before real household data.
+Reworded from POLY-104's staging deploy (finding F17): staging has no backup or uploader service, so these measurements run on the first instance that has a backup, which is prod. INFRA's OQ-INFRA-11 says the same. **Ordering is open:** POLY-164 (first prod deploy) is blocked by POLY-106, which is blocked by this issue, so as filed these measurements must pass before the only instance that can host them exists. Either staging gets a backup service for the measurement, or the order becomes prod deploy, then this issue, then real household data. The Principal decides, with POLY-165.
