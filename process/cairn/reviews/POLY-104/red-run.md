@@ -88,7 +88,16 @@ Box suite: 222 run, 215 passed, 7 failed, all new `F11` tests; the `F11 control`
 
 `test_set_secret.py`: 32 run, 2 subtests failed: with a staging service directory missing, the message names 10001 and 10007 where staging.yml says 10101 and 10107. The prod subtests pass. `list-secrets` reads the group from the directory, so it calls the wrong layout `set`; not pinned.
 
-CI never ran provision's layout: `deploy-real/harness.ts` makes the staging secrets itself, in the 101xx gids.
+**Added after:** `F11: set-secret --staging, on the box …` runs the real `set_secret` module and `Ctx` as root on the host box (only the hidden prompt is stood in). `set-secret` copies the directory's group, so today the 3 staging files get prod gids and the 3 prod files are right. `host.test.ts` alone with it: 102 run, 94 passed, 8 failed, all `F11`.
+
+### Can `deploy-real` use provision's layout?
+
+CI never ran it: `harness.ts` makes the staging secrets itself from its own table (`SECRETS`, 101xx). **Yes, for the secrets; no, for the whole host stage** (it wants a block volume for LUKS and installs packages and host settings on the runner). The seam is `secrets_for` with `gid_of`, `ensure_dir`, `change` and the `STAGING_SERVICES` / `STAGING_GENERATED` lists. `provision.sh` cannot be sourced (it parses arguments and dispatches at top level), so one of:
+
+- **A, no product change:** the harness cuts those definitions out of `provision.sh` by name and runs them as root, failing if one is not found. Tied to the script's text.
+- **B, small product change:** a narrow stage or source guard in `provision.sh` that runs only the secrets layout. Cleaner to call; adds root-run surface (devops-104, seceng).
+
+Either way the harness then writes the files provision does not generate (`plaid_secret`, `resend_api_key`, `credential_keyring`) with the group of the directory it finds, as `set-secret` does, drops its gid table, and adds the generated values to the leak sweep's list by reading them back. A wrong gid would then leave a real container unable to read its secret, which `first-deploy` should refuse (unmeasured). Recommend A. Not done.
 
 ## F9: H25 false FAIL, the render user cannot read its HOME
 

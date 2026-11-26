@@ -311,6 +311,25 @@ describe('provision.sh host stage (R5)', () => {
     expect(again, 'a second run changes nothing').toBe('0');
   });
 
+  it('F11: set-secret --staging, on the box as the host stage left it, writes each file 0440 root:<the staging gid> (prod: the prod gid)', () => {
+    // the real command module and context on the real files; only the terminal is stood in (a hidden prompt needs a tty)
+    const py = [
+      'import argparse, sys', 'sys.path.insert(0, "/repo/infra/ops")',
+      'from commands import set_secret', 'from lib.ctx import Ctx',
+      'ctx = Ctx(trusted_uid=0, getpass=lambda p="": "fxvalue-" + sys.argv[1], isatty=lambda: True, confirm=lambda p="": "yes")',
+      'sys.exit(set_secret.run(argparse.Namespace(staging=sys.argv[2] == "staging", name=sys.argv[1]), ctx))',
+    ].join('\n');
+    const r = run(`mkdir -p /opt/polycarpic/ops && ln -sfn /repo /opt/polycarpic/ops/current
+cat > /tmp/set.py <<'PY'
+${py}
+PY
+for a in "plaid_secret staging" "resend_api_key staging" "plaid_secret prod" "resend_api_key prod"; do python3 -B /tmp/set.py $a > /dev/null || echo "FAILED $a"; done
+cd /etc/polycarpic; stat -c '%n %a %u:%g' staging-secrets/*/plaid_secret staging-secrets/*/resend_api_key secrets/*/plaid_secret secrets/*/resend_api_key`, { image: HOST });
+    expect(r.out.split('\n').filter(Boolean).length, r.out + r.err).toBe(6); // web, auth and worker, in both projects
+    expect(r.out).not.toContain('FAILED');
+    expect(wrongOwners(r.out)).toEqual([]);
+  });
+
   it('F11: provision-check passes H6 on the right staging layout, set-secret files included', () => {
     const r = check(`${rightStaging}; ${addLater}`);
     expect(find(r.out, 'FAIL', 'H6')?.text).toBeUndefined();
