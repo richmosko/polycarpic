@@ -348,13 +348,21 @@ cd /etc/polycarpic; stat -c '%n %a %u:%g' staging-secrets/*/plaid_secret staging
   // no host account other than root may hold a service gid: now both ranges
   const RESERVED = [999, 10001, 10010, 10101, 10107, 10110];
   const FREE = [998, 10100, 10111];
-  const holder = (gid: number, how: 'primary' | 'member') => (how === 'primary'
-    ? `groupadd -g ${gid} g${gid}; useradd -M -g ${gid} -s /usr/sbin/nologin held${gid}`
-    : `groupadd -g ${gid} g${gid}; useradd -M -s /usr/sbin/nologin held${gid}; usermod -aG g${gid} held${gid}`);
+  // the box already has a group at some of these gids (999 is systemd-journal): join whatever group holds the gid, and stop loudly if the plant did not take
+  const holder = (gid: number, how: 'primary' | 'member') => {
+    const group = `getent group ${gid} > /dev/null || groupadd -g ${gid} g${gid}`;
+    return how === 'primary'
+      ? `${group}; useradd -M -g ${gid} -s /usr/sbin/nologin held${gid}; [ "$(id -g held${gid})" = ${gid} ] || { echo "PLANT FAILED ${gid}"; exit 90; }`
+      : `${group}; useradd -M -s /usr/sbin/nologin held${gid}; usermod -aG "$(getent group ${gid} | cut -d: -f1)" held${gid}; id -G held${gid} | grep -qw ${gid} || { echo "PLANT FAILED ${gid}"; exit 90; }`;
+  };
 
   it('F11 H9: provision-check FAILs an account whose primary group or membership is any of 999, 10001-10010, 10101-10110, and passes just outside them', () => {
-    for (const gid of RESERVED) for (const how of ['primary', 'member'] as const) failLine(check(holder(gid, how)), 'H9', [`held${gid}`, String(gid)]);
-    const r = check(FREE.map((g) => `${holder(g, 'primary')}; usermod -aG g${g} polyops`).join('; '));
+    for (const gid of RESERVED) for (const how of ['primary', 'member'] as const) {
+      const r = check(holder(gid, how));
+      expect(find(r.out, 'FAIL', 'H9')?.text, `${gid} ${how}: ${r.out.slice(-300)}${r.err.slice(-300)}`).toBeDefined();
+      failLine(r, 'H9', [`held${gid}`, String(gid)]);
+    }
+    const r = check(FREE.map((g) => `${holder(g, 'primary')}; usermod -aG "$(getent group ${g} | cut -d: -f1)" polyops`).join('; '));
     expect(find(r.out, 'PASS', 'H9'), r.out.slice(-800)).toBeDefined();
   });
 
@@ -391,7 +399,7 @@ cd /etc/polycarpic; stat -c '%n %a %u:%g' staging-secrets/*/plaid_secret staging
     for (const l of staging) expect(l).toMatch(/ 750 root:\d+$/);
     for (const [root, set] of [['secrets', PROD_GEN], ['staging-secrets', STAGING_GEN]] as const) {
       const f = run(`cd /etc/polycarpic/${root}; stat -c '%n %a %U:%g' */*; find . -type f | wc -l`, { image: HOST });
-      for (const p of set) expect(f.out, `${root}/${p}`).toContain(`${p} 440 root:${GIDS[p.split('/')[0]!]}`);
+      for (const p of set) expect(f.out, `${root}/${p}`).toContain(`${p} 440 root:${(root === 'secrets' ? GIDS : STAGING_USERS)[p.split('/')[0]!]}`);
       expect(Number(f.out.trim().split('\n').pop())).toBe(set.length);
     }
   });

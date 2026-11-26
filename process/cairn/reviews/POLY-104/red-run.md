@@ -90,6 +90,15 @@ Box suite: 222 run, 215 passed, 7 failed, all new `F11` tests; the `F11 control`
 
 **Added after:** `F11: set-secret --staging, on the box …` runs the real `set_secret` module and `Ctx` as root on the host box (only the hidden prompt is stood in). `set-secret` copies the directory's group, so today the 3 staging files get prod gids and the 3 prod files are right. `host.test.ts` alone with it: 102 run, 94 passed, 8 failed, all `F11`.
 
+### Two defects in these tests, found at build-green
+
+- **The H9 red at `db9a7809` was not shown for the right reason.** The test box already has a group at gid 999 (`systemd-journal`), so the member plant for 999 failed without a word and the loop stopped there, never reaching 101xx. The plant now joins whatever group holds the gid and exits 90 if it did not take. Re-run against the scripts before the fix, it fails at `10101 primary`; the provision account test fails there too.
+- The older `secrets: both roots 0700…` test expected the prod gids for the staging generated files: it asserted the defect. Staging now takes the gids of `staging.yml`.
+
+### F11 build-green at `936f833b`: not green yet
+
+Box suite (with both test fixes): 223 run, 222 passed, 1 failed: `infra/provision.sh is shellcheck clean`, SC2015 (info) at line 377, `[ -f "$f" ] && [ ! -L "$f" ] || continue`. CI's `shellcheck -x` step exits 1 on it. All `F11` tests pass. `-p` runs of `test_set_secret` (32), `test_list_secrets` (7), `test_provision` (24), `test_staging_auth` (12), `test_lint` (9), `test_dispatcher` (19), `test_status` (53), `test_restart` (9): all pass. `vitest.config.ts`: 677 passed, 3 skipped.
+
 ### Can `deploy-real` use provision's layout?
 
 CI never ran it: `harness.ts` makes the staging secrets itself from its own table (`SECRETS`, 101xx). **Yes, for the secrets; no, for the whole host stage** (it wants a block volume for LUKS and installs packages and host settings on the runner). The seam is `secrets_for` with `gid_of`, `ensure_dir`, `change` and the `STAGING_SERVICES` / `STAGING_GENERATED` lists. `provision.sh` cannot be sourced (it parses arguments and dispatches at top level), so one of:
