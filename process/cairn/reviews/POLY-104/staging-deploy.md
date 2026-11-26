@@ -40,6 +40,17 @@ The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging o
 | F12 | 12 | Step 12 says a missing secret is not a problem because the first start names it. Every file a service mounts must exist: `web` mounts `plaid_secret` and `worker` mounts `credential_keyring`, and `staging.yml` reads neither. `resend_api_key` must be a non-empty single line; it is not checked with the provider. A missing file would fail `check-config`, which quarantines the digest (Docker's behaviour for a missing secret source: not measured). | code | step 12 corrected (INFRA 1.3.34) |
 | F13 | 12, 13, 14 | `polycarpic-ops init-keyring`, `keyring-fingerprint` and `restore-keyring` do not exist, and the app CLI has no `secrets init`. `set-secret credential_keyring` refuses and names `init-keyring`. No tool can create the file the worker mounts. | code | lead, 2026-11-25: no `init-keyring` in this loop; staging uses a hand-made random placeholder (a departure from the runbook); follow-up to be filed. Runbook lines marked "not built" (INFRA 1.3.34) |
 
+## Security review of the F11 fix (seceng)
+
+Verdict at `936f833b`: safe to install on the staging box.
+
+| # | Level | Finding | State |
+|---|---|---|---|
+| S1 | Low | A link at a secrets root or service directory was followed: its target, with the files in it, was re-owned. A staging link to prod's `web` directory would have handed prod's secrets to the staging group. qa found the same for a linked generated secret file. Only root can create such a link. | fixed: a link at any of these, and at the host-only secret, stops the stage and is left as found |
+| S2 | Info | A hard link inside a staging service directory to a prod file would be re-owned. Only root can create one. | recorded; not changed (read from code; whether H6 flags it is not measured) |
+| S3 | Info | `set-secret` checks a directory's owner and mode, not its group, and writes with the group it finds. A host-stage rerun now repairs the file and H6 flags it. | recorded; not changed |
+| S4 | Info | `gid_of` gave the prod groups for a staging root written with a trailing slash. No caller passed one. | fixed in both scripts |
+
 ## Box results
 
 With operator tool `git-84dc7374d08f`:

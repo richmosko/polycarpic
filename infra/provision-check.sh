@@ -48,7 +48,9 @@ gid_of() { # service [secrets root]
     uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;; host) g=0 ;;
     *) g='' ;;
   esac
-  if [[ "${2:-}" == */staging-secrets && -n "$g" && "$g" != 999 ]]; then g=$((g + 100)); fi
+  local root=${2:-}
+  while [[ "$root" == */ ]]; do root=${root%/}; done # a trailing slash must not read as prod (POLY-104 S4)
+  if [[ "$root" == */staging-secrets && -n "$g" && "$g" != 999 ]]; then g=$((g + 100)); fi
   echo "$g"
 }
 service_gid() { [ "$1" = 999 ] || { [ "$1" -ge 10001 ] && [ "$1" -le 10010 ]; } || { [ "$1" -ge 10101 ] && [ "$1" -le 10110 ]; }; }

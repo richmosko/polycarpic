@@ -49,7 +49,9 @@ gid_of() { # service [secrets root]
     uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;;
     *) die "unknown service $1" ;;
   esac
-  if [[ "${2:-}" == */staging-secrets && "$g" != 999 ]]; then g=$((g + 100)); fi
+  local root=${2:-}
+  while [[ "$root" == */ ]]; do root=${root%/}; done # a trailing slash must not read as prod (POLY-104 S4)
+  if [[ "$root" == */staging-secrets && "$g" != 999 ]]; then g=$((g + 100)); fi
   echo "$g"
 }
 # the gids no host account but root may hold
@@ -364,12 +366,18 @@ install_units() {
   if [ "$reload" = 1 ]; then systemctl daemon-reload; fi
 }
 
+# chown and chmod follow a link: one in a secrets tree could hand another tree's secrets to this one's gid, so it stops the run and is left as
+# found (POLY-104 S1).
+refuse_link() { [ ! -L "$1" ] || die "$1 is a link; not changing it"; }
+
 secrets_for() { # root services generated
   local root=$1 services=$2 generated=$3 svc pair f gid
+  refuse_link "$root"
   ensure_dir "$root" 0700 0:0
   [ "$(stat -c %a "$root")" = 700 ] || chmod 0700 "$root"
   for svc in $services; do
     gid=$(gid_of "$svc" "$root")
+    refuse_link "$root/$svc"
     ensure_dir "$root/$svc" 0750 "0:$gid"
     [ "$(stat -c %a "$root/$svc")" = 750 ] || chmod 0750 "$root/$svc"
     # every file already there, set-secret's included: owner only, the value is never opened
@@ -380,6 +388,7 @@ secrets_for() { # root services generated
   done
   for pair in $generated; do
     svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc" "$root")
+    refuse_link "$f" # a dangling one too: generating would write through it
     if [ ! -e "$f" ]; then
       (umask 0377; head -c 32 /dev/urandom | base64 > "$f")
       change "generated ${f#"$ETC"/}"
@@ -391,6 +400,8 @@ secrets_for() { # root services generated
 
 host_secrets() { # secrets root reads and no service mounts (heartbeat_url): root:root 0700 directory, root:root 0400 files
   local root=$ETC/secrets old=$ETC/secrets/uploader/heartbeat_url new=$ETC/secrets/host/heartbeat_url
+  refuse_link "$root/host"
+  refuse_link "$new"
   ensure_dir "$root/host" 0700 0:0
   [ "$(stat -c %a "$root/host")" = 700 ] || chmod 0700 "$root/host"
   if [ -f "$old" ] && [ ! -e "$new" ]; then
