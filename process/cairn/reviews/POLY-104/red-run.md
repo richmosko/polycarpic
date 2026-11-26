@@ -110,6 +110,10 @@ Box suite (with both test fixes): 223 run, 222 passed, 1 failed: `infra/provisio
 
 S2 (hardlinks) has no test.
 
+### Build-green at `f674a6d3` (F11 with S1 and S4)
+
+Box suite: 228 run, 228 passed. CI's `shellcheck -x` command: exit 0. `vitest.config.ts`: 687 passed, 3 skipped (`provision-gid.test.ts` among them). `-p` runs of `test_provision*` (24), `test_set_secret*` (32), `test_list_secrets*` (7), `test_lint*` (9): all pass. The refusal reads `<path> is a link; not changing it`. A linked host-only secret and `secrets/host` are refused too (read from the diff; no test plants one).
+
 ### Can `deploy-real` use provision's layout?
 
 CI never ran it: `harness.ts` makes the staging secrets itself from its own table (`SECRETS`, 101xx). **Yes, for the secrets; no, for the whole host stage** (it wants a block volume for LUKS and installs packages and host settings on the runner). The seam is `secrets_for` with `gid_of`, `ensure_dir`, `change` and the `STAGING_SERVICES` / `STAGING_GENERATED` lists. `provision.sh` cannot be sourced (it parses arguments and dispatches at top level), so one of:
