@@ -92,3 +92,7 @@ The INFRA edit is devops-engineer's to make.
 3. **INFRA 1.3.46**: OQ-INFRA-8 names its carriers, and OQ-INFRA-11 no longer expects a backup on staging (`e2b39006`).
 
 **Verdict for PR 2: APPROVE WITH CONDITIONS.** One condition (C5): the Hetzner API token made to read the firewall and create the scan server is deleted, with the laptop's `hcloud` context, and the deletion is recorded in `staging-deploy.md` before the issue closes. The issue folds in C-78, and the record says only that the token was made.
+
+**C5 is met** (`staging-deploy.md` at `7ab7d7b6` and `ac57833a`, read at `e1499d31`). On the laptop, measured by the lead: the `hcloud` context list is empty, a server list answers `no active context or token`, and `laptop-check.py` ends `LAPTOP CHECK PASSED`. That the token is deleted in the Hetzner console is the Principal's statement, which is the same basis as the first token's deletion. It cannot be measured from here now that no copy of the token is left.
+
+**Final verdict for POLY-104: APPROVE.** C1 to C5 are met. What follows from this loop is carried by POLY-164, POLY-165, POLY-105, POLY-116, POLY-120 and POLY-121.
