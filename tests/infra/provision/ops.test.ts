@@ -319,7 +319,7 @@ describe('provision-check D3 records its probe window in jobs.log (R7: without i
       const superPw = superPassword();
       sh('docker', ['network', 'create', NET]);
       startPg(names.good, NET, BASE_IMAGE, superPw);
-      startPg(names.stg, NET, BASE_IMAGE, superPw);
+      startPg(names.stg, NET, BASE_IMAGE, superPw, [], true, 'staging');
       for (const n of [names.good, names.stg]) waitPg(n);
       const prod = run(`${STAGE(names.good)} 2>&1`, { image: HOST, network: NET });
       if (prod.code !== 0) throw new Error(`the prod database stage failed: ${prod.all.slice(-600)}`);
