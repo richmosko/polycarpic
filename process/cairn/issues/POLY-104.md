@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/**, docs/SECURITY/**, docs/ARCH/**, infra/**, tests/infra/**, process/cairn/issues/POLY-104.md]
 labels: [ops, verification]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/159
 created: 2026-11-08
 updated: 2026-11-25
 ---
@@ -77,3 +77,7 @@ Feature started. Branch: `feature/poly-104-first-staging-deploy`. The lead decid
 ### @team-lead — 2026-11-25
 
 Acceptance line 1 amended (architect condition C1, lead decision F7 under the Principal's delegation): staging is IPv4-only, so the scan expects 22/80/443 on IPv4 and 22 only on IPv6. The issue lands in two PRs: PR 1 the fixes (issue stays in-progress), PR 2 the edge-2 record, which closes it. See `process/DECISIONS.md` 2026-11-26.
+
+### @team-lead — 2026-11-25
+
+PR 1 of 2: https://github.com/richmosko/polycarpic/pull/159. CI green on e3d32c98 (deploy-real 684 s with the changed fake gh, image 713 s of 1200, provision 229 s, lint 223 s; architect condition C2 met). Merging PR 1; the issue stays in-progress for edge-2, the outside scans and PR 2.
