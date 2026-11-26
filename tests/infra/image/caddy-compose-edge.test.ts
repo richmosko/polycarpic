@@ -88,13 +88,24 @@ describe('F18: the edge project, as infra/compose/edge.yml defines it', () => {
       .toEqual([SVC.user, SVC.read_only, SVC.cap_drop, [], SVC.security_opt, SVC.tmpfs]);
   });
 
-  it('starts and stays up: running, never restarted, and the healthcheck command runs inside it', () => {
+  // the file's own healthcheck, not a faster one from the override: its first run comes one interval (60 s) after the start
+  it('starts and stays up: still running after 30 s, never restarted, and healthy by edge.yml\'s own healthcheck', { timeout: 150_000 }, () => {
     expect(upError, state()).toBe('');
-    sh('sleep', ['5']);
-    const s = sh('docker', ['inspect', '-f', '{{.State.Running}} {{.RestartCount}}', cid()]).out.trim();
-    expect(s, state()).toBe('true 0');
-    const v = compose('exec', '-T', 'caddy', 'caddy', 'version');
-    expect(v.code, v.err + state()).toBe(0);
+    const read = () => {
+      const [running, restarts, health, started] = sh('docker', ['inspect', '-f', '{{.State.Running}} {{.RestartCount}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} {{.State.StartedAt}}', cid()]).out.trim().split(' ');
+      return { running, restarts, health, age: (Date.now() - Date.parse(started ?? '')) / 1000 };
+    };
+    let s = read();
+    for (let i = 0; i < 100 && s.running === 'true' && s.restarts === '0' && (s.health === 'starting' || s.age < 30); i++) { sh('sleep', ['1']); s = read(); }
+    expect([s.running, s.restarts, s.health], state()).toEqual(['true', '0', 'healthy']);
+    expect(s.age, 'seconds up').toBeGreaterThanOrEqual(30);
+  });
+
+  it('its process 1 is caddy and holds no capability at all: CapPrm, CapEff and CapBnd are zero', () => {
+    const r = compose('exec', '-T', 'caddy', 'cat', '/proc/1/status');
+    expect(r.code, r.err + state()).toBe(0);
+    const field = (name: string) => new RegExp(`^${name}:\\s+(\\S+)$`, 'm').exec(r.out)?.[1];
+    expect([field('Name'), field('CapPrm'), field('CapEff'), field('CapBnd')]).toEqual(['caddy', ...Array(3).fill('0000000000000000')]);
   });
 
   it('answers on 8443 for both sites (no upstream here: 502), asks staging for its password from the mounted secret, and redirects 8080 to https', () => {
