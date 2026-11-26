@@ -148,6 +148,10 @@ Two defects on the test side, found here:
 
 **Red.** Box suite: 252 run, 244 passed, 8 failed, all in `checks-db.test.ts` and all on `staging: archive_mode is off (want on); archive_timeout is 0 (want 300)`: three new `F17` tests and five older all-pass and summary cases. The new `F17` prod guard (prod on the staging conf FAILs) and the D1 fault case pass today.
 
+### Build-green at `4940b3fc`
+
+Box suite: 252 run, 252 passed. CI's `shellcheck -x` command: exit 0. `vitest.config.ts`: 687 passed, 3 skipped.
+
 ## F9: H25 false FAIL, the render user cannot read its HOME
 
 `provision-check.sh` makes the render user's HOME with `mktemp -d` as root (0700 root) and asks `docker compose version --short` as uid 10020. The fake `docker compose version` now does what the real CLI did on the box: if `$HOME/.docker/config.json` gives "permission denied" to the caller, it prints the warning and `unknown flag: --short` and exits 125; a HOME that is not there is no error.
