@@ -1,7 +1,7 @@
 ---
 id: POLY-104
 title: First staging deploy
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
@@ -9,9 +9,9 @@ assignee: devops-engineer
 paths: [process/cairn/reviews/**, docs/INFRA/**, docs/SECURITY/**, docs/ARCH/**, infra/**, tests/infra/**, process/cairn/issues/POLY-104.md]
 labels: [ops, verification]
 priority: null
-pr: https://github.com/richmosko/polycarpic/pull/159
+pr: https://github.com/richmosko/polycarpic/pull/160
 created: 2026-11-08
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -81,3 +81,7 @@ Acceptance line 1 amended (architect condition C1, lead decision F7 under the Pr
 ### @team-lead — 2026-11-25
 
 PR 1 of 2: https://github.com/richmosko/polycarpic/pull/159. CI green on e3d32c98 (deploy-real 684 s with the changed fake gh, image 713 s of 1200, provision 229 s, lint 223 s; architect condition C2 met). Merging PR 1; the issue stays in-progress for edge-2, the outside scans and PR 2.
+
+### @team-lead — 2026-11-26
+
+PR 2 opened: https://github.com/richmosko/polycarpic/pull/160. It carries the record from `edge-2` on and closes the issue. Awaiting CI.
