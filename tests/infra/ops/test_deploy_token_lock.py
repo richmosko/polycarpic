@@ -36,7 +36,7 @@ class Token(Candidate):
             self.assertNotIn(self.token, blob, "the token is in an argv or stdin: %r" % c["argv"][:4])
             self.assertNotIn("--token", c["argv"])
             env = c["env"] or {}
-            if c["argv"][0] == "gh":
+            if c["argv"][0] == "gh" and c["argv"] != ["gh", "--version"]:  # the version question needs no token and gets none (POLY-104 F15)
                 self.assertEqual(env.get("GH_TOKEN"), self.token)
             else:
                 self.assertNotIn("GH_TOKEN", env, c["argv"][:3])

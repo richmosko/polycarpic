@@ -1,24 +1,24 @@
 ---
 id: POLY-104
 title: First staging deploy
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
 assignee: devops-engineer
-paths: [process/cairn/reviews/**, docs/INFRA/index.html]
+paths: [process/cairn/reviews/**, docs/INFRA/**, docs/SECURITY/**, docs/ARCH/**, infra/**, tests/infra/**, process/cairn/issues/POLY-104.md]
 labels: [ops, verification]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/159
 created: 2026-11-08
-updated: 2026-11-24
+updated: 2026-11-25
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
 
 ## Acceptance criteria
 
-- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on v4 and v6.
+- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26).
 - [ ] provision-check passes.
 - [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer.
 - [ ] The review file lists every doc correction, and INFRA v1.2 lands them.
@@ -69,3 +69,15 @@ From the POLY-161 loop (2026-11-25, `process/cairn/reviews/POLY-161/verdict.md` 
 ### @team-lead — 2026-11-24
 
 From the POLY-160 loop (2026-11-25; `process/cairn/reviews/POLY-160/verdict.md`, "For filing"), three checks for the first real box: the runbook's Ctrl-C line run once on a real `edge-deploy`; a reboot after a stand-down, to see that the stopped containers stay stopped (unmeasured); `docker compose --project-directory` on the box's Compose 5.7.1 with no render home (measured only on 5.7.0 on the Mac).
+
+### @team-lead — 2026-11-25
+
+Feature started. Branch: `feature/poly-104-first-staging-deploy`. The lead decides and merges under the Principal's delegation of 2026-11-25 ("approved to go with your rec's. drive to completion and merge"). State at start, measured: no git tags, no `RELEASE_SIGNERS` variable, no `app` or `staging` DNS records, `main` build 45668115611 green on 4b186404. Decided (POLY-100 ruling §L6): Caddy comes up from a signed `edge-1` tag, not from a prod deploy. The lead runs the box commands with the Principal's loaded SSH key; teammates touch no real credential.
+
+### @team-lead — 2026-11-25
+
+Acceptance line 1 amended (architect condition C1, lead decision F7 under the Principal's delegation): staging is IPv4-only, so the scan expects 22/80/443 on IPv4 and 22 only on IPv6. The issue lands in two PRs: PR 1 the fixes (issue stays in-progress), PR 2 the edge-2 record, which closes it. See `process/DECISIONS.md` 2026-11-26.
+
+### @team-lead — 2026-11-25
+
+PR 1 of 2: https://github.com/richmosko/polycarpic/pull/159. CI green on e3d32c98 (deploy-real 684 s with the changed fake gh, image 713 s of 1200, provision 229 s, lint 223 s; architect condition C2 met). Merging PR 1; the issue stays in-progress for edge-2, the outside scans and PR 2.

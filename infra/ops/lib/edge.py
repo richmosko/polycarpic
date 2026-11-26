@@ -131,6 +131,7 @@ def _run(tag, ctx, seen, run):
     os.chmod(work, 0o700)
     deployer.check_edge_env(ctx)  # F10, before any network call and so before V1
     compose_guard.check_compose_version(ctx)  # G10, before any network call
+    rel.check_gh_version(ctx, work)  # POLY-104 F15, before any network call
     rel.load_pointer(ctx, "edge", "previous")
     if cur:
         n_cur, n = number(cur["tag"]), number(tag)

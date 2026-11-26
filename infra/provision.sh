@@ -39,14 +39,23 @@ unset CDPATH
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) || die "cannot resolve the directory of this script; nothing changed" 2
 cd / # G11: the caller's directory decides nothing
 
-# Service gids (F6, POLY-146). The same set the compose files mount secrets for.
-gid_of() {
+# Service gids (F6, POLY-146). The same set the compose files mount secrets for: each is the gid of the service's `user:` in that project's compose
+# file. A file secret keeps its host owner, so a wrong group means the service cannot read it. Staging runs its own range, 100 above prod's;
+# postgres is 999 in both (POLY-104 F11).
+gid_of() { # service [secrets root]
+  local g
   case "$1" in
-    postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;;
+    postgres) g=999 ;; web) g=10001 ;; worker) g=10002 ;; migrate) g=10003 ;; backup) g=10004 ;;
+    uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;;
     *) die "unknown service $1" ;;
   esac
+  local root=${2:-}
+  while [[ "$root" == */ ]]; do root=${root%/}; done # a trailing slash must not read as prod (POLY-104 S4)
+  if [[ "$root" == */staging-secrets && "$g" != 999 ]]; then g=$((g + 100)); fi
+  echo "$g"
 }
+# the gids no host account but root may hold
+service_gid() { [ "$1" = 999 ] || { [ "$1" -ge 10001 ] && [ "$1" -le 10010 ]; } || { [ "$1" -ge 10101 ] && [ "$1" -le 10110 ]; }; }
 PROD_SERVICES="postgres web worker migrate backup uploader operator auth caddy"
 STAGING_SERVICES="postgres web worker migrate operator auth"
 # service/file pairs generated here (32 random bytes, base64, written once, never overwritten).
@@ -140,7 +149,8 @@ install_docker() {
     local tmp fpr
     tmp=$(mktemp)
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp"
-    fpr=$(gpg --show-keys --with-colons "$tmp" | awk -F: '$1 == "fpr" { print $10; exit }')
+    # no pipeline here may stop reading early: under pipefail the producer dies of SIGPIPE and the script ends with 141 (POLY-104 F3)
+    fpr=$(gpg --show-keys --with-colons "$tmp" | awk -F: '$1 == "fpr" && !n++ { print $10 }')
     if [ "$fpr" != "$DOCKER_KEY_FPR" ]; then
       rm -f "$tmp"
       die "Docker's apt key fingerprint is $fpr, expected $DOCKER_KEY_FPR; nothing installed"
@@ -170,12 +180,55 @@ install_compose() {
     apt-mark hold docker-compose-plugin > /dev/null
     return 0
   fi
-  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2); if (index($2, w "-") == 1) { print $2; exit } }')
+  cand=$(apt-cache madison docker-compose-plugin | awk -F'|' -v w="$want" '{ gsub(/ /, "", $2) } index($2, w "-") == 1 && !n++ { print $2 }') \
+    || die "apt-cache madison docker-compose-plugin failed; nothing installed"
   [ -n "$cand" ] || die "Docker's repository does not list docker-compose-plugin $want; nothing installed"
   apt-mark unhold docker-compose-plugin > /dev/null 2>&1 || true
   apt-get install -y --no-install-recommends --allow-downgrades --allow-change-held-packages "docker-compose-plugin=$cand" > /dev/null
   apt-mark hold docker-compose-plugin > /dev/null
   change "docker-compose-plugin $cand installed and held (infra/deploy/compose-version)"
+}
+
+# gh decides whether an image is ours (`attestation verify`) and holds the GitHub token, so the host stage installs exactly the bytes two pins name
+# (POLY-104 F15): the release tarball, checked before it is unpacked, and its bin/gh, checked before it is run or put in place. No apt repository:
+# it would trust any version GitHub's key signs and run maintainer scripts as root.
+# Bumping the pin: change gh-version and both lines of gh-sha256; compare the tarball's line with the release's checksums.txt, run
+# `gh attestation verify <tarball> --repo cli/cli` with a gh you already trust, and write both results in the PR. Never go under 2.102.0.
+install_gh() {
+  local pins=$here/deploy/gh-sha256 bin=/usr/local/bin/gh want name tarsum binsum arch
+  want=$(tr -d '[:space:]' < "$here/deploy/gh-version" 2> /dev/null || true)
+  [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "$here/deploy/gh-version does not hold one version N.N.N; nothing installed"
+  name=gh_${want}_linux_amd64
+  tarsum=$(awk -v n="$name.tar.gz" '$2 == n { print $1 }' "$pins")
+  binsum=$(awk -v n="$name/bin/gh" '$2 == n { print $1 }' "$pins")
+  [[ "$tarsum" =~ ^[0-9a-f]{64}$ && "$binsum" =~ ^[0-9a-f]{64}$ ]] || die "$pins does not pin the sha256 of $name.tar.gz and of its bin/gh; nothing installed"
+  if [ -f "$bin" ] && [ ! -L "$bin" ] && [ "$(sha256sum < "$bin" | cut -d' ' -f1)" = "$binsum" ]; then
+    [ "$(stat -c %u:%g "$bin")" = 0:0 ] || { chown 0:0 "$bin"; change "owner of $bin set to 0:0"; }
+    [ "$(stat -c %a "$bin")" = 755 ] || { chmod 0755 "$bin"; change "mode of $bin set to 755"; }
+    return 0
+  fi
+  arch=$(dpkg --print-architecture)
+  [ "$arch" = amd64 ] || die "gh is pinned for amd64 only and this box is $arch; nothing installed"
+  [ ! -d "$bin" ] || die "$bin is a directory; nothing installed"
+  (
+    work=$(mktemp -d)
+    staged=$(dirname "$bin")/.gh.new
+    trap 'rm -rf "$work"; rm -f "$staged"' EXIT
+    curl -fsSL --proto =https --proto-redir =https --retry 3 -o "$work/$name.tar.gz" "https://github.com/cli/cli/releases/download/v$want/$name.tar.gz" \
+      || die "could not download gh $want; nothing installed"
+    got=$(sha256sum < "$work/$name.tar.gz" | cut -d' ' -f1)
+    [ "$got" = "$tarsum" ] || die "the gh tarball has sha256 $got, expected $tarsum; nothing installed"
+    # that one member's bytes and nothing else: no other entry, no path, owner or link from the archive reaches the disk
+    tar -xzOf "$work/$name.tar.gz" --no-same-owner -- "$name/bin/gh" > "$work/gh" || die "$name/bin/gh is not in the tarball; nothing installed"
+    got=$(sha256sum < "$work/gh" | cut -d' ' -f1)
+    [ "$got" = "$binsum" ] || die "gh's binary has sha256 $got, expected $binsum; nothing installed"
+    rm -f "$staged"
+    install -m 0755 -o 0 -g 0 "$work/gh" "$staged"
+    said=$(GH_CONFIG_DIR="$work" GH_NO_UPDATE_NOTIFIER=1 GH_PROMPT_DISABLED=1 "$staged" --version)
+    [[ "$said" == "gh version $want "* ]] || die "the pinned gh binary does not report version $want; nothing installed"
+    mv -T "$staged" "$bin"
+  )
+  change "gh $want installed at $bin (infra/deploy/gh-sha256)"
 }
 
 write_daemon_json() {
@@ -209,6 +262,28 @@ no_swap() {
   if grep -qE '^[^#]*[[:space:]]swap[[:space:]]' /etc/fstab 2> /dev/null; then
     sed -i -E '/^[^#]*[[:space:]]swap[[:space:]]/d' /etc/fstab
     change "swap removed from /etc/fstab"
+  fi
+}
+
+# No core dump leaves a crashing process (POLY-104, seceng's ruling). Ubuntu pipes core_pattern to apport, a root process on the host, and the
+# kernel does not apply a core limit of 0 to a pipe, so the containers' limits stop nothing there. apport goes first: its stop rewrites
+# core_pattern, and its service would take it back at every boot.
+no_core_dumps() {
+  local conf=/etc/sysctl.d/50-polycarpic-core.conf pattern='|/bin/false' status got
+  status=$(dpkg-query -W -f='${Status}' apport 2> /dev/null || true)
+  if [ -n "$status" ] && [[ "$status" != *not-installed ]]; then
+    apt-get purge -y apport > /dev/null
+    change "apport purged"
+  fi
+  put_file "$conf" 0644 "kernel.core_pattern=$pattern
+fs.suid_dumpable=0"
+  if [ "$(sysctl -n kernel.core_pattern)" != "$pattern" ] || [ "$(sysctl -n fs.suid_dumpable)" != 0 ]; then
+    sysctl -q -p "$conf"
+    got=$(sysctl -n kernel.core_pattern)
+    [ "$got" = "$pattern" ] || die "kernel.core_pattern is '$got' after applying $conf (want '$pattern')"
+    got=$(sysctl -n fs.suid_dumpable)
+    [ "$got" = 0 ] || die "fs.suid_dumpable is '$got' after applying $conf (want 0)"
+    change "core dump settings applied (sysctl)"
   fi
 }
 
@@ -271,6 +346,12 @@ data_dirs() {
   for d in pg-prod pg-staging; do
     ensure_dir "$DATA/$d" 0700 999:999
     [ "$(stat -c %a "$DATA/$d")" = 700 ] || chmod 0700 "$DATA/$d"
+  done
+  # Caddy's certificate store and config (edge.yml), for uid 10010. A missing bind source would be made by Docker as root:root 0755, which Caddy
+  # cannot write while its health check still passes; one made that way is repaired, its contents kept (POLY-104 F6).
+  for d in caddy caddy-config; do
+    ensure_dir "$DATA/$d" 0700 10010:10010
+    [ "$(stat -c %a "$DATA/$d")" = 700 ] || { chmod 0700 "$DATA/$d"; change "mode of $DATA/$d set to 700"; }
   done
   ensure_dir "$DATA/spool" 0755 0:0
   acl_dir "$DATA/spool/wal" 999:999
@@ -349,17 +430,29 @@ install_units() {
   if [ "$reload" = 1 ]; then systemctl daemon-reload; fi
 }
 
+# chown and chmod follow a link: one in a secrets tree could hand another tree's secrets to this one's gid, so it stops the run and is left as
+# found (POLY-104 S1).
+refuse_link() { [ ! -L "$1" ] || die "$1 is a link; not changing it"; }
+
 secrets_for() { # root services generated
   local root=$1 services=$2 generated=$3 svc pair f gid
+  refuse_link "$root"
   ensure_dir "$root" 0700 0:0
   [ "$(stat -c %a "$root")" = 700 ] || chmod 0700 "$root"
   for svc in $services; do
-    gid=$(gid_of "$svc")
+    gid=$(gid_of "$svc" "$root")
+    refuse_link "$root/$svc"
     ensure_dir "$root/$svc" 0750 "0:$gid"
     [ "$(stat -c %a "$root/$svc")" = 750 ] || chmod 0750 "$root/$svc"
+    # every file already there, set-secret's included: owner only, the value is never opened
+    for f in "$root/$svc"/*; do
+      if [ ! -f "$f" ] || [ -L "$f" ]; then continue; fi
+      [ "$(stat -c %u:%g "$f")" = "0:$gid" ] || { chown "0:$gid" "$f"; change "owner of ${f#"$ETC"/} set to 0:$gid"; }
+    done
   done
   for pair in $generated; do
-    svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc")
+    svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc" "$root")
+    refuse_link "$f" # a dangling one too: generating would write through it
     if [ ! -e "$f" ]; then
       (umask 0377; head -c 32 /dev/urandom | base64 > "$f")
       change "generated ${f#"$ETC"/}"
@@ -371,6 +464,8 @@ secrets_for() { # root services generated
 
 host_secrets() { # secrets root reads and no service mounts (heartbeat_url): root:root 0700 directory, root:root 0400 files
   local root=$ETC/secrets old=$ETC/secrets/uploader/heartbeat_url new=$ETC/secrets/host/heartbeat_url
+  refuse_link "$root/host"
+  refuse_link "$new"
   ensure_dir "$root/host" 0700 0:0
   [ "$(stat -c %a "$root/host")" = 700 ] || chmod 0700 "$root/host"
   if [ -f "$old" ] && [ ! -e "$new" ]; then
@@ -444,7 +539,7 @@ effective_mail_from() {
   local cur='' f
   for f in "$ETC/mail.env" "$ETC/host.env"; do # an old host.env still carries the key until the rerun drops it
     if [ -f "$f" ]; then
-      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | head -1 | sed -e 's/^"//' -e 's/"$//')
+      cur=$(sed -n 's/^MAIL_FROM=//p' "$f" | sed -n -e '1{s/^"//' -e 's/"$//' -e 'p' -e '}')
       [ -z "$cur" ] || break
     fi
   done
@@ -455,12 +550,12 @@ check_accounts() {
   local bad='' line user gid
   while IFS=: read -r user _ _ gid _; do
     [ "$user" = root ] && continue
-    if [ "$gid" = 999 ] || { [ "$gid" -ge 10001 ] && [ "$gid" -le 10010 ]; }; then bad="$bad $user(primary gid $gid)"; fi
+    if service_gid "$gid"; then bad="$bad $user(primary gid $gid)"; fi
   done < <(getent passwd)
   while IFS= read -r line; do
     local name=${line%%:*} g rest
     rest=${line#*:*:}; g=${rest%%:*}; rest=${rest#*:}
-    if [ "$g" = 999 ] || { [ "$g" -ge 10001 ] && [ "$g" -le 10010 ]; } || [ "$name" = docker ]; then
+    if service_gid "$g" || [ "$name" = docker ]; then
       for user in ${rest//,/ }; do [ "$user" = root ] || bad="$bad $user(in group $name, gid $g)"; done
     fi
   done < <(getent group)
@@ -480,6 +575,7 @@ stage_host() {
   write_daemon_json
   install_packages
   install_docker
+  install_gh
   systemctl enable --now docker > /dev/null 2>&1 || true
   [ "$DAEMON_CHANGED" = 0 ] || systemctl restart docker
   edge_networks
@@ -487,6 +583,7 @@ stage_host() {
   unattended_upgrades
   systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
   no_swap
+  no_core_dumps
   data_volume "$state"
   data_dirs
   state_files
@@ -554,7 +651,9 @@ stage_database() {
 
   render_home || die "render-path: $STATE/deploy/render-home is not a real directory owned by root, mode 0755 and empty; nothing changed"
   local dc=(docker compose -p "polycarpic-$project" --project-directory "$rh" --env-file /dev/null)
-  "${dc[@]}" ps --status running --services < /dev/null | grep -qx postgres \
+  local running
+  running=$("${dc[@]}" ps --status running --services < /dev/null) || running=''
+  grep -qx postgres <<< "$running" \
     || die "Postgres of $project is not running; start it first (the first deploy does)"
 
   # G13: the database itself, before roles.sql (POSTGRES_DB acts only on an empty data directory, never on one already initialised). Both statements are

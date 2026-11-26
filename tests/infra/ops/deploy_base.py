@@ -40,6 +40,8 @@ _TEMPLATE = None
 _KEYS = {}
 STAGING_AUTH_PATHS = ("/etc/polycarpic/secrets/caddy", "/etc/polycarpic/secrets/caddy/staging_basic_auth")
 SYSTEM_PATH = os.environ.get("PATH", "/usr/bin:/bin")
+_GH_VERSION = REPO / "infra" / "deploy" / "gh-version"
+GH_PINNED = _GH_VERSION.read_text().strip() if _GH_VERSION.exists() else "2.106.0"  # POLY-104 F15
 
 
 _FLAGS = json.loads((Path(__file__).parent / "fixtures" / "flags.json").read_text())
@@ -144,6 +146,8 @@ class World(object):
         self.artifacts = {}  # run id -> digest.txt text
         self.premigration = (0, "", "")
         self.gh_down = False  # a network outage: gh exits 1 with a transport error
+        self.gh_version = GH_PINNED  # POLY-104 F15: what `gh --version` answers: a version string, None (no gh on the box: the real seam's 127) or (code, out, err)
+        self.gh_fails = {}  # {"api" | "api -i" | "run download" | "attestation verify": (code, stderr)}: that call fails with exactly this
         self.docker_log, self.unhandled, self.pulled = [], [], []
         self.cids = {}
         self.compose_log, self.containers, self.by_name, self.render_hooks = [], {}, {}, {}
@@ -286,6 +290,17 @@ class World(object):
 
     def _gh(self, argv, stdin):
         env = self._last_env(argv) or {}
+        if argv[1:] == ["--version"]:  # no network, no token
+            got = self.gh_version
+            if got is None:
+                return 127, "", "gh: No such file or directory\n"
+            if isinstance(got, tuple):
+                return got
+            return 0, "gh version %s (2026-09-01)\nhttps://github.com/cli/cli/releases/tag/v%s\n" % (got, got), ""
+        key = "api -i" if argv[1:3] == ["api", "-i"] else "api" if argv[1] == "api" else " ".join(argv[1:3])
+        if key in self.gh_fails:
+            code, text = self.gh_fails[key]
+            return code, "", text
         bad = bad_options(argv)
         if bad:
             self.bad_flags.append((list(argv), bad))
@@ -649,6 +664,9 @@ class DeployTest(OpsTest):
         pinned = REPO / "infra" / "deploy" / "compose-version"  # G10: the installed bundle holds the pinned Compose version (install.sh's PATHS)
         if pinned.exists():
             h.write("/opt/polycarpic/ops/%s/infra/deploy/compose-version" % h.ops_id, pinned.read_bytes())
+        gh_pin = REPO / "infra" / "deploy" / "gh-version"  # POLY-104 F15: as compose-version
+        if gh_pin.exists():
+            h.write("/opt/polycarpic/ops/%s/infra/deploy/gh-version" % h.ops_id, gh_pin.read_bytes())
         self.staging_auth_file()
         h.write("/etc/passwd", "root:x:0:0:root:/root:/bin/bash\npolycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin\n")  # A18: the render user, as provision.sh makes it
         self.current_digest = digest("current")

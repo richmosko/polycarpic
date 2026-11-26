@@ -40,12 +40,20 @@ join() { local IFS="$1"; shift; echo "$*"; }
 
 PROD_SERVICES="postgres web worker migrate backup uploader operator auth caddy"
 STAGING_SERVICES="postgres web worker migrate operator auth"
-gid_of() {
+# A service's gid is its `user:` in that project's compose file: staging runs 100 above prod, postgres is 999 in both (provision.sh carries the same table).
+gid_of() { # service [secrets root]
+  local g
   case "$1" in
-    postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;; host) echo 0 ;;
+    postgres) g=999 ;; web) g=10001 ;; worker) g=10002 ;; migrate) g=10003 ;; backup) g=10004 ;;
+    uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;; host) g=0 ;;
+    *) g='' ;;
   esac
+  local root=${2:-}
+  while [[ "$root" == */ ]]; do root=${root%/}; done # a trailing slash must not read as prod (POLY-104 S4)
+  if [[ "$root" == */staging-secrets && -n "$g" && "$g" != 999 ]]; then g=$((g + 100)); fi
+  echo "$g"
 }
+service_gid() { [ "$1" = 999 ] || { [ "$1" -ge 10001 ] && [ "$1" -le 10010 ]; } || { [ "$1" -ge 10101 ] && [ "$1" -le 10110 ]; }; }
 # Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
 HOST_ONLY="heartbeat_url=host github_read_token=host"
 # The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
@@ -158,7 +166,7 @@ secret_root() { # root services
     svc=$(basename "$d")
     # shellcheck disable=SC2086
     if ! in_list "$svc" $services; then h6="$h6 $d must not exist here;"; continue; fi
-    gid=$(gid_of "$svc")
+    gid=$(gid_of "$svc" "$root")
     dmode=750 fmode=440
     if [ "$svc" = host ]; then dmode=700 fmode=400; fi # secrets root reads and no service mounts (HOST_ONLY): root:root, nobody else
     [ "$(stat -c '%a %u:%g' "$d")" = "$dmode 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want $dmode 0:$gid);"
@@ -392,13 +400,16 @@ want25=$(tr -d '[:space:]' < "$here/deploy/compose-version" 2> /dev/null || true
 if ! [[ "$want25" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then h25=" $here/deploy/compose-version does not hold one version;"
 else
   root25=$(docker compose version --short 2> /dev/null || true)
+  # a HOME like the deploy's render home: root's, 0755 and empty. mktemp's 0700 hides it from 10020, and docker then loses its plugins (POLY-104 F9)
   rhome=$(mktemp -d)
+  chmod 0755 "$rhome"
   user25=$(HOME="$rhome" setpriv --reuid 10020 --regid 10020 --clear-groups --no-new-privs -- docker compose version --short 2> /dev/null || true)
   rm -rf "$rhome"
   [ "$root25" = "$want25" ] || h25="$h25 root's Compose is '${root25:-none}' (want $want25);"
   [ "$user25" = "$want25" ] || h25="$h25 the render user's Compose is '${user25:-none}' (want $want25);"
-  apt-cache policy docker-compose-plugin 2> /dev/null | grep -q 'download.docker.com' || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
-  apt-mark showhold 2> /dev/null | grep -qx docker-compose-plugin || h25="$h25 docker-compose-plugin is not held;"
+  # read to the end, then match: `producer | grep -q` under pipefail can fail a check that holds (POLY-104)
+  grep -q 'download.docker.com' <<< "$(apt-cache policy docker-compose-plugin 2> /dev/null)" || h25="$h25 docker-compose-plugin does not come from download.docker.com;"
+  grep -qx docker-compose-plugin <<< "$(apt-mark showhold 2> /dev/null)" || h25="$h25 docker-compose-plugin is not held;"
 fi
 [ -z "$(ls -A /root/.docker/cli-plugins 2> /dev/null)" ] || h25="$h25 /root/.docker/cli-plugins holds a plugin;"
 report H25 "compose version" "$h25" "sudo bash provision.sh --stage host ... installs and holds it; remove /root/.docker/cli-plugins by hand"
@@ -409,6 +420,47 @@ for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/depl
   if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
   else [ "$(stat -c '%a %u' "$d")" = "755 0" ] || h24="$h24 $d is $(stat -c '%a %u' "$d") (want 755, owned by root);"; fi
 done
+# ------------------------------------------------------------------ H26 gh (POLY-104 F15)
+# The gh the ops tool runs is /usr/local/bin/gh with exactly the pinned bytes, root's and writable by root alone, at the pinned version (2.102.0
+# or later), with no other gh before it on the tool's PATH and no gh package. This check runs as root, so a gh is executed only once its owner,
+# mode and sha256 are right.
+h26=''
+gh_bin=/usr/local/bin/gh
+want26=$(tr -d '[:space:]' < "$here/deploy/gh-version" 2> /dev/null || true)
+sum26=$(awk -v n="gh_${want26}_linux_amd64/bin/gh" '$2 == n { print $1 }' "$here/deploy/gh-sha256" 2> /dev/null)
+if ! [[ "$want26" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$sum26" =~ ^[0-9a-f]{64}$ ]]; then
+  h26=" $here/deploy/gh-version and gh-sha256 do not pin one version and its binary;"
+else
+  IFS=. read -r major26 minor26 _ <<< "$want26"
+  { [ "$major26" -gt 2 ] || { [ "$major26" -eq 2 ] && [ "$minor26" -ge 102 ]; }; } || h26="$h26 the pinned gh $want26 is under 2.102.0;"
+  [ ! -e /usr/local/sbin/gh ] && [ ! -L /usr/local/sbin/gh ] || h26="$h26 /usr/local/sbin/gh comes before $gh_bin on the tool's PATH;"
+  if [ -L "$gh_bin" ] || [ ! -f "$gh_bin" ]; then h26="$h26 gh is not a regular file at $gh_bin;"
+  else
+    safe26=1
+    read -r uid26 mode26 <<< "$(stat -c '%u %a' "$gh_bin")"
+    { [ "$uid26" = 0 ] && [ $((8#$mode26 & 8#022)) = 0 ]; } || { safe26=0; h26="$h26 gh at $gh_bin is uid $uid26 mode $mode26 (want root's, not group or world writable);"; }
+    [ "$(sha256sum < "$gh_bin" | cut -d' ' -f1)" = "$sum26" ] || { safe26=0; h26="$h26 the sha256 of $gh_bin is not the pinned one (it was not run);"; }
+    if [ "$safe26" = 1 ]; then
+      said26=$(GH_NO_UPDATE_NOTIFIER=1 GH_PROMPT_DISABLED=1 "$gh_bin" --version 2> /dev/null)
+      [[ "$said26" == "gh version $want26 "* ]] || h26="$h26 $gh_bin reports '${said26%%$'\n'*}' (want version $want26);"
+    fi
+  fi
+fi
+[ "$(dpkg-query -W -f='${Status}' gh 2> /dev/null)" != "install ok installed" ] || h26="$h26 the gh dpkg package is installed: a second, unpinned gh;"
+report H26 "gh" "$h26" "sudo bash provision.sh --stage host ... installs the pinned gh; remove another gh or the gh package by hand (sudo apt-get remove gh)"
+
+# ------------------------------------------------------------------ H27 core dumps (POLY-104, seceng)
+# The LIVE kernel values, not the file: core_pattern exactly |/bin/false (a pipe is not bound by a core limit of 0, so what it names matters),
+# fs.suid_dumpable 0, and no apport package, whose service would take core_pattern back.
+h27=''
+got27=$(sysctl -n kernel.core_pattern 2> /dev/null || true)
+[ "$got27" = '|/bin/false' ] || h27="$h27 kernel.core_pattern is '$got27' (want '|/bin/false');"
+got27=$(sysctl -n fs.suid_dumpable 2> /dev/null || true)
+[ "$got27" = 0 ] || h27="$h27 fs.suid_dumpable is '$got27' (want 0);"
+got27=$(dpkg-query -W -f='${Status}' apport 2> /dev/null || true)
+[ -z "$got27" ] || [[ "$got27" == *not-installed ]] || h27="$h27 the apport package is present ($got27);"
+report H27 "core dumps" "$h27" "sudo bash provision.sh --stage host ... purges apport and sets /etc/sysctl.d/50-polycarpic-core.conf"
+
 # The render home (POLY-160 R7): absent is `/` (as the ops tool does); one that exists is used only as a real directory, owned by root, mode 0755 and empty.
 rh=/
 rd=/var/lib/polycarpic/state/deploy/render-home
@@ -426,11 +478,11 @@ report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... 
 h9=''
 while IFS=: read -r user _ _ gid _; do
   [ "$user" = root ] && continue
-  if [ "$gid" = 999 ] || { [ "$gid" -ge 10001 ] && [ "$gid" -le 10010 ]; }; then h9="$h9 $user has primary gid $gid;"; fi
+  if service_gid "$gid"; then h9="$h9 $user has primary gid $gid;"; fi
 done < <(getent passwd)
 while IFS= read -r line; do
   name=${line%%:*}; rest=${line#*:*:}; g=${rest%%:*}; members=${rest#*:}
-  if [ "$g" = 999 ] || { [ "$g" -ge 10001 ] && [ "$g" -le 10010 ]; } || [ "$name" = docker ]; then
+  if service_gid "$g" || [ "$name" = docker ]; then
     for u in ${members//,/ }; do [ "$u" = root ] || h9="$h9 $u is in group $name (gid $g);"; done
   fi
 done < <(getent group)
@@ -564,7 +616,7 @@ report H15 "operator access" "$h15" "remove the extra account or its authorized_
 
 # ------------------------------------------------------------------ database checks
 dc() { local proj=$1; shift; docker compose -p "polycarpic-$proj" --project-directory "$rh" --env-file /dev/null "$@"; }
-running() { dc "$1" ps --status running --services < /dev/null 2> /dev/null | grep -qx postgres; }
+running() { local up; up=$(dc "$1" ps --status running --services < /dev/null 2> /dev/null) && grep -qx postgres <<< "$up"; }
 q() { local proj=$1; shift; dc "$proj" exec -T postgres psql -X -tA -U postgres -d polycarpic -c "$1" < /dev/null 2>&1; }
 up_prod=0 up_staging=0
 if [ -z "$rh_bad" ]; then
@@ -594,9 +646,15 @@ per_project() {
   else pass "$id" "$what"; fi
 }
 
+# D1 wants what each project's postgresql.<project>.conf sets. Only archiving differs: prod ships its WAL, staging is not backed up (INFRA §6.1)
+# and has no spool, so archiving must be off there (POLY-104 F17).
 d1() {
-  local want='log_parameter_max_length=0 log_parameter_max_length_on_error=0 log_statement=ddl archive_mode=on archive_timeout=300 max_replication_slots=2 max_wal_senders=3 max_slot_wal_keep_size=2048 log_connections=on password_encryption=scram-sha-256 shared_preload_libraries= log_min_duration_statement=-1'
+  local want='log_parameter_max_length=0 log_parameter_max_length_on_error=0 log_statement=ddl max_replication_slots=2 max_wal_senders=3 max_slot_wal_keep_size=2048 log_connections=on password_encryption=scram-sha-256 shared_preload_libraries= log_min_duration_statement=-1'
   local rows out='' kv name
+  case "$1" in
+    staging) want="$want archive_mode=off archive_timeout=0" ;;
+    *) want="$want archive_mode=on archive_timeout=300" ;;
+  esac
   rows=$(q "$1" "SELECT name || '=' || setting FROM pg_settings WHERE name IN ('log_parameter_max_length','log_parameter_max_length_on_error','log_statement','archive_mode','archive_timeout','max_replication_slots','max_wal_senders','max_slot_wal_keep_size','log_connections','password_encryption','shared_preload_libraries','log_min_duration_statement')")
   for kv in $want; do
     name=${kv%%=*}

@@ -23,8 +23,10 @@ beforeAll(() => {
     sh('docker', ['network', 'create', NET]);
     startPg(names.good, NET, BASE_IMAGE, superPw);
     startPg(names.bad, NET, BASE_IMAGE, superPw, ['-c', 'archive_mode=off', '-c', 'shared_preload_libraries=pg_stat_statements', '-c', 'log_min_duration_statement=0']);
-    startPg(names.stg, NET, BASE_IMAGE, superPw);
-    for (const n of [names.good, names.bad, names.stg]) waitPg(n);
+    startPg(names.stg, NET, BASE_IMAGE, superPw, [], true, 'staging');
+    // a staging instance with one other D1 setting wrong
+    startPg(names.fail, NET, BASE_IMAGE, superPw, ['-c', 'log_min_duration_statement=0'], true, 'staging');
+    for (const n of [names.good, names.bad, names.stg, names.fail]) waitPg(n);
     // prod roles and passwords on the good instance, staging's five on the staging one (poly_backup gets no verifier there)
     const prod = run(`${STAGE(names.good)} 2>&1`, { image: HOST, network: NET });
     if (prod.code !== 0) throw new Error(`the prod database stage failed: ${prod.all.slice(-600)}`);
@@ -37,7 +39,7 @@ beforeAll(() => {
 }, 900_000);
 beforeEach(() => { if (setupError) throw new Error(setupError); });
 afterAll(() => {
-  for (const n of [names.good, names.bad, names.stg]) sh('docker', ['rm', '-f', n]);
+  for (const n of [names.good, names.bad, names.stg, names.fail]) sh('docker', ['rm', '-f', n]);
   sh('docker', ['network', 'rm', NET]);
 });
 
@@ -51,8 +53,25 @@ describe('provision-check database checks D1–D6, with a running Postgres', () 
   });
 
   it('D1: wrong archive_mode, shared_preload_libraries and log_min_duration_statement are each named', () => {
-    const r = ALL('', { prod: names.bad, staging: names.good });
-    failLine(r, 'D1', ['archive_mode', 'shared_preload_libraries', 'log_min_duration_statement']);
+    const r = ALL('', { prod: names.bad, staging: names.stg });
+    failLine(r, 'D1', ['prod:', 'archive_mode is off (want on)', 'shared_preload_libraries', 'log_min_duration_statement']);
+  });
+  // POLY-104 F17 (first real box): staging is not backed up (INFRA §6.1), so postgresql.staging.conf turns archiving off, and D1 wanted it on
+  it('F17: D1 passes a staging Postgres on postgresql.staging.conf beside a prod one on the prod conf', () => {
+    const r = ALL('', { prod: names.good, staging: names.stg });
+    expect(find(r.out, 'FAIL', 'D1')?.text).toBeUndefined();
+    expect(find(r.out, 'PASS', 'D1'), r.out.slice(-900)).toBeDefined();
+  });
+  it('F17: D1 FAILs a staging Postgres with archiving on, naming staging and both settings, and says nothing against prod', () => {
+    const line = failLine(ALL('', { prod: names.good, staging: names.good }), 'D1', ['staging:', 'archive_mode is on (want off)', 'archive_timeout is 300 (want 0)']);
+    expect(line).not.toContain('prod:');
+  });
+  it('F17: D1 still FAILs staging for another wrong setting, and names only that one', () => {
+    const line = failLine(ALL('', { prod: names.good, staging: names.fail }), 'D1', ['staging:', 'log_min_duration_statement is 0 (want -1)']);
+    expect(line).not.toContain('archive_');
+  });
+  it('F17: D1 FAILs a prod Postgres on the staging conf: prod still wants archiving on every 300 s', () => {
+    failLine(ALL('', { prod: names.stg, staging: names.stg }), 'D1', ['prod:', 'archive_mode is off (want on)', 'archive_timeout is 0 (want 300)']);
   });
   it('D2: an extension besides plpgsql fails (staging faulty, prod good: the check covers both)', () => {
     const r = ALL('', { prod: names.good, staging: names.bad });

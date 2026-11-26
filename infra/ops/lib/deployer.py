@@ -555,6 +555,7 @@ def _deploy_checked(project, ctx, first, existing_data, seen, run):
     run["work"] = work
     os.chmod(work, 0o700)
     compose_guard.check_compose_version(ctx)  # G10, before any network call
+    rel.check_gh_version(ctx, work)  # POLY-104 F15, before any network call
     tok = rel.token(ctx)
     tokenexp.refresh(ctx, tok, work)
     rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)

@@ -34,6 +34,23 @@ class Provision(ProvisionBase):
         for code in (1, 3):
             self.assertEqual(self.prov(*self.BASE, code=code).rc, code)
 
+    # POLY-104 F3b: on the first real box a provision that ended 141 printed nothing at all. 128+n is how bash reports a child killed by
+    # signal n; a negative code is how subprocess reports provision.sh itself being killed.
+    def test_a_provision_ended_by_a_signal_prints_a_line_naming_it_and_exits_128_plus_n(self):
+        for code, signal_name, status in ((141, "SIGPIPE", 141), (137, "SIGKILL", 137), (-13, "SIGPIPE", 141), (-9, "SIGKILL", 137)):
+            with self.subTest(code=code):
+                r = self.prov(*self.BASE, code=code)
+                self.assertEqual(r.rc, status, r.err)
+                lines = r.err.splitlines()
+                self.assertEqual(len(lines), 1, "one line naming the signal, got %r" % r.err)
+                for term in ("provision", signal_name, str(status)):
+                    self.assertIn(term, lines[0])
+
+    def test_an_ordinary_exit_adds_no_line(self):  # positive twin
+        for code in (0, 1, 2):
+            r = self.prov(*self.BASE, code=code)
+            self.assertEqual((r.rc, r.err), (code, ""), code)
+
     def test_target_home_exits_2_with_the_message_and_runs_nothing(self):
         r = self.prov("provision", "--target", "home", "--domain", "polycarpic.com")
         self.assertEqual((r.rc, r.err), (2, "provision: --target home is not available\n"))
@@ -117,6 +134,33 @@ class Provision(ProvisionBase):
         self.assertEqual(oct(os.stat(str(conf)).st_mode & 0o777), "0o644")
         again = self.host.go(*self.BASE, "--b2-bucket", "polycarpic-hetzner-backups", "--b2-endpoint", self.EP, runner=runner)
         self.assertNotIn("change:", again.out)
+
+    # ---- POLY-104 F4: provision.sh writes edge.env from these three, and the ops tool, the only way it is run on the box, refused them
+    EDGE = [("--bind-addr", "192.0.2.10"), ("--staging-allow", "192.0.2.0/24,2001:db8::/32"), ("--acme-email", "ops@polycarpic.com")]
+
+    def test_the_three_edge_flags_are_accepted_and_forwarded_to_provision_sh_with_their_values_unchanged(self):
+        r = self.prov(*self.BASE, *[x for pair in self.EDGE for x in pair])
+        self.assertEqual((r.rc, r.err), (0, ""))
+        argvs = r.runner.argvs()
+        self.assertEqual(len(argvs), 1)
+        self.assertEqual(argvs[0][:2], ["/bin/bash", self.script("provision.sh")])
+        flags = argvs[0][2:]
+        got = dict(zip(flags[::2], flags[1::2]))
+        self.assertEqual(len(flags), 2 * len(got), flags)
+        self.assertEqual(got, dict([("--stage", "host"), ("--target", "hetzner"), ("--domain", "polycarpic.com")] + self.EDGE))
+
+    def test_a_bad_edge_flag_value_exits_2_naming_the_flag_and_runs_nothing(self):
+        bad = {
+            "--bind-addr": ("", "-1.2.3.4", "example.com", "1.2.3", "1.2.3.4 ", "1.2.3.4\n", "::1"),
+            "--staging-allow": ("", "-192.0.2.0/24", "192.0.2.0/24 {", "192.0.2.0/24}", "192.0.2.0/24\nimport x", "example.com", "192.0.2.0/24;rm"),
+            "--acme-email": ("", "-a@b.example", "no-at-sign", "a@b.example}", "{a@b.example", "a@b.example\nx", "a b@c.example", 'a"@b.example'),
+        }
+        for flag, values in bad.items():
+            for value in values:
+                with self.subTest(flag=flag, value=value):
+                    argv = [x for pair in self.EDGE for x in (pair if pair[0] != flag else (flag, value))]
+                    r = self.prov(*self.BASE, *argv)
+                    self.assertEqual((r.rc, r.err, r.runner.calls), (2, "provision: bad %s\n" % flag, []))
 
     def test_stage_database_forwards_project_and_refuses_anything_else(self):
         for p in ("prod", "staging"):
