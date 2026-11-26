@@ -189,6 +189,48 @@ install_compose() {
   change "docker-compose-plugin $cand installed and held (infra/deploy/compose-version)"
 }
 
+# gh decides whether an image is ours (`attestation verify`) and holds the GitHub token, so the host stage installs exactly the bytes two pins name
+# (POLY-104 F15): the release tarball, checked before it is unpacked, and its bin/gh, checked before it is run or put in place. No apt repository:
+# it would trust any version GitHub's key signs and run maintainer scripts as root.
+# Bumping the pin: change gh-version and both lines of gh-sha256; compare the tarball's line with the release's checksums.txt, run
+# `gh attestation verify <tarball> --repo cli/cli` with a gh you already trust, and write both results in the PR. Never go under 2.102.0.
+install_gh() {
+  local pins=$here/deploy/gh-sha256 bin=/usr/local/bin/gh want name tarsum binsum arch
+  want=$(tr -d '[:space:]' < "$here/deploy/gh-version" 2> /dev/null || true)
+  [[ "$want" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "$here/deploy/gh-version does not hold one version N.N.N; nothing installed"
+  name=gh_${want}_linux_amd64
+  tarsum=$(awk -v n="$name.tar.gz" '$2 == n { print $1 }' "$pins")
+  binsum=$(awk -v n="$name/bin/gh" '$2 == n { print $1 }' "$pins")
+  [[ "$tarsum" =~ ^[0-9a-f]{64}$ && "$binsum" =~ ^[0-9a-f]{64}$ ]] || die "$pins does not pin the sha256 of $name.tar.gz and of its bin/gh; nothing installed"
+  if [ -f "$bin" ] && [ ! -L "$bin" ] && [ "$(sha256sum < "$bin" | cut -d' ' -f1)" = "$binsum" ]; then
+    [ "$(stat -c %u:%g "$bin")" = 0:0 ] || { chown 0:0 "$bin"; change "owner of $bin set to 0:0"; }
+    [ "$(stat -c %a "$bin")" = 755 ] || { chmod 0755 "$bin"; change "mode of $bin set to 755"; }
+    return 0
+  fi
+  arch=$(dpkg --print-architecture)
+  [ "$arch" = amd64 ] || die "gh is pinned for amd64 only and this box is $arch; nothing installed"
+  [ ! -d "$bin" ] || die "$bin is a directory; nothing installed"
+  (
+    work=$(mktemp -d)
+    staged=$(dirname "$bin")/.gh.new
+    trap 'rm -rf "$work"; rm -f "$staged"' EXIT
+    curl -fsSL --proto =https --proto-redir =https --retry 3 -o "$work/$name.tar.gz" "https://github.com/cli/cli/releases/download/v$want/$name.tar.gz" \
+      || die "could not download gh $want; nothing installed"
+    got=$(sha256sum < "$work/$name.tar.gz" | cut -d' ' -f1)
+    [ "$got" = "$tarsum" ] || die "the gh tarball has sha256 $got, expected $tarsum; nothing installed"
+    # that one member's bytes and nothing else: no other entry, no path, owner or link from the archive reaches the disk
+    tar -xzOf "$work/$name.tar.gz" --no-same-owner -- "$name/bin/gh" > "$work/gh" || die "$name/bin/gh is not in the tarball; nothing installed"
+    got=$(sha256sum < "$work/gh" | cut -d' ' -f1)
+    [ "$got" = "$binsum" ] || die "gh's binary has sha256 $got, expected $binsum; nothing installed"
+    rm -f "$staged"
+    install -m 0755 -o 0 -g 0 "$work/gh" "$staged"
+    said=$(GH_CONFIG_DIR="$work" GH_NO_UPDATE_NOTIFIER=1 GH_PROMPT_DISABLED=1 "$staged" --version)
+    [[ "$said" == "gh version $want "* ]] || die "the pinned gh binary does not report version $want; nothing installed"
+    mv -T "$staged" "$bin"
+  )
+  change "gh $want installed at $bin (infra/deploy/gh-sha256)"
+}
+
 write_daemon_json() {
   install -d -m 0755 /etc/docker
   local want='{
@@ -511,6 +553,7 @@ stage_host() {
   write_daemon_json
   install_packages
   install_docker
+  install_gh
   systemctl enable --now docker > /dev/null 2>&1 || true
   [ "$DAEMON_CHANGED" = 0 ] || systemctl restart docker
   edge_networks

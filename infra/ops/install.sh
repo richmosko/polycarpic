@@ -29,7 +29,7 @@ unset CDPATH
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd -P)
 repo_git() { (cd -- "$repo" && git "$@"); }
 
-PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/deploy/compose-allow.json infra/deploy/compose-version infra/deploy/systemd infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
+PATHS="infra/ops infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/deploy/compose-allow.json infra/deploy/compose-version infra/deploy/gh-version infra/deploy/gh-sha256 infra/deploy/systemd infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql"
 
 if [ -n "$commit" ]; then
   # no checkout: a checkout would run C's tracked git hooks on this machine

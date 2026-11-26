@@ -420,6 +420,35 @@ for d in /opt/polycarpic /opt/polycarpic/releases /var/lib/polycarpic/state/depl
   if [ -L "$d" ] || [ ! -d "$d" ]; then h24="$h24 $d is missing or a link;"
   else [ "$(stat -c '%a %u' "$d")" = "755 0" ] || h24="$h24 $d is $(stat -c '%a %u' "$d") (want 755, owned by root);"; fi
 done
+# ------------------------------------------------------------------ H26 gh (POLY-104 F15)
+# The gh the ops tool runs is /usr/local/bin/gh with exactly the pinned bytes, root's and writable by root alone, at the pinned version (2.102.0
+# or later), with no other gh before it on the tool's PATH and no gh package. This check runs as root, so a gh is executed only once its owner,
+# mode and sha256 are right.
+h26=''
+gh_bin=/usr/local/bin/gh
+want26=$(tr -d '[:space:]' < "$here/deploy/gh-version" 2> /dev/null || true)
+sum26=$(awk -v n="gh_${want26}_linux_amd64/bin/gh" '$2 == n { print $1 }' "$here/deploy/gh-sha256" 2> /dev/null)
+if ! [[ "$want26" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$sum26" =~ ^[0-9a-f]{64}$ ]]; then
+  h26=" $here/deploy/gh-version and gh-sha256 do not pin one version and its binary;"
+else
+  IFS=. read -r major26 minor26 _ <<< "$want26"
+  { [ "$major26" -gt 2 ] || { [ "$major26" -eq 2 ] && [ "$minor26" -ge 102 ]; }; } || h26="$h26 the pinned gh $want26 is under 2.102.0;"
+  [ ! -e /usr/local/sbin/gh ] && [ ! -L /usr/local/sbin/gh ] || h26="$h26 /usr/local/sbin/gh comes before $gh_bin on the tool's PATH;"
+  if [ -L "$gh_bin" ] || [ ! -f "$gh_bin" ]; then h26="$h26 gh is not a regular file at $gh_bin;"
+  else
+    safe26=1
+    read -r uid26 mode26 <<< "$(stat -c '%u %a' "$gh_bin")"
+    { [ "$uid26" = 0 ] && [ $((8#$mode26 & 8#022)) = 0 ]; } || { safe26=0; h26="$h26 gh at $gh_bin is uid $uid26 mode $mode26 (want root's, not group or world writable);"; }
+    [ "$(sha256sum < "$gh_bin" | cut -d' ' -f1)" = "$sum26" ] || { safe26=0; h26="$h26 the sha256 of $gh_bin is not the pinned one (it was not run);"; }
+    if [ "$safe26" = 1 ]; then
+      said26=$(GH_NO_UPDATE_NOTIFIER=1 GH_PROMPT_DISABLED=1 "$gh_bin" --version 2> /dev/null)
+      [[ "$said26" == "gh version $want26 "* ]] || h26="$h26 $gh_bin reports '${said26%%$'\n'*}' (want version $want26);"
+    fi
+  fi
+fi
+[ "$(dpkg-query -W -f='${Status}' gh 2> /dev/null)" != "install ok installed" ] || h26="$h26 the gh dpkg package is installed: a second, unpinned gh;"
+report H26 "gh" "$h26" "sudo bash provision.sh --stage host ... installs the pinned gh; remove another gh or the gh package by hand (sudo apt-get remove gh)"
+
 # The render home (POLY-160 R7): absent is `/` (as the ops tool does); one that exists is used only as a real directory, owned by root, mode 0755 and empty.
 rh=/
 rd=/var/lib/polycarpic/state/deploy/render-home

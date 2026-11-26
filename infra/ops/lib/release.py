@@ -209,15 +209,64 @@ def token(ctx):
     return text.strip()
 
 
-def gh(ctx, tok, work, argv, timeout=120):
-    """gh gets the token in its own environment only (S6), and an empty config directory."""
+def _gh_env(work):
+    """gh's whole environment beyond the tool's fixed one, which is built from nothing, so no GH_DEBUG or DEBUG reaches it (they print headers, the
+    token's included). The config directory is this run's own, root 0700 and empty."""
     cfg = os.path.join(work, "gh")
     os.makedirs(cfg, mode=0o700, exist_ok=True)
+    return {"GH_CONFIG_DIR": cfg, "GH_NO_UPDATE_NOTIFIER": "1", "GH_PROMPT_DISABLED": "1"}
+
+
+# gh's stderr is never printed or logged (POLY-104 F15): it can echo URLs, API bodies, headers and terminal escapes. A failed call reports its exit
+# code and the first label of this list whose pattern matches; the label is the only thing taken from it.
+GH_LABELS = (("rate limit", r"rate limit"), ("http 401", r"HTTP 401\b"), ("http 403", r"HTTP 403\b"), ("http 404", r"HTTP 404\b"),
+             ("no attestations", r"no attestations? found"), ("verify failed", r"verification failed|failed to verify"),
+             ("network", r"dial tcp|no such host|connection (refused|reset)|network is unreachable|i/o timeout|TLS handshake timeout|error connecting to"))
+
+
+def _gh_label(err):
+    for label, pattern in GH_LABELS:
+        if re.search(pattern, str(err or ""), re.I):
+            return label
+    return "other"
+
+
+def gh(ctx, tok, work, argv, timeout=120):
+    """gh gets the token in its own environment only (S6), and an empty config directory."""
+    env = _gh_env(work)
+    env["GH_TOKEN"] = tok
     try:
-        code, out, err = ctx.run(["gh"] + argv, timeout=timeout, extra_env={"GH_TOKEN": tok, "GH_CONFIG_DIR": cfg})
+        code, out, err = ctx.run(["gh"] + argv, timeout=timeout, extra_env=env)
     except TimeoutError:
         raise Transient("gh timed out")
-    return code, out, err
+    if code != 0:
+        ctx.err("gh: exit %d (%s)" % (code, _gh_label(err)))
+    return code, out, ""
+
+
+GH_VERSION_FILE = "infra/deploy/gh-version"
+
+
+def check_gh_version(ctx, work):
+    """Before any network call: the gh on the box is the pinned one. Missing, failing or any other version is the refusal `gh` (alert, exit 4, no
+    quarantine): a box fault with a named fix, never `transient`. gh gets no token here, and a rollback does not ask."""
+    try:
+        with open(ctx.bundle(GH_VERSION_FILE), encoding="utf-8") as fh:
+            want = fh.read(64).strip()
+    except OSError:
+        want = ""
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", want):
+        want = None
+    try:
+        code, out, _ = ctx.run(["gh", "--version"], timeout=30, extra_env=_gh_env(work))
+    except (TimeoutError, OSError):
+        code, out = 1, ""
+    match = re.match(r"gh version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \n]|$)", out) if code == 0 else None
+    found = match.group(1) if match else None
+    if want is not None and found == want:
+        return
+    ctx.err("deploy: gh: pinned %s, found %s; fix: sudo polycarpic-ops provision --stage host" % (want or "unreadable", found or "none"))
+    raise Refusal("gh", code=4)
 
 
 def gh_json(ctx, tok, work, path):
