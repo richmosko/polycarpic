@@ -1,6 +1,29 @@
 # POLY-104: first staging deploy
 
-The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging only (fake data), from 2026-11-25. This file records the box, every command that differed from §7.1, every defect and every doc correction. "Measured" means seen on the real box; "code" means read from the code and not yet seen on a box.
+The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging only (fake data), from 2026-11-25. This file records the box, every command that differed from §7.1, every defect and every doc correction. "Measured" means seen on the real box; "code" means read from the code and not yet seen on a box. Times with `Z` are UTC.
+
+## State at PR 1
+
+POLY-104 lands in two pull requests (lead's decision under the Principal's delegation; a departure from one issue, one PR, forced by the edge shipping from `main` only):
+
+1. **PR 1**: the fixes and this record. The issue stays in progress.
+2. The Principal signs `edge-2` on the new `main`; the lead deploys it and runs the outside checks. The new `main` build also deploys to staging by its timer.
+3. **PR 2**: the box record from `edge-2` on. It closes the issue.
+
+On the box now: staging is deployed and healthy (`status` GREEN); `provision-check` ends `HOST CHECKS PASSED; 6 checks wait for the first deploy` (exit 3), the staging-only result; the edge is not running (F18).
+
+| Acceptance criterion | State at PR 1 |
+|---|---|
+| Staging reaches healthy; the outside scan | healthy: **measured**. Scan: **waits for `edge-2`**; by the lead's decision (F7) it expects 22, 80 and 443 on IPv4 and 22 only on IPv6 |
+| `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566` |
+| OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the outside scan; 8 in progress; **9 not measured** |
+| This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.41. The issue's text says "INFRA v1.2"; the document is past that version |
+
+**Waits for `edge-2`** (nothing here has been seen on a box): Caddy starting at all (F18's fix); its writes to `caddy` and `caddy-config` (F6); a certificate from a real CA for `staging`; ports 80 and 443 on the real bind address with `userland-proxy: false`; the staging allowlist and basic auth; the client address Caddy passes on and the Caddy-to-`auth` probe; the sign-in pages, static files and the `no-store` and `nosniff` headers in front of the real `web`; the outside scans on IPv4 and IPv6, with `curl -sI` and the refused password login; the runbook's Ctrl-C line on a real `edge-deploy`.
+
+**Not recorded in the run notes, to be confirmed or marked not run by the lead:** the Hetzner API token's deletion after step 7 (C-78); steps 1 to 6 as run (tools, keys, backup bucket, token, clone); the age recipient of step 10 (`provision-check` passes, and it checks that there is exactly one); a reboot of the box.
+
+**Step 18 (first backup), named in the issue, cannot run on a staging-only box:** staging has no backup or upload service and is not backed up (F17). It waits for prod (POLY-105 has the first-run checks; OQ-INFRA-11 as worded expects a backup on the staging instance, which this design cannot run).
 
 ## Box
 
@@ -46,10 +69,12 @@ The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging o
 | F14 | 8 | The public DNS answer holds 13 CAA records, not the 3 that were written: Cloudflare adds its own issuers, and an `issuewild`, while Universal SSL is on. `dns-check.py` reads the API, sees 3 and passes. So the narrowing of certificate issuers is not in force and the check cannot see it. Candidate fix: turn Universal SSL off in Cloudflare (the records are DNS only), and have `dns-check.py` compare the public answer. | measured (public `dig`) | open |
 | F15 | 13 | `first-deploy staging` ended `deploy: transient: gh api failed`: `gh` was not installed. Nothing installed or checked it, and the tool hid the cause and called a missing program transient. | measured | fixed (INFRA 1.3.37): the host stage installs the pinned release tarball (form ruled by seceng), check H26, refusal `gh`, and a failed call prints its exit code and a fixed label. On the box: installed, hash equal to the pin, `PASS H26` |
 | F16 | 13 | The end-to-end deploy test in CI replaces `gh` entirely, so no CI job runs a real `gh attestation verify`. Its first real run was on this box, and it passed. | code, then measured | open (test gap) |
-| F17 | 13 | After the first deploy `provision-check` fails: `FAIL D1 postgres settings: staging: archive_mode is off (want on); archive_timeout is 0 (want 300)`. The check is wrong, not the configuration: staging is not backed up, `postgresql.staging.conf` sets `archive_mode = off`, the compose lint fails CI on anything else, and staging has no spool or backup service. D1 asks prod's list of both projects. The check's own test started its "staging" Postgres with the prod file. | measured; cause from code | fixed (INFRA 1.3.39): D1 wants each project's own settings. No change to the box's configuration. To be rerun on the box |
+| F17 | 13 | After the first deploy `provision-check` fails: `FAIL D1 postgres settings: staging: archive_mode is off (want on); archive_timeout is 0 (want 300)`. The check is wrong, not the configuration: staging is not backed up, `postgresql.staging.conf` sets `archive_mode = off`, the compose lint fails CI on anything else, and staging has no spool or backup service. D1 asks prod's list of both projects. The check's own test started its "staging" Postgres with the prod file. | measured; cause from code | fixed (INFRA 1.3.39): D1 wants each project's own settings. No change to the box's configuration. On the box with `git-51ea0e3b5566`: 25 `PASS`, no `FAIL`, `WAIT` H12 and D1 to D5, `WARN H13`, exit 3 |
 | F18 | 13 | `edge-deploy edge-1` ended `rollback-unhealthy` and quarantined the digest in the edge's state: the Caddy container exited 255, its log repeating `exec /usr/bin/caddy: operation not permitted`. The released binary carried `cap_net_bind_service+ep` (read from the released image's layer; the builder image sets `XCADDY_SETCAP=1`), and `edge.yml` drops every capability. No test had started the Caddy image under those settings: the end-to-end test deploys staging only, and the image tests used a plain `docker run`. Staging was not touched. | measured | fixed in the build (form ruled by seceng: `XCADDY_SETCAP=0`; `edge.yml` and the guard policy unchanged; INFRA 1.3.40). It reaches the box only from `main`, with a new signed `edge-2`; the `edge-1` quarantine line stays as the record. Not yet run on the box |
 
-`gh` 2.106.0, the pin: the tarball's sha256 equals the release's `checksums.txt` and a download hashed locally; `gh attestation verify <tarball> --repo cli/cli` with the local `gh` 2.105.0 exited 0 (source `cli/cli` at `refs/heads/trunk`, signer `.github/workflows/deployment.yml`). Both on 2026-11-25. `bin/gh`'s sha256 was computed from that tarball. The end-to-end deploy test in CI uses a stand-in `gh`: the first real `attestation verify` runs on the box.
+`gh` 2.106.0, the pin: the tarball's sha256 equals the release's `checksums.txt` and a download hashed locally; `gh attestation verify <tarball> --repo cli/cli` with the local `gh` 2.105.0 exited 0 (source `cli/cli` at `refs/heads/trunk`, signer `.github/workflows/deployment.yml`). Both on 2026-11-25. `bin/gh`'s sha256 was computed from that tarball. The end-to-end deploy test in CI uses a stand-in `gh`; the first real `attestation verify` ran on the box and passed (run 2 below).
+
+F18, the cause: the capability was **measured** on the released image (caddy `sha256:36dff3bb…`); that it is what the kernel refused follows from capabilities(7), and qa reproduced the same error before the fix with a local build of the unfixed Dockerfile, started by a real `compose up` of `edge.yml`'s settings (`red-run.md`). `edge-deploy` takes `edge.yml` and the Caddy image from the tag's release, not from the operator tool. The edge quarantine is per digest, so nothing needs clearing: a rebuilt Caddy gives a new digest.
 
 ## Security review of the F11 fix (seceng)
 
@@ -79,19 +104,73 @@ With operator tool `git-84dc7374d08f`:
 - With `git-94e122126c5c`: `change: gh 2.106.0 installed`, 1 change; `/usr/local/bin/gh` has the pinned sha256; `PASS H26`.
 - Run 2: exit 4, `deploy: refused roles-missing`; the candidate (`sha256:0eba28cc…44d5`, `main` at `4b186404`) was verified in 43 s, the first real `gh attestation verify` of this design. `provision --stage database --project staging`: exit 0, database created, `roles.sql` applied, 5 login passwords set.
 - Run 3: exit 0. Verified (22 s), migrated, up at 02:28:53Z, healthy at 02:29:55Z (62 s). `status`: `STATUS GREEN`, token expires in 89 days, slots and revokes OK, 9 waiting (prod, edge, certificate). `web`, `auth`, `worker` and `postgres` healthy; `polycarpic-deploy@staging.timer` enabled.
-- `provision-check` after the deploy: exit 1, one failure (F17).
+- `provision-check` after the deploy: exit 1, one failure (F17). With the fix (`git-51ea0e3b5566`): exit 3, 25 `PASS`, no `FAIL`, `WAIT` H12 and D1 to D5 (prod's Postgres is not running), `WARN H13`, `HOST CHECKS PASSED; 6 checks wait for the first deploy`.
+
+`edge-1` (2026-11-26 05:00Z on):
+
+- The Principal signed `edge-1` on `main` at `4b186404` with the release key and pushed it; the lead verified it locally (annotated, good signature). Release workflow run 45759366614: `verify` and `publish` succeeded; the Release's body is `digest: sha256:0eba28cc…44d5`, with the SBOM, not a draft. The three image packages answer anonymous tag lists.
+- `sudo polycarpic-ops edge-deploy edge-1`: exit 1, `deploy: rollback-unhealthy`. Edge `deploy.log`: candidate 05:07:30Z, verified 05:07:53Z, up 05:07:53Z, `refused unhealthy` 05:09:55Z, `rollback-unhealthy`. The digest is quarantined as `unhealthy`; an `alert` file was written. `polycarpic-edge-caddy-1` exited 255, not out of memory (F18). The staging containers stayed healthy.
 
 ## Open questions
 
 | Id | Answer |
 |---|---|
-| OQ-INFRA-7 | Plan `cx33`; 3 firewall rules covering both families. IPv6: see F7. Outside scan not yet run. |
-| OQ-INFRA-8 | In progress: §7.1 run through the first staging deploy; the differences are above. |
-| OQ-INFRA-9 | Not yet recorded. |
+| OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound rules, each covering IPv4 and IPv6. The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). The outside scans wait for `edge-2`. |
+| OQ-INFRA-8 | In progress. §7.1 was run through step 13 for staging, with the differences above. Step 15 waits for `edge-2`; step 18 cannot run on staging; steps 14, 16, 17 and 19 and all of §8 were not run. |
+| OQ-INFRA-9 | **Not measured.** No Healthchecks.io limit is recorded in this loop so far; `provision-check` shows `WARN H13` (no heartbeat configured). |
+
+## Measurements inherited from earlier loops
+
+From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs the edge running. **Prod**: needs prod, a real bucket or real provider keys. **Not run**: could be run on the staging box now or in a later loop, and has not been.
+
+| From | Measurement | State |
+|---|---|---|
+| POLY-138 | Caddy overwrites `X-Forwarded-For` with the real client address, so `/api/auth/*` does not answer 503 | `edge-2` |
+| POLY-97 | uploader ACLs before the first backup | the spool ACL check passes on the box (done); the uploader's use of them: prod |
+| POLY-97 | POLY-147 marker measurement on the VPS against a control (acceptance criterion moved here; limits 5 ms p95, 1 KB WAL) | **Not run**; does not depend on `edge-2` |
+| POLY-97 | "provision-check passes" means the staging-only result | Done |
+| POLY-97 | `dns-check.py` shown to fail on a planted record on the live zone (E6) | **Not run** as a planted record. It did fail on the live zone on the old `_dmarc` and the missing CAA, and it does not see the public CAA answer (F14) |
+| POLY-97 | `_dmarc` edit and CAA records before the test mail | Done (but see F14) |
+| POLY-97 | `b2-setup.py --probe` (E9) and the new `polycarpic-read` key | Prod (before the first backup) |
+| POLY-97 | IPv6 scan from outside | `edge-2` (expects 22 only) |
+| POLY-97 | host key compared with the console boot log | **Not done**: accepted as first seen, staging only (F1). Needed before prod (OQ-INFRA-12) |
+| POLY-97 | `app` and `staging` records pinned to the server's addresses | Done for `A`; no `AAAA` (F7). They must not outlive the server |
+| POLY-97 | Caddy real-address proof; Caddy-to-auth live probe | `edge-2` |
+| POLY-97 | memory caps | **Not run** |
+| POLY-97 | the four Resend keys at `set-secret` time; DMARC test mail (`dkim=pass`, `dmarc=pass`) | Prod: staging holds a placeholder, so no mail is sent |
+| POLY-97 | Caddy pinned to Let's Encrypt, then CAA narrowed to one issuer with `accounturi` | after `edge-2`, and blocked by F14 |
+| POLY-97 (seceng F-D3) | the uploader's connect to Postgres's addresses expects a timeout or no route | Prod |
+| POLY-97 | `cx33` plan, stock by location | Done |
+| POLY-98 1 | sudo's `secure_path` reaches `/usr/local/sbin` | Done (`sudo polycarpic-ops` works) |
+| POLY-98 2 | `install.sh` over real ssh; a reboot, then `provision-check` from the bundle | `install.sh`: done. After a reboot: **not run** |
+| POLY-98 3 | `status` `cert` item through Caddy | `edge-2` for what staging shows; the prod name: prod |
+| POLY-98 4 | `status` `disk`, `app`, `backupdb`, `revokes`, `slots` within 15 s | `app`, `revokes`, `slots`: done in a GREEN status; the time was not recorded; `disk` is not named in the notes; `backupdb`: prod |
+| POLY-98 5 | `cli user invite` live | **Not run** |
+| POLY-98 6 | `restart` against real health checks; a renamed secret file as Linux sees it | **Not run** |
+| POLY-98 7 | `gate-check` on the deployed schema | **Not run** (`--staging` can run now); the gate itself: prod |
+| POLY-98 8 | `b2-setup.py --probe --show-rclone-output` | Prod |
+| POLY-98 9 | `jobs.log` under the real backup and uploader | Prod |
+| POLY-98 10 | CI `provision` job time at the PR head | PR 1's CI run (not a box measurement) |
+| POLY-99 | spool ACLs on real LUKS ext4 | Done as far as `provision-check` reads them; no write by 999, 10004 or read by 10005 was tried |
+| POLY-99 | `core: 0` and the host's `core_pattern` | **Not run** |
+| POLY-99 | backup and uploader units under real systemd | Prod (installed, not enabled) |
+| POLY-99 | `docker compose run`'s timeout and `rm -f` | **Not run** |
+| POLY-99 | `secrets/host/` and the ownership of `jobs.log` and `last-upload` | Done as far as `provision-check` reads them; the move from the old path does not occur on a new box |
+| POLY-99 | `backupdb` on real logs; the nightly run's duration and 256 MB limit; `CONNECTION LIMIT 3` with both backup runs | Prod |
+| POLY-99 | the two POLY-95 secret-mode cases that need Linux | CI, not this box; their state was not checked in this loop |
+| POLY-100 | edge networks made by provisioning; the release-signing key and `RELEASE_SIGNERS` before the first deploy | Done |
+| POLY-100 | Caddy up from a signed release before staging is served | `edge-2` (`edge-1` failed, F18) |
+| POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | **Not run** |
+| POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | `edge-2` |
+| POLY-160 | the runbook's Ctrl-C line on a real `edge-deploy` | `edge-2` |
+| POLY-160 | stopped containers stay stopped over a reboot after a stand-down | **Not run** |
+| POLY-160 | `docker compose --project-directory` on Compose 5.7.1 with no render home | **Not measured** (the F9 check ran `version --short` with no render home as `HOME`, which is a different thing) |
+
+The 2026-11-23 comment about creating `app.` only after a prod deploy was withdrawn by the one after it. Prod is not opened to the internet before POLY-163.
 
 ## Doc corrections (INFRA)
 
-Landed in INFRA 1.3.33 (the run is still in progress; steps not yet run are unchanged except where the code settles them).
+Every correction of this loop up to PR 1, INFRA 1.3.32 to 1.3.41. Steps not yet run are unchanged except where the code settles them.
 
 | Where | Correction | From |
 |---|---|---|
@@ -108,7 +187,17 @@ Landed in INFRA 1.3.33 (the run is still in progress; steps not yet run are unch
 | Open questions | OQ-INFRA-12 (host key), OQ-INFRA-13 (web on IPv6), OQ-INFRA-14 (public CAA) | F1, F7, F14 |
 | §7.1 step 10 (1.3.38) | how to make the release-signing key, the signers file and `RELEASE_SIGNERS` (written from what was done; these exact lines were not run as written) | box result |
 | §7.1 step 8 (1.3.38) | `dns-check.py` does not see the public CAA answer | F14 |
-| §3.2, §4.4, §5, §7.1 (1.3.34 to 1.3.37) | mounted secrets before the first deploy and staging placeholders; keyring commands marked not built; staging gids and the link refusal; the pinned `gh` | F11, F12, F13, F15 |
+| §7.1 step 11 | `install.sh` stops with git's code, and opens no connection, when git fails | F10 |
+| §7.1 step 12 | every mounted secret must exist before the first deploy (the old text said a missing one was not a problem); staging placeholders and what breaks; a different value for each name | F12 |
+| §7.1 step 12 | the staging keyring placeholder made by hand | F13 |
+| §7.1 step 13, step 14; §3.2 (table and the `set-secret` row); the "lost the keyring" row; §8.10; §8.12 | `init-keyring` removed from step 13; `init-keyring`, `keyring-fingerprint`, `restore-keyring`, `keyring-show`, `cli secrets rotate` and `secrets init` marked not built; step 14 does not run before they exist | F13 |
+| §3.2 | the gids of prod and staging, both reserved ranges, a host-stage rerun re-owns the files, a link stops the stage | F11, S1 |
+| §4.4 | the pinned `gh`: install, check H26, the refusal `gh`, the failure line and its labels, its environment; CI uses a stand-in | F15, F16 |
+| §5 patch schedule | how a `gh` pin is bumped, and its floor | F15 |
+| §7.1 step 11 | H26 in the list of what `provision-check` covers | F15 |
+| §2.2; §7.1 step 11 | archiving is on for prod only; D1 checks each project's own settings | F17 |
+| §2.2 | no file capability in any of our images; what the image job runs | F18 |
+| §7.1 step 11 | D6 is not among a staging-only box's waiting checks (1.3.41) | box result and code |
 
 ## Wording to fix
 
