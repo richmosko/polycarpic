@@ -7,7 +7,23 @@ name=${FAKE_NAME:-$(basename "$0")}
 unsupported() { echo "FAKE: unsupported $name $*" >&2; exit 99; }
 vol() { cat "$S/volume" 2>/dev/null || echo empty; }
 case "$name" in
-  mkfs.ext4|update-grub|update-initramfs|dpkg-reconfigure|swapoff|sysctl|ufw|hostnamectl|apt-key|add-apt-repository|reboot|shutdown) exit 0 ;;
+  mkfs.ext4|update-grub|update-initramfs|dpkg-reconfigure|swapoff|ufw|hostnamectl|apt-key|add-apt-repository|reboot|shutdown) exit 0 ;;
+  sysctl)
+    # POLY-104 core dumps: live kernel values, one file per key under $S/sysctl; unset ones are the first real box's (apport's pipe, and the 2 apport
+    # sets). `-n key` reads; `-p <file>` applies it. `$S/sysctl-stuck`: -p answers 0 and changes nothing.
+    mkdir -p "$S/sysctl"
+    live() { if [ -f "$S/sysctl/$1" ]; then cat "$S/sysctl/$1"; else case "$1" in
+      kernel.core_pattern) echo '|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E' ;; fs.suid_dumpable) echo 2 ;; *) return 1 ;; esac; fi; }
+    case "$*" in
+      "-n "*) live "$2" || { echo "sysctl: cannot stat /proc/sys/$2: No such file or directory" >&2; exit 1; } ;;
+      *-p*) f=${*: -1}; [ -f "$f" ] || { echo "sysctl: cannot open \"$f\"" >&2; exit 1; }
+        [ -e "$S/sysctl-stuck" ] && exit 0
+        while IFS= read -r line; do
+          case "$line" in ''|'#'*|';'*) continue ;; esac
+          k=$(echo "${line%%=*}" | xargs); v=${line#*=}; v=${v# }; printf '%s\n' "$v" > "$S/sysctl/$k"
+        done < "$f" ;;
+    esac
+    exit 0 ;;
   systemctl)
     case "$1" in is-enabled) echo enabled ;; is-active) echo active ;; esac
     exit 0 ;;
@@ -80,6 +96,8 @@ case "$name" in
   apt-get)
     # G10: `install ... docker-compose-plugin=<ver>` records the installed version (dpkg-query answers it); everything else is a no-op that only the call log shows
     for a in "$@"; do case "$a" in docker-compose-plugin=*) echo "${a#docker-compose-plugin=}" > "$S/compose-installed" ;; esac; done
+    # POLY-104 core dumps: `purge ... apport` removes it, and as its service stops it writes core_pattern back to `core`
+    case " $* " in *" purge "*" apport "*|*" remove "*" apport "*) : > "$S/apport-purged"; rm -f "$S/apport-status"; mkdir -p "$S/sysctl"; echo core > "$S/sysctl/kernel.core_pattern" ;; esac
     exit 0 ;;
   apt-mark)
     case "$1" in
@@ -97,6 +115,13 @@ case "$name" in
     esac
     exec /usr/bin/dpkg "$@" ;;
   dpkg-query)
+    # POLY-104: apport is installed, as on the cloud image, until purged. `$S/apport-status` plants another dpkg status line.
+    if [ "${*: -1}" = apport ]; then
+      if [ -f "$S/apport-status" ]; then cat "$S/apport-status"; exit 0; fi
+      [ -e "$S/apport-purged" ] && { echo "dpkg-query: no packages found matching apport" >&2; exit 1; }
+      case "$*" in *Status*) printf 'install ok installed' ;; *) printf '2.28.1-0ubuntu3' ;; esac
+      exit 0
+    fi
     if [ "${*: -1}" = gh ]; then
       [ -e "$S/gh-deb" ] || { echo "dpkg-query: no packages found matching gh" >&2; exit 1; }
       case "$*" in *Status*) printf 'install ok installed' ;; *) printf '2.106.0' ;; esac

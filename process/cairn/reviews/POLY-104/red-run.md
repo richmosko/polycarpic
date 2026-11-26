@@ -26,6 +26,12 @@ Run on a Mac on 2026-11-25. The commits after it up to `5ca11b67` change `proces
 
 **CI time (estimate, unmeasured).** `image` job: 772 s on run 45661985841, backup step included (439 s; container tests 154 s). `caddy-compose-edge.test.ts` adds about 90 to 120 s, mostly fixed waits (the 60 s healthcheck interval, two 10 s upstream retries): about **860 to 890 s of 1200**. `provision` job: 219 to 296 s in the last three runs read, already over its 200 s warning budget; the box suite grew from 210 to 252 tests since this loop's first run (189 s here) and the ops tests by the new files, so expect about 330 to 380 s of its 900 s limit (weaker estimate: no same-machine baseline from `main`).
 
+## Core dumps (seceng's ruling; lead: in PR 1), red
+
+`tests/infra/provision/core-dumps.test.ts`: box suite 270 run, 253 passed, 17 failed, all in that file; its fake-box control passes. The host stage tests: purge, file (root 0644, exactly the two settings), live values, purge before apply, a quiet rerun, live and file drift repaired, `config-files` purged and `not-installed` left, and a stop naming the setting when applying does not take. `H27` fails on the box's shape of today's `core_pattern` (apport's pipe), on a near-miss pattern, on `suid_dumpable` 1 and 2, and on apport installed or half removed.
+
+**Model** (fakes): a live value per key behind `sysctl -n` and `-p <file>`, starting at apport's pipe and 2; apport `install ok installed` until purged; the purge writes `core_pattern=core`, as apport's stopping service does, so applying before purging fails. Not exercised: the real kernel, a reboot (that `sysctl.d` is applied at boot with apport gone), and any real crash.
+
 ## F3: `provision --stage host` exits 141
 
 ### Red
