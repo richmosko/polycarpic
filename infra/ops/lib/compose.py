@@ -8,6 +8,15 @@ SECRET_ROOT = {"prod": "/etc/polycarpic/secrets/", "staging": "/etc/polycarpic/s
 FILES = {"prod": ("prod.yml", "edge.yml"), "staging": ("staging.yml",)}
 GIDS = {"postgres": 999, "web": 10001, "worker": 10002, "migrate": 10003, "backup": 10004, "uploader": 10005,
         "operator": 10006, "auth": 10007, "caddy": 10010}
+
+
+def gid(project, service):
+    """The gid of the service's `user:` in that project's compose file: staging runs 100 above prod, postgres is 999 in both (POLY-104 F11).
+    Only a fallback where a secret directory cannot be read; 0 for an unknown service."""
+    number = GIDS.get(service, 0)
+    return number + 100 if project == "staging" and number not in (0, 999) else number
+
+
 LONG_RUNNING = ("postgres", "web", "auth", "worker", "caddy")
 
 

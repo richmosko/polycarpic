@@ -42,7 +42,7 @@ def _read(ctx, name):
     return values
 
 
-def _plan(ctx, targets):
+def _plan(ctx, project, targets):
     """Phase 1: open and check every service directory and target before anything is written. -> (plan, exit code)."""
     plan = []
     for svc, path in targets:
@@ -51,7 +51,7 @@ def _plan(ctx, targets):
         try:
             gid_hint = os.stat(dpath).st_gid
         except OSError:
-            gid_hint = compose.GIDS.get(svc, 0)
+            gid_hint = compose.gid(project, svc)
         dmode = 0o700 if svc == rules.HOST_DIR else 0o750
         fail = "%s is not root:%d %04o: run provision" % (dpath, gid_hint, dmode)
         try:
@@ -123,7 +123,7 @@ def run(args, ctx):
         ctx.err("set-secret reads from a terminal only")
         return 2
 
-    plan, code = _plan(ctx, targets)
+    plan, code = _plan(ctx, project, targets)
     written = []
     try:
         if code:

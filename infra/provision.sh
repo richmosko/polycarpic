@@ -39,14 +39,21 @@ unset CDPATH
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P) || die "cannot resolve the directory of this script; nothing changed" 2
 cd / # G11: the caller's directory decides nothing
 
-# Service gids (F6, POLY-146). The same set the compose files mount secrets for.
-gid_of() {
+# Service gids (F6, POLY-146). The same set the compose files mount secrets for: each is the gid of the service's `user:` in that project's compose
+# file. A file secret keeps its host owner, so a wrong group means the service cannot read it. Staging runs its own range, 100 above prod's;
+# postgres is 999 in both (POLY-104 F11).
+gid_of() { # service [secrets root]
+  local g
   case "$1" in
-    postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;;
+    postgres) g=999 ;; web) g=10001 ;; worker) g=10002 ;; migrate) g=10003 ;; backup) g=10004 ;;
+    uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;;
     *) die "unknown service $1" ;;
   esac
+  if [[ "${2:-}" == */staging-secrets && "$g" != 999 ]]; then g=$((g + 100)); fi
+  echo "$g"
 }
+# the gids no host account but root may hold
+service_gid() { [ "$1" = 999 ] || { [ "$1" -ge 10001 ] && [ "$1" -le 10010 ]; } || { [ "$1" -ge 10101 ] && [ "$1" -le 10110 ]; }; }
 PROD_SERVICES="postgres web worker migrate backup uploader operator auth caddy"
 STAGING_SERVICES="postgres web worker migrate operator auth"
 # service/file pairs generated here (32 random bytes, base64, written once, never overwritten).
@@ -362,12 +369,17 @@ secrets_for() { # root services generated
   ensure_dir "$root" 0700 0:0
   [ "$(stat -c %a "$root")" = 700 ] || chmod 0700 "$root"
   for svc in $services; do
-    gid=$(gid_of "$svc")
+    gid=$(gid_of "$svc" "$root")
     ensure_dir "$root/$svc" 0750 "0:$gid"
     [ "$(stat -c %a "$root/$svc")" = 750 ] || chmod 0750 "$root/$svc"
+    # every file already there, set-secret's included: owner only, the value is never opened
+    for f in "$root/$svc"/*; do
+      [ -f "$f" ] && [ ! -L "$f" ] || continue
+      [ "$(stat -c %u:%g "$f")" = "0:$gid" ] || { chown "0:$gid" "$f"; change "owner of ${f#"$ETC"/} set to 0:$gid"; }
+    done
   done
   for pair in $generated; do
-    svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc")
+    svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc" "$root")
     if [ ! -e "$f" ]; then
       (umask 0377; head -c 32 /dev/urandom | base64 > "$f")
       change "generated ${f#"$ETC"/}"
@@ -463,12 +475,12 @@ check_accounts() {
   local bad='' line user gid
   while IFS=: read -r user _ _ gid _; do
     [ "$user" = root ] && continue
-    if [ "$gid" = 999 ] || { [ "$gid" -ge 10001 ] && [ "$gid" -le 10010 ]; }; then bad="$bad $user(primary gid $gid)"; fi
+    if service_gid "$gid"; then bad="$bad $user(primary gid $gid)"; fi
   done < <(getent passwd)
   while IFS= read -r line; do
     local name=${line%%:*} g rest
     rest=${line#*:*:}; g=${rest%%:*}; rest=${rest#*:}
-    if [ "$g" = 999 ] || { [ "$g" -ge 10001 ] && [ "$g" -le 10010 ]; } || [ "$name" = docker ]; then
+    if service_gid "$g" || [ "$name" = docker ]; then
       for user in ${rest//,/ }; do [ "$user" = root ] || bad="$bad $user(in group $name, gid $g)"; done
     fi
   done < <(getent group)

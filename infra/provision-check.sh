@@ -40,12 +40,18 @@ join() { local IFS="$1"; shift; echo "$*"; }
 
 PROD_SERVICES="postgres web worker migrate backup uploader operator auth caddy"
 STAGING_SERVICES="postgres web worker migrate operator auth"
-gid_of() {
+# A service's gid is its `user:` in that project's compose file: staging runs 100 above prod, postgres is 999 in both (provision.sh carries the same table).
+gid_of() { # service [secrets root]
+  local g
   case "$1" in
-    postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;; host) echo 0 ;;
+    postgres) g=999 ;; web) g=10001 ;; worker) g=10002 ;; migrate) g=10003 ;; backup) g=10004 ;;
+    uploader) g=10005 ;; operator) g=10006 ;; auth) g=10007 ;; caddy) g=10010 ;; host) g=0 ;;
+    *) g='' ;;
   esac
+  if [[ "${2:-}" == */staging-secrets && -n "$g" && "$g" != 999 ]]; then g=$((g + 100)); fi
+  echo "$g"
 }
+service_gid() { [ "$1" = 999 ] || { [ "$1" -ge 10001 ] && [ "$1" -le 10010 ]; } || { [ "$1" -ge 10101 ] && [ "$1" -le 10110 ]; }; }
 # Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
 HOST_ONLY="heartbeat_url=host github_read_token=host"
 # The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
@@ -158,7 +164,7 @@ secret_root() { # root services
     svc=$(basename "$d")
     # shellcheck disable=SC2086
     if ! in_list "$svc" $services; then h6="$h6 $d must not exist here;"; continue; fi
-    gid=$(gid_of "$svc")
+    gid=$(gid_of "$svc" "$root")
     dmode=750 fmode=440
     if [ "$svc" = host ]; then dmode=700 fmode=400; fi # secrets root reads and no service mounts (HOST_ONLY): root:root, nobody else
     [ "$(stat -c '%a %u:%g' "$d")" = "$dmode 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want $dmode 0:$gid);"
@@ -429,11 +435,11 @@ report H24 "deploy directories" "$h24" "sudo bash provision.sh --stage host ... 
 h9=''
 while IFS=: read -r user _ _ gid _; do
   [ "$user" = root ] && continue
-  if [ "$gid" = 999 ] || { [ "$gid" -ge 10001 ] && [ "$gid" -le 10010 ]; }; then h9="$h9 $user has primary gid $gid;"; fi
+  if service_gid "$gid"; then h9="$h9 $user has primary gid $gid;"; fi
 done < <(getent passwd)
 while IFS= read -r line; do
   name=${line%%:*}; rest=${line#*:*:}; g=${rest%%:*}; members=${rest#*:}
-  if [ "$g" = 999 ] || { [ "$g" -ge 10001 ] && [ "$g" -le 10010 ]; } || [ "$name" = docker ]; then
+  if service_gid "$g" || [ "$name" = docker ]; then
     for u in ${members//,/ }; do [ "$u" = root ] || h9="$h9 $u is in group $name (gid $g);"; done
   fi
 done < <(getent group)
