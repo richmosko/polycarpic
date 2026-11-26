@@ -56,6 +56,37 @@ Not edited, and why: ARCH says nothing about IPv6, so "staging is IPv4-only" is 
 ## Conditions
 
 1. **Met** (`d03aa3ec`): the issue's first criterion reads "22/80/443 on IPv4, and 22 only on IPv6".
-2. **Before PR 1 merges:** CI's own `deploy-real` job is green on the PR head. It is the one test of the changed fake `gh` (`--version`), and no one has run it (red-run "Not run").
+2. **Met:** CI green on `e3d32c98`, `deploy-real` among it (the lead's comment in `POLY-104.md`); PR 1 merged at `47fb1fbc`.
 3. **Met in PR 1**, recorded at `7bd2f147` (`staging-deploy.md`, "The core-dump control and the reboot"): H27 FAIL on the box's apport value, host stage, PASS H27, reboot, `provision-check` exit 3 with H27 passing.
-4. **PR 2 closes the issue only with:** the `edge-2` items in the record's "Waits for `edge-2`" list each measured or moved by name to an issue; OQ-INFRA-8's unrun steps placed; the stand-in rule (section 2) filed on POLY-165.
+4. **PR 2 closes the issue only with** (status below, under PR 2): the `edge-2` items in the record's "Waits for `edge-2`" list each measured or moved by name to an issue; OQ-INFRA-8's unrun steps placed; the stand-in rule (section 2) filed on POLY-165.
+
+## PR 2: condition 4
+
+Read at `d936ab4e`: `staging-deploy.md` ("`edge-2` on the box", F21 to F25), `security-review.md` (PR 2), devops-104's follow-up list. Nothing here was run by me.
+
+**C4 is not yet met.** All but one of the `edge-2` items are measured. Two things are still to be filed, and the scan below is still owed.
+
+| Part of C4 | State | Still needed |
+|---|---|---|
+| Caddy up, certificates into the 0700 dirs, 80/443 on the bind address, allowlist and basic auth, real client address, Caddy-to-`auth` probe, pages, static file, headers, password SSH refused, the Ctrl-C line | Measured (E1, M1 to M8, M10, O1, O2) | none |
+| IPv4 full scan | Measured, TCP (M11) | none |
+| IPv6 full scan | **Pending** | Measured and recorded showing 22 only. It is acceptance criterion 1, so it cannot be moved to another issue. Record the Cloud Firewall's rules read as TCP only next to it, since UDP was not scanned (seceng item 6) |
+| M12 (the address `auth` records), 9d (renamed secret), E6 (planted DNS record), M9 (log filter: `caddy-edge.test.ts` is the evidence, F24) | Not measured | Each named on POLY-165 |
+| Stand-in rule and register (section 2) | Not yet on POLY-165 at `d936ab4e` | Filed there |
+| OQ-INFRA-8's unrun steps | Not placed | As below |
+
+**Where OQ-INFRA-8's unrun steps go.** OQ-INFRA-8 asks for every command in INFRA §7 and §8 to be run once on a real machine. A staging box cannot answer all of it, so it should not close with POLY-104. POLY-104 answers §7.1 steps 1 to 13 and 15 for staging. INFRA's "when" cell for OQ-INFRA-8 should then name the issues that carry the rest:
+- §7.1 step 14 (prod keyring and first deploy) and steps 16 and 17 (bootstrap user, sign-up, second step) on prod: POLY-164. Step 16's invite ran on staging (box measurement 7).
+- Step 18 (first backup): POLY-105, with OQ-INFRA-11 reworded so that it does not expect a backup on staging.
+- Step 19 (first restore drill): POLY-116.
+- The home box section: POLY-120. The Vercel and Neon section: POLY-121.
+- §8: the commands that can run on staging and gate prod go on POLY-165 as one criterion: each run once on staging or marked prod-only. They are `rollback`, the renamed secret (9d), `docker compose run`'s timeout and `rm -f`, and `lockdown` once F22 builds it. The prod-only commands go on POLY-164.
+
+The INFRA edit is devops-engineer's to make.
+
+**F25b and ARCH.** Every new `main` build recreates Postgres. seceng's security view is to keep that, because the rebuild is how Debian security fixes reach the image; whether to keep the restart is the Principal's decision, on POLY-165. ARCH §7's deploy-interruption text named only `web`, so ARCH 1.31.4 now says that the deploy also recreates `postgres` and that the app services restart while it starts. F21, F23 and F24 change nothing in ARCH.
+
+**Verdict for PR 2: APPROVE WITH CONDITIONS.** It closes the issue once these are done:
+1. The IPv6 full scan shows 22 only, and the firewall rules are recorded as TCP only.
+2. The §8 criterion is on POLY-165. The stand-in rule and register, M12, 9d and E6 were filed at `38b21723`.
+3. INFRA's OQ-INFRA-8 cell names POLY-164, 105, 116, 120 and 121 as above.
