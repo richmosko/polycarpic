@@ -26,6 +26,10 @@ Run on a Mac on 2026-11-25. The commits after it up to `5ca11b67` change `proces
 
 **CI time (estimate, unmeasured).** `image` job: 772 s on run 45661985841, backup step included (439 s; container tests 154 s). `caddy-compose-edge.test.ts` adds about 90 to 120 s, mostly fixed waits (the 60 s healthcheck interval, two 10 s upstream retries): about **860 to 890 s of 1200**. `provision` job: 219 to 296 s in the last three runs read, already over its 200 s warning budget; the box suite grew from 210 to 252 tests since this loop's first run (189 s here) and the ops tests by the new files, so expect about 330 to 380 s of its 900 s limit (weaker estimate: no same-machine baseline from `main`).
 
+## PR 1 final gate, `5c980a03`
+
+It adds the core-dump control to the gate below (`dbdfa571a5`). Between the two, code changes are `infra/provision.sh`, `infra/provision-check.sh` and the provision tests and fakes. Rerun on `5c980a03`: box suite **270 of 270** (194 s); CI's `shellcheck -x` exit 0; `vitest.config.ts` 687 passed, 3 skipped; `tests/infra/image/provision-db*` (they run `provision.sh` on the same fake box) 15 of 15; gitleaks over the PR range, 60 commits, no leaks; `cairn check` ok. Every other result stands from `dbdfa571a5`, the 2 Mac-only `postgres.test.ts` failures among them.
+
 ## Core dumps (seceng's ruling; lead: in PR 1), red
 
 `tests/infra/provision/core-dumps.test.ts`: box suite 270 run, 253 passed, 17 failed, all in that file; its fake-box control passes. The host stage tests: purge, file (root 0644, exactly the two settings), live values, purge before apply, a quiet rerun, live and file drift repaired, `config-files` purged and `not-installed` left, and a stop naming the setting when applying does not take. `H27` fails on the box's shape of today's `core_pattern` (apport's pipe), on a near-miss pattern, on `suid_dumpable` 1 and 2, and on apport installed or half removed.
