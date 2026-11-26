@@ -39,6 +39,7 @@ The part of POLY-160 that gates prod and real data, not staging. Split out by th
   - [ ] F17: OQ-INFRA-11 and POLY-105 are reworded (staging has no backups; the first-run backup checks need a place to run).
   - [ ] Recovery for a lost release-signing key is decided (a second enrolled key, or a recorded re-enrolment step).
 - [ ] **From POLY-104, not gating prod:** F21 (a command that applies a changed staging allow address to a running Caddy, and a provision-check drift row); F23 (`servers { protocols h1 h2 }` with the next `edge-<n>`); F24 (upstream failures leave no Caddy log line: decide with monitoring, POLY-103); F25a (start guards wait a bounded time for an unreachable database and log it apart from schema-behind); F19 (`restart --staging caddy` wording); F11 S2/S3; provisioning installs or checks `git`; the A19 render memory cap and its test; `set-secret github_read_token`'s closing message.
+- [ ] **From POLY-104, INFRA §8's commands:** each is run once on staging or marked prod-only: `rollback`, a renamed secret (9d), `docker compose run`'s timeout and `rm -f`, and `lockdown` once F22 builds it. The prod-only ones are run under POLY-164.
 - [ ] **From POLY-104, measurements not taken on the box:** a renamed secret as the container sees it (9d); the planted DNS record against `dns-check.py`; the address `auth` records for a session (M12); `docker compose run`'s timeout and `rm -f`; certificate renewal; Caddy across a reboot while running; the "Prod" and "Not run" rows of the record's inherited-measurements table.
 
 ## Comments
