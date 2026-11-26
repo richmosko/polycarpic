@@ -4,7 +4,7 @@ The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging o
 
 ## State for PR 2 (in progress)
 
-PR 1 merged at `47fb1fbc`. `edge-2` is deployed on the box and healthy, and holds real certificates (section "`edge-2` on the box"). The checks with the staging password, the browser check and the IPv4 full scan pass. Still open: the checks from another network (O1 to O3, the IPv6 scan among them), a staging user (M12, optional) and the planted DNS record. Where the sections below say a thing "waits for `edge-2`" as of PR 1, this section and the `edge-2` section are the later word.
+PR 1 merged at `47fb1fbc`. `edge-2` is deployed on the box and healthy, and holds real certificates (section "`edge-2` on the box"). The checks with the staging password, the browser check, the IPv4 full scan and the checks from another network (O1 to O3) pass. Still open: the IPv6 full port scan (running), a staging user (M12, optional) and the planted DNS record. Where the sections below say a thing "waits for `edge-2`" as of PR 1, this section and the `edge-2` section are the later word.
 
 ## State at PR 1
 
@@ -170,13 +170,15 @@ From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed th
 - **Browser** (the Principal, allowed network): the basic-auth prompt, then `/sign-in` with its styles (the placeholder form), no certificate warning, the connection shown as secure. The console was not inspected.
 - **M11, pass:** `nmap -Pn -p- 167.235.205.75` (Nmap 7.993) from the Principal's network, started 16:18Z: 22, 80 and 443 open and nothing else (`65532 filtered tcp ports (no-response)`), 5148.72 seconds. TCP only; UDP was not scanned.
 - **After these** (about 18:2xZ): Caddy up 2 h and healthy, the four staging containers up 11 h and healthy; `status` GREEN, 6 waiting (prod). Restart counts: Caddy, `postgres`, `auth` and `web` 0, `worker` 1 (F25).
-- **Not run yet:** O1 to O3 (another network), M12.
+- **O1 to O3, pass** (the Principal's Mac on a phone hotspot; the script compared its public IPv4 with the home one and they differ). O1: `HTTP/2 403` with no `www-authenticate` line; a wrong password on `/api/auth/ok` also 403. O2: a forged `X-Forwarded-For` carrying the allowed address: 403. So Caddy judges the real client address, and the allowlist answers before the password. O3, the control: `nc -6` to port 22 on the server's IPv6 address succeeded, so this network has IPv6; `curl -6` to `https` on that address got no HTTP answer (`000`).
+- **The IPv6 full port scan: PENDING** (running from that hotspot; it expects 22 only).
+- **Not run:** M12.
 
 ## Open questions
 
 | Id | Answer |
 |---|---|
-| OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound rules, each covering IPv4 and IPv6. The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). The IPv4 full TCP scan shows 22, 80 and 443 and nothing else; the IPv6 scan is not yet run. |
+| OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound rules, each covering IPv4 and IPv6. The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). The IPv4 full TCP scan shows 22, 80 and 443 and nothing else; the IPv6 full scan is **pending** (from another network: port 22 answers over IPv6 and `https` does not). |
 | OQ-INFRA-8 | In progress. §7.1 was run through step 13 for staging, with the differences above. Step 15 is being run on `edge-2`; step 18 cannot run on staging; steps 14, 16, 17 and 19 and all of §8 were not run. |
 | OQ-INFRA-9 | **Deferred to prod** (lead): staging has no heartbeat, so no Healthchecks.io limit was measured; `provision-check` shows `WARN H13`. |
 
@@ -193,10 +195,10 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-97 | `dns-check.py` shown to fail on a planted record on the live zone (E6) | **Not run** as a planted record. It did fail on the live zone on the old `_dmarc` and the missing CAA, and it does not see the public CAA answer (F14) |
 | POLY-97 | `_dmarc` edit and CAA records before the test mail | Done (but see F14) |
 | POLY-97 | `b2-setup.py --probe` (E9) and the new `polycarpic-read` key | Prod (before the first backup) |
-| POLY-97 | IPv6 scan from outside | `edge-2` (expects 22 only) |
+| POLY-97 | IPv6 scan from outside | **Pending**: the full scan is running from a network shown to have IPv6 (expects 22 only) |
 | POLY-97 | host key compared with the console boot log | **Not done**: accepted as first seen, staging only (F1). Needed before prod (OQ-INFRA-12) |
 | POLY-97 | `app` and `staging` records pinned to the server's addresses | Done for `A`; no `AAAA` (F7). They must not outlive the server |
-| POLY-97 | Caddy real-address proof; Caddy-to-auth live probe | The probe: done (M7). The real address: a forged header does not reach `auth`; that the address it receives is the client's still waits for O1 and O2 (the allowlist) or a recorded session (M12) |
+| POLY-97 | Caddy real-address proof; Caddy-to-auth live probe | The probe: done (M7). The real address: a forged header does not reach `auth`; Caddy judges the client's real address (O1, O2). The address as `auth` records it for a session: M12, not run |
 | POLY-97 | memory caps | Idle figures recorded, no OOM kill (box measurements, 5). Under load: **not run** |
 | POLY-97 | the four Resend keys at `set-secret` time; DMARC test mail (`dkim=pass`, `dmarc=pass`) | Prod: staging holds a placeholder, so no mail is sent |
 | POLY-97 | Caddy pinned to Let's Encrypt, then CAA narrowed to one issuer with `accounturi` | after `edge-2`, and blocked by F14 |
@@ -222,7 +224,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-100 | edge networks made by provisioning; the release-signing key and `RELEASE_SIGNERS` before the first deploy | Done |
 | POLY-100 | Caddy up from a signed release before staging is served | Done with `edge-2` (`edge-1` failed, F18) |
 | POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | Measured: all three render at every cap down to 24M; `prod` fails at 16M and below, so the cap is in force (box measurements, 6). The cap and its test: next ops loop |
-| POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | Done: redirect and basic auth, pages, a static file, the headers on served pages and on errors, the browser rendering (M5 to M8; the console not inspected). Still to run: the refusal from another network (O1, O2) |
+| POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | Done: redirect and basic auth, pages, a static file, the headers on served pages and on errors, the browser rendering (M5 to M8; the console not inspected), and the refusal from another network (O1, O2) |
 | POLY-160 | the runbook's Ctrl-C line on a real `edge-deploy` | Done (`edge-2`, E1a to E1c; the interrupt was sent to the terminal by a script) |
 | POLY-160 | stopped containers stay stopped over a reboot after a stand-down | Done: the edge Caddy stood down after F18 was still stopped after the reboot |
 | POLY-160 | `docker compose --project-directory` on Compose 5.7.1 with no render home | Done for the command form the tool then uses (`--project-directory /`, box measurements, 3). The render home exists on the box, so the tool's own choice of `/` was not seen. A database restart left `web`, `auth` and `worker` running (9c) |
