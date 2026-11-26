@@ -86,7 +86,9 @@ The INFRA edit is devops-engineer's to make.
 
 **F25b and ARCH.** Every new `main` build recreates Postgres. seceng's security view is to keep that, because the rebuild is how Debian security fixes reach the image; whether to keep the restart is the Principal's decision, on POLY-165. ARCH §7's deploy-interruption text named only `web`, so ARCH 1.31.4 now says that the deploy also recreates `postgres` and that the app services restart while it starts. F21, F23 and F24 change nothing in ARCH.
 
-**Verdict for PR 2: APPROVE WITH CONDITIONS.** It closes the issue once these are done:
-1. The IPv6 full scan shows 22 only, and the firewall rules are recorded as TCP only.
-2. The §8 criterion is on POLY-165. The stand-in rule and register, M12, 9d and E6 were filed at `38b21723`.
-3. INFRA's OQ-INFRA-8 cell names POLY-164, 105, 116, 120 and 121 as above.
+**C4 is met.** Read at `33cd0dce`:
+1. **Scans and firewall** (`staging-deploy.md`). The full TCP scan over IPv6 from a temporary Hetzner server in `hel1` shows 22 the only open port. Ports 80 and 443 answer closed: the firewall admits them and nothing listens, as F7 expects. The IPv6 control passed before and after. The IPv4 run agrees with M11, and no UDP port answered on either. Through the API the firewall has 3 inbound rules, all TCP, with no UDP, ICMP or outbound rule. The two hotspot attempts are rightly recorded as not results. The scan came from inside Hetzner's network, and that the Cloud Firewall judges that traffic is the record's statement (unmeasured by me). It agrees with the two outside IPv4 runs and with O3.
+2. **POLY-165** carries the stand-in rule and register, M12, 9d and E6 (`38b21723`) and the §8 criterion (`4822f141`).
+3. **INFRA 1.3.46**: OQ-INFRA-8 names its carriers, and OQ-INFRA-11 no longer expects a backup on staging (`e2b39006`).
+
+**Verdict for PR 2: APPROVE WITH CONDITIONS.** One condition (C5): the Hetzner API token made to read the firewall and create the scan server is deleted, with the laptop's `hcloud` context, and the deletion is recorded in `staging-deploy.md` before the issue closes. The issue folds in C-78, and the record says only that the token was made.
