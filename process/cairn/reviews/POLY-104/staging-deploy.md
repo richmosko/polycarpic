@@ -104,7 +104,10 @@ Landed in INFRA 1.3.33 (the run is still in progress; steps not yet run are unch
 | §7.1 step 13 | a staging run never starts Caddy (code: a staging run neither renders nor starts the edge project) | code |
 | §7.1 step 15 | 22, 80 and 443 on IPv4, 22 only on IPv6; the IPv6 scan takes the server's address | F7 |
 | §8 command table, `provision` | `--b2-endpoint` and the three edge flags | F5 |
-| Open questions | OQ-INFRA-12 (host key), OQ-INFRA-13 (web on IPv6) | F1, F7 |
+| Open questions | OQ-INFRA-12 (host key), OQ-INFRA-13 (web on IPv6), OQ-INFRA-14 (public CAA) | F1, F7, F14 |
+| §7.1 step 10 (1.3.38) | how to make the release-signing key, the signers file and `RELEASE_SIGNERS` (written from what was done; these exact lines were not run as written) | box result |
+| §7.1 step 8 (1.3.38) | `dns-check.py` does not see the public CAA answer | F14 |
+| §3.2, §4.4, §5, §7.1 (1.3.34 to 1.3.37) | mounted secrets before the first deploy and staging placeholders; keyring commands marked not built; staging gids and the link refusal; the pinned `gh` | F11, F12, F13, F15 |
 
 ## Wording to fix
 
