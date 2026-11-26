@@ -15,13 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** First staging deploy
-- **Issue:** `POLY-104` (cairn)
-- **Milestone:** POLY-M1
-- **Branch:** `feature/poly-104-first-staging-deploy`
-- **Started:** 2026-11-25
-- **Goal:** Staging healthy on a real Hetzner box by INFRA §7.1, with only 22, 80 and 443 open, and every runbook correction landed in INFRA.
-- **Status:** In Review — staging and the shared Caddy (`edge-2`) are deployed and healthy on the box; the outside scans pass. PR 1 ([#159](https://github.com/richmosko/polycarpic/pull/159)) merged the fixes; PR 2 carries the record from `edge-2` on and closes the issue.
+_None. POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160) — ARCH 1.31.4, SECURITY 1.21.5, INFRA 1.3.47; staging and the shared Caddy (`edge-2`) run on the Hetzner box; follow-ups on POLY-165, POLY-164 and POLY-105._
+
+- **Next:** the Principal's decisions listed on POLY-165 (host key, IPv6 for prod, Postgres restart at deploy, where the backup measurements run, CAA), then the next POLY-M1 issue from `scripts/cairn/cairn ls --status todo`.
 
 _Standing context. POLY-101 (CI: auth route-policy row) merged 2026-11-25 via PR [#158](https://github.com/richmosko/polycarpic/pull/158) — ARCH 1.31.2, INFRA 1.3.32, SECURITY unchanged. A change to the auth or tenancy packages, or a BetterAuth bump by any path, cannot merge unless the route-policy test, the routing-pool test and the adapter lint ran and passed: a skipped, missing or expected-to-fail test is red, and a manual run with a `base` range can no longer turn `app` green. Not proved: a real newer BetterAuth was not installed. Put to the Principal on POLY-135 (`process/DECISIONS.md`, 2026-11-25): a pull request can edit its own gate. A flaky port in `tests/db/auth-service-main.test.ts` is filed on POLY-155. The record is `process/cairn/reviews/POLY-101/`._
 

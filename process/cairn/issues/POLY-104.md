@@ -1,7 +1,7 @@
 ---
 id: POLY-104
 title: First staging deploy
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-98, POLY-100, POLY-99, POLY-95, POLY-96, POLY-101, POLY-160, POLY-161, POLY-162]
@@ -85,3 +85,7 @@ PR 1 of 2: https://github.com/richmosko/polycarpic/pull/159. CI green on e3d32c9
 ### @team-lead — 2026-11-26
 
 PR 2 opened: https://github.com/richmosko/polycarpic/pull/160. It carries the record from `edge-2` on and closes the issue. Awaiting CI.
+
+### @team-lead — 2026-11-26
+
+Validate passed (qa-104 green at 0654e4fa; architect APPROVE, C1 to C5 met; seceng: nothing found on `edge-2` blocks prod); merging via PR #160. Closing. One criterion closes part-deferred (OQ-INFRA-8 for the staging steps only, OQ-INFRA-9 not measured); carriers: POLY-164, POLY-165, POLY-105, POLY-116, POLY-120, POLY-121.
