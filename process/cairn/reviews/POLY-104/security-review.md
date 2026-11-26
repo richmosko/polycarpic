@@ -48,7 +48,14 @@ Whether apport then writes it to `/var/crash` for a process in a container is un
 - **provision-check** gets a new row that FAILs unless `/proc/sys/kernel/core_pattern` reads exactly `|/bin/false`, `fs.suid_dumpable` is 0, and no `apport` package is installed. It reads the live `/proc` value, not the file.
 - The row must be shown red on today's box value.
 
-**Gate.** It does not gate PR 1: staging holds fake data and staging secrets only, nothing has crashed, and prod is not on this box. It is on the before-prod list (item 9). It is cheap, so it should land with PR 2 or the first follow-up.
+**Gate.** It does not gate PR 1: staging holds fake data and staging secrets only, nothing has crashed, and prod is not on this box. It is on the before-prod list (item 9). The lead put it in PR 1.
+
+**Build at `5c980a03`: Pass.**
+- `no_core_dumps` purges apport before it applies the setting, writes the file, and re-reads both live values, dying on a mismatch.
+- H27 reads the live values with `sysctl -n` and treats an apport package in `config-files` as present.
+- Info: the purge's output goes to `/dev/null`. On the box, read `apt-get -s purge apport` once to see that nothing beyond apport and its own dependents (for example `apport-core-dump-handler`) is removed. This is unmeasured.
+- Info: a later-sorting file in `sysctl.d` could set `core_pattern` again at boot. H27 reads the live value, so it would FAIL and not pass.
+- Box and qa runs are pending; I did not run them.
 
 ## Must be true before a prod box
 
