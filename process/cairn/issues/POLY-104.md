@@ -18,7 +18,7 @@ Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fak
 
 ## Acceptance criteria
 
-- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on v4 and v6.
+- [ ] Staging reaches healthy; nmap shows exactly 22/80/443 on IPv4, and 22 only on IPv6 (staging is IPv4-only: `process/DECISIONS.md` 2026-11-26).
 - [ ] provision-check passes.
 - [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer.
 - [ ] The review file lists every doc correction, and INFRA v1.2 lands them.
@@ -73,3 +73,7 @@ From the POLY-160 loop (2026-11-25; `process/cairn/reviews/POLY-160/verdict.md`,
 ### @team-lead — 2026-11-25
 
 Feature started. Branch: `feature/poly-104-first-staging-deploy`. The lead decides and merges under the Principal's delegation of 2026-11-25 ("approved to go with your rec's. drive to completion and merge"). State at start, measured: no git tags, no `RELEASE_SIGNERS` variable, no `app` or `staging` DNS records, `main` build 45668115611 green on 4b186404. Decided (POLY-100 ruling §L6): Caddy comes up from a signed `edge-1` tag, not from a prod deploy. The lead runs the box commands with the Principal's loaded SSH key; teammates touch no real credential.
+
+### @team-lead — 2026-11-25
+
+Acceptance line 1 amended (architect condition C1, lead decision F7 under the Principal's delegation): staging is IPv4-only, so the scan expects 22/80/443 on IPv4 and 22 only on IPv6. The issue lands in two PRs: PR 1 the fixes (issue stays in-progress), PR 2 the edge-2 record, which closes it. See `process/DECISIONS.md` 2026-11-26.
