@@ -23,7 +23,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 **From the lead, outside the run notes:** after the server was created (step 7) the Principal deleted the Hetzner API token and the lead deleted the `hcloud` context from the laptop (C-78, 2026-11-25). The age recipient (step 10) was written from `~/polycarpic-backup.key.public` before the host stage. Steps 1 to 6 ran before step 7; the run notes hold no entry for them, so no difference from the runbook is recorded for them, and none is ruled out.
 
-**Not run yet:** a reboot of the box.
+**Still to run on the box without `edge-2`:** the marker measurement is running; the planted DNS record (E6) and then a reboot follow it.
 
 **Step 18 (first backup), named in the issue, cannot run on a staging-only box:** staging has no backup or upload service and is not backed up (F17). It waits for prod (POLY-105 has the first-run checks; OQ-INFRA-11 as worded expects a backup on the staging instance, which this design cannot run).
 
@@ -77,6 +77,8 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 `gh` 2.106.0, the pin: the tarball's sha256 equals the release's `checksums.txt` and a download hashed locally; `gh attestation verify <tarball> --repo cli/cli` with the local `gh` 2.105.0 exited 0 (source `cli/cli` at `refs/heads/trunk`, signer `.github/workflows/deployment.yml`). Both on 2026-11-25. `bin/gh`'s sha256 was computed from that tarball. The end-to-end deploy test in CI uses a stand-in `gh`; the first real `attestation verify` ran on the box and passed (run 2 below).
 
 F18, the cause: the capability was **measured** on the released image (caddy `sha256:36dff3bb…`); that it is what the kernel refused follows from capabilities(7), and qa reproduced the same error before the fix with a local build of the unfixed Dockerfile, started by a real `compose up` of `edge.yml`'s settings (`red-run.md`). `edge-deploy` takes `edge.yml` and the Caddy image from the tag's release, not from the operator tool. The edge quarantine is per digest, so nothing needs clearing: a rebuilt Caddy gives a new digest.
+| F19 | after 13 | `restart --staging caddy` is refused with `restart: unknown service caddy; available: auth, caddy, postgres, web, worker`: the message lists the service it refuses. The refusal itself is right (staging has no Caddy). The list is built from every long-running service, not from those the project allows. | measured; cause from code | open (wording) |
+| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | sent to seceng |
 
 ## Security review of the F11 fix (seceng)
 
@@ -113,6 +115,20 @@ With operator tool `git-84dc7374d08f`:
 - The Principal signed `edge-1` on `main` at `4b186404` with the release key and pushed it; the lead verified it locally (annotated, good signature). Release workflow run 45759366614: `verify` and `publish` succeeded; the Release's body is `digest: sha256:0eba28cc…44d5`, with the SBOM, not a draft. The three image packages answer anonymous tag lists.
 - `sudo polycarpic-ops edge-deploy edge-1`: exit 1, `deploy: rollback-unhealthy`. Edge `deploy.log`: candidate 05:07:30Z, verified 05:07:53Z, up 05:07:53Z, `refused unhealthy` 05:09:55Z, `rollback-unhealthy`. The digest is quarantined as `unhealthy`; an `alert` file was written. `polycarpic-edge-caddy-1` exited 255, not out of memory (F18). The staging containers stayed healthy.
 
+### Box measurements that do not need `edge-2`
+
+From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed the commands to `bash -s` on standard input, and `docker compose run` consumed the rest of them after the first command of number 7; the rest was run again from a script file with standard input closed, so that refusal ran twice (it writes nothing). Numbers 1 to 9 follow the command sheet.
+
+1. `status`: 1.127 s. `STATUS RED: 3`: the `cert` item for prod and for staging (nothing answers on 443) and the edge deploy (`rollback-unhealthy`), all expected with the edge down. Disk `/` 6%, `/srv/polycarpic` 1%; `app` staging, `slots` and `revokes` (`plpgsql` and the 17 built-ins closed to PUBLIC) OK; the token expires in 89 days.
+2. `gate-check --staging`: `gate: pass`, exit 0.
+3. `docker compose -p polycarpic-staging --project-directory / --env-file /dev/null ps --status running --services`: `auth`, `postgres`, `web`, `worker`; exit 0, no warning; Compose 5.7.1.
+4. Core limits soft and hard 0 in all four containers. `core_pattern` is a pipe (F20). `/var/crash` empty.
+5. Idle memory: `web` 50.87 MiB of 384, `auth` 74.62 MiB of 192 (38.87%), `worker` 38.22 MiB of 384, `postgres` 56.87 MiB of 1 GiB. No OOM kill; staging restarts 0. The stopped edge Caddy shows 11 restarts (F18).
+6. The render under a memory cap: `prod`, `staging` and `edge` each exit 0 at 1G, 256M, 128M, 64M, 48M, 32M and 24M, with one hash per file at every cap (`d07fceceda5817f9`, `6438b08c2fcafa8b`, `6747e89d07b18caf`). No run was killed, so these show neither the floor nor that the cap was in force.
+7. `cli --staging user invite qa@example.com`: `refused: the instance has no user; use --bootstrap`, exit 2. With `--bootstrap`: `invitation recorded (bootstrap), expires 2026-12-03T05:28:21.243Z`, a link beginning `https://staging.polycarpic.com/` (not recorded), exit 0. The invitation row stays in staging.
+8. Spool: a probe written in `wal` (as 999), `dump` and `premigration` (as 10004) is read by 10005, whose `rm`, `touch` and `ls .inflight` are each `Permission denied`. The probes were removed and no file is left in the spool.
+9. a: `restart --staging web auth worker`: all healthy, exit 0. b: `restart --staging caddy`: refused, exit 2 (F19). c: `restart --staging postgres`: healthy, exit 0; 60 s later `web`, `auth` and `worker` were running with 0 restarts; `web` logged one `db.connection_lost` and no `process.crash`. d (the renamed secret): not run.
+
 ## Open questions
 
 | Id | Answer |
@@ -129,7 +145,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 |---|---|---|
 | POLY-138 | Caddy overwrites `X-Forwarded-For` with the real client address, so `/api/auth/*` does not answer 503 | `edge-2` |
 | POLY-97 | uploader ACLs before the first backup | the spool ACL check passes on the box (done); the uploader's use of them: prod |
-| POLY-97 | POLY-147 marker measurement on the VPS against a control (acceptance criterion moved here; limits 5 ms p95, 1 KB WAL) | **Not run**; does not depend on `edge-2` |
+| POLY-97 | POLY-147 marker measurement on the VPS against a control (acceptance criterion moved here; limits 5 ms p95, 1 KB WAL) | **Running** (branch `71ba9813` against control `33faf77f`, throwaway Postgres on its own network); no result yet |
 | POLY-97 | "provision-check passes" means the staging-only result | Done |
 | POLY-97 | `dns-check.py` shown to fail on a planted record on the live zone (E6) | **Not run** as a planted record. It did fail on the live zone on the old `_dmarc` and the missing CAA, and it does not see the public CAA answer (F14) |
 | POLY-97 | `_dmarc` edit and CAA records before the test mail | Done (but see F14) |
@@ -138,7 +154,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-97 | host key compared with the console boot log | **Not done**: accepted as first seen, staging only (F1). Needed before prod (OQ-INFRA-12) |
 | POLY-97 | `app` and `staging` records pinned to the server's addresses | Done for `A`; no `AAAA` (F7). They must not outlive the server |
 | POLY-97 | Caddy real-address proof; Caddy-to-auth live probe | `edge-2` |
-| POLY-97 | memory caps | **Not run** |
+| POLY-97 | memory caps | Idle figures recorded, no OOM kill (box measurements, 5). Under load: **not run** |
 | POLY-97 | the four Resend keys at `set-secret` time; DMARC test mail (`dkim=pass`, `dmarc=pass`) | Prod: staging holds a placeholder, so no mail is sent |
 | POLY-97 | Caddy pinned to Let's Encrypt, then CAA narrowed to one issuer with `accounturi` | after `edge-2`, and blocked by F14 |
 | POLY-97 (seceng F-D3) | the uploader's connect to Postgres's addresses expects a timeout or no route | Prod |
@@ -146,15 +162,15 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-98 1 | sudo's `secure_path` reaches `/usr/local/sbin` | Done (`sudo polycarpic-ops` works) |
 | POLY-98 2 | `install.sh` over real ssh; a reboot, then `provision-check` from the bundle | `install.sh`: done. After a reboot: **not run** |
 | POLY-98 3 | `status` `cert` item through Caddy | `edge-2` for what staging shows; the prod name: prod |
-| POLY-98 4 | `status` `disk`, `app`, `backupdb`, `revokes`, `slots` within 15 s | `app`, `revokes`, `slots`: done in a GREEN status; the time was not recorded; `disk` is not named in the notes; `backupdb`: prod |
-| POLY-98 5 | `cli user invite` live | **Not run** |
-| POLY-98 6 | `restart` against real health checks; a renamed secret file as Linux sees it | **Not run** |
-| POLY-98 7 | `gate-check` on the deployed schema | **Not run** (`--staging` can run now); the gate itself: prod |
+| POLY-98 4 | `status` `disk`, `app`, `backupdb`, `revokes`, `slots` within 15 s | Done: 1.127 s, with `disk`, `app`, `slots` and `revokes` OK; `backupdb`: prod |
+| POLY-98 5 | `cli user invite` live | Done on staging (box measurements, 7). Opening the link: `edge-2` |
+| POLY-98 6 | `restart` against real health checks; a renamed secret file as Linux sees it | `restart`: done (9a to 9c). The renamed secret: **not run** (it needs the Principal to type the value); moved by name to a later loop |
+| POLY-98 7 | `gate-check` on the deployed schema | Done on staging: `gate: pass`; the gate on prod: prod |
 | POLY-98 8 | `b2-setup.py --probe --show-rclone-output` | Prod |
 | POLY-98 9 | `jobs.log` under the real backup and uploader | Prod |
 | POLY-98 10 | CI `provision` job time at the PR head | PR 1's CI run (not a box measurement) |
-| POLY-99 | spool ACLs on real LUKS ext4 | Done as far as `provision-check` reads them; no write by 999, 10004 or read by 10005 was tried |
-| POLY-99 | `core: 0` and the host's `core_pattern` | **Not run** |
+| POLY-99 | spool ACLs on real LUKS ext4 | Done, by use (box measurements, 8) |
+| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20), with seceng |
 | POLY-99 | backup and uploader units under real systemd | Prod (installed, not enabled) |
 | POLY-99 | `docker compose run`'s timeout and `rm -f` | **Not run** |
 | POLY-99 | `secrets/host/` and the ownership of `jobs.log` and `last-upload` | Done as far as `provision-check` reads them; the move from the old path does not occur on a new box |
@@ -162,11 +178,11 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-99 | the two POLY-95 secret-mode cases that need Linux | CI, not this box; their state was not checked in this loop |
 | POLY-100 | edge networks made by provisioning; the release-signing key and `RELEASE_SIGNERS` before the first deploy | Done |
 | POLY-100 | Caddy up from a signed release before staging is served | `edge-2` (`edge-1` failed, F18) |
-| POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | **Not run** |
+| POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | Measured: all three render at every cap down to 24M (box measurements, 6); no floor found, and no run showed that the cap bites. The cap and its test: next ops loop |
 | POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | `edge-2` |
 | POLY-160 | the runbook's Ctrl-C line on a real `edge-deploy` | `edge-2` |
 | POLY-160 | stopped containers stay stopped over a reboot after a stand-down | **Not run** |
-| POLY-160 | `docker compose --project-directory` on Compose 5.7.1 with no render home | **Not measured** (the F9 check ran `version --short` with no render home as `HOME`, which is a different thing) |
+| POLY-160 | `docker compose --project-directory` on Compose 5.7.1 with no render home | Done for the command form the tool then uses (`--project-directory /`, box measurements, 3). The render home exists on the box, so the tool's own choice of `/` was not seen. A database restart left `web`, `auth` and `worker` running (9c) |
 
 The 2026-11-23 comment about creating `app.` only after a prod deploy was withdrawn by the one after it. Prod is not opened to the internet before POLY-163.
 
