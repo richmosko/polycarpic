@@ -4,7 +4,7 @@ The lead ran INFRA §7.1 on a real Hetzner project with the Principal, staging o
 
 ## State for PR 2 (in progress)
 
-PR 1 merged at `47fb1fbc`. `edge-2` is deployed on the box and healthy, and holds real certificates (section "`edge-2` on the box"). The checks with the staging password, the browser check, the IPv4 full scan and the checks from another network (O1 to O3) pass. Still open: the IPv6 full port scan (running), a staging user (M12, optional) and the planted DNS record. Where the sections below say a thing "waits for `edge-2`" as of PR 1, this section and the `edge-2` section are the later word.
+PR 1 merged at `47fb1fbc`. `edge-2` is deployed on the box and healthy, and holds real certificates (section "`edge-2` on the box"). The checks with the staging password, the browser check, the checks from another network (O1 to O3) and the full outside scans pass (22, 80 and 443 open on IPv4, 22 alone on IPv6). Not run: a staging user (M12, optional) and the planted DNS record. Where the sections below say a thing "waits for `edge-2`" as of PR 1, this section and the `edge-2` section are the later word.
 
 ## State at PR 1
 
@@ -20,7 +20,7 @@ On the box now (operator tool `git-064e7429baa2`, rebooted 2026-11-26 06:01Z): s
 |---|---|
 | Staging reaches healthy; the outside scan | healthy: **measured**. Scan: **waits for `edge-2`**; by the lead's decision (F7) it expects 22, 80 and 443 on IPv4 and 22 only on IPv6 |
 | `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566`, and again with `git-064e7429baa2` after the reboot |
-| OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the IPv6 scan; 8 in progress; 9 recorded as deferred to prod, not measured |
+| OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered; 8 open, with a carrier for each unrun step (INFRA); 9 recorded as deferred to prod, not measured |
 | This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.42. The issue's text says "INFRA v1.2"; the document is past that version |
 
 **Waits for `edge-2`** (nothing here has been seen on a box): Caddy starting at all (F18's fix); its writes to `caddy` and `caddy-config` (F6); a certificate from a real CA for `staging`; ports 80 and 443 on the real bind address with `userland-proxy: false`; the staging allowlist and basic auth; the client address Caddy passes on and the Caddy-to-`auth` probe; the sign-in pages, static files and the `no-store` and `nosniff` headers in front of the real `web`; the outside scans on IPv4 and IPv6, with `curl -sI` and the refused password login; the runbook's Ctrl-C line on a real `edge-deploy`.
@@ -65,7 +65,7 @@ On the box now (operator tool `git-064e7429baa2`, rebooted 2026-11-26 06:01Z): s
 | F4 | 11 | The usage line shows `--bind-addr`, `--staging-allow` and `--acme-email`; step 11 names none. `edge-deploy` needs them: it refuses `edge-env` unless `edge.env` holds all four keys. | code | the tool takes the flags (`ff62d0d0`); step 11 corrected (INFRA 1.3.33); run on the box: `edge.env` written, `root:root 0644`, four keys |
 | F5 | 11 | `polycarpic-ops provision` accepts none of those three flags. | code | fixed in `ff62d0d0` |
 | F6 | 13 | Nothing creates `/srv/polycarpic/caddy` or `caddy-config` for uid 10010. Docker would create them `root:root 0755`: Caddy could not write its ACME storage, while its health check (`caddy version`) still passes. | code | fixed in `ff62d0d0`; on the box both directories are `0700 10010:10010` (Caddy writing there: not yet seen) |
-| F7 | 8, 15 | The web ports are published on the IPv4 bind address only and no compose network enables IPv6, so 80 and 443 are closed on IPv6. Lead's decision, 2026-11-25: staging is IPv4-only in this loop; the DNS tools run without `--ipv6`; the acceptance line becomes "22, 80, 443 on IPv4; 22 only on IPv6"; IPv6 service is a follow-up. The Cloud Firewall still admits 80 and 443 from `::/0`. | code; the IPv6 scan will measure it | follow-up |
+| F7 | 8, 15 | The web ports are published on the IPv4 bind address only and no compose network enables IPv6, so 80 and 443 are closed on IPv6. Lead's decision, 2026-11-25: staging is IPv4-only in this loop; the DNS tools run without `--ipv6`; the acceptance line becomes "22, 80, 443 on IPv4; 22 only on IPv6"; IPv6 service is a follow-up. The Cloud Firewall still admits 80 and 443 from `::/0`. | code; measured by the IPv6 scan: 80 and 443 closed | follow-up |
 | F8 | restore drill | `infra/drill.sh` check DR3 has the same early-exit pipeline shape: a match can end `plain_stream` with SIGPIPE, so DR3 can report PASS with a password in the globals file. | code | fixed in `ff62d0d0` |
 | F9 | 11 | `provision-check` check H25 fails on a correct box. It makes the render user's `HOME` with `mktemp -d` as root (`0700 root:root`), so `docker`, as uid 10020, cannot read its config there and answers `unknown flag: --short` (exit 125). With the directory owned by 10020 the same command prints `5.7.1`. The fix text of H25 points at `/root/.docker/cli-plugins`, which is not the cause. The deploy's own render is not affected (code): its `HOME` is the render home, `root:root 0755` and empty. | measured | fixed in `410a3e47`: the directory is `root:root 0755`, as the render home is |
 | F10 | 11 | `install.sh` is `sh`, so a failed `git show` or `git archive` was hidden behind `ssh`'s exit 0: the install could report success after sending nothing or part of the tree. Separately, in `en_US.UTF-8` on macOS an upper-case `--commit` could pass the hex check. | test harness | fixed: git's output is checked before any connection; the hex characters are listed |
@@ -171,14 +171,23 @@ From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed th
 - **M11, pass:** `nmap -Pn -p- 167.235.205.75` (Nmap 7.993) from the Principal's network, started 16:18Z: 22, 80 and 443 open and nothing else (`65532 filtered tcp ports (no-response)`), 5148.72 seconds. TCP only; UDP was not scanned.
 - **After these** (about 18:2xZ): Caddy up 2 h and healthy, the four staging containers up 11 h and healthy; `status` GREEN, 6 waiting (prod). Restart counts: Caddy, `postgres`, `auth` and `web` 0, `worker` 1 (F25).
 - **O1 to O3, pass** (the Principal's Mac on a phone hotspot; the script compared its public IPv4 with the home one and they differ). O1: `HTTP/2 403` with no `www-authenticate` line; a wrong password on `/api/auth/ok` also 403. O2: a forged `X-Forwarded-For` carrying the allowed address: 403. So Caddy judges the real client address, and the allowlist answers before the password. O3, the control: `nc -6` to port 22 on the server's IPv6 address succeeded, so this network has IPv6; `curl -6` to `https` on that address got no HTTP answer (`000`).
-- **The IPv6 full port scan: PENDING** (running from that hotspot; it expects 22 only).
+- **The IPv6 full port scan: pass,** from a third network. Two earlier attempts from the hotspot are **not results**, because it lost IPv6 part-way both times:
+  - attempt 1 (from 17:59Z, `nmap -Pn -6 -p- -T4 --max-retries 1`, 1306 s): `62769 filtered (host-unreach)`, `2763 filtered (no-response)`; the closing control (`nc -6` to port 22) failed with `No route to host` and the Mac no longer had a global IPv6 address, so about 96% of the ports were never probed;
+  - attempt 2 (20:12 to 21:25Z, `--max-retries 2 --min-parallelism 150 --max-rtt-timeout 700ms`, 4424 s): `40558 filtered (no-response)`, `24974 filtered (host-unreach)`; the control passed before and failed after, so 38% of the ports were not probed.
+
+  While each was connected it saw 22 open and 80 and 443 closed.
+- **The scan that counts:** a temporary Hetzner server `poly-104-scan` (`cx23`, `hel1`, made for this and deleted afterwards with its throwaway SSH key), nmap 7.94SVN as root, 22:14 to 22:20Z. It is inside Hetzner's network; the Cloud Firewall still judges its traffic. The IPv6 control (`nc -6` to port 22) passed before, after the TCP scan and at the end.
+  - **TCP over IPv6** (`nmap -6 -sS -Pn -p- --max-retries 2 --min-rate 1500`, 87 s): 22 open, 80 closed, 443 closed, `65532 filtered (no-response)`. **22 is the only open port.** 80 and 443 answer closed, not filtered: the firewall admits them on IPv6 and nothing listens.
+  - **TCP over IPv4**, same options, 87 s: 22, 80 and 443 open, 65532 filtered. It agrees with M11.
+  - **UDP over IPv4 and over IPv6** (`-sU -Pn -p- --max-retries 1 --min-rate 1500`): all 65535 ports `open|filtered (no-response)` on both. No port answered. A UDP scan cannot tell a dropped probe from an open, silent port, so this shows no UDP service that replies, and no more.
+- **The Cloud Firewall, read through the API** (2026-11-26, with a new token made for the run): one firewall, `polycarpic`, applied to 1 server; 3 inbound rules, each **TCP** (22, 80, 443), each from `0.0.0.0/0` and `::/0`; no outbound rule; no UDP or ICMP rule.
 - **Not run:** M12.
 
 ## Open questions
 
 | Id | Answer |
 |---|---|
-| OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound rules, each covering IPv4 and IPv6. The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). The IPv4 full TCP scan shows 22, 80 and 443 and nothing else; the IPv6 full scan is **pending** (from another network: port 22 answers over IPv6 and `https` does not). |
+| OQ-INFRA-7 | Plan `cx33` (4 vCPU / 8 GB / 80 GB); `fsn1` had stock on 2026-11-25. One firewall of 3 inbound TCP rules (22, 80, 443), each covering IPv4 and IPv6; no outbound, UDP or ICMP rule (read through the API). The server's IPv6 address is the `<prefix>::1` of its /64. The web ports answer on IPv4 only (F7). Full outside TCP scans: 22, 80 and 443 open on IPv4; 22 alone open on IPv6, with 80 and 443 closed. No UDP port answered on either. **Answered.** |
 | OQ-INFRA-8 | In progress. §7.1 was run through step 13 for staging, with the differences above. Step 15 is being run on `edge-2`; step 18 cannot run on staging; steps 14, 16, 17 and 19 and all of §8 were not run. |
 | OQ-INFRA-9 | **Deferred to prod** (lead): staging has no heartbeat, so no Healthchecks.io limit was measured; `provision-check` shows `WARN H13`. |
 
@@ -195,7 +204,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-97 | `dns-check.py` shown to fail on a planted record on the live zone (E6) | **Not run** as a planted record. It did fail on the live zone on the old `_dmarc` and the missing CAA, and it does not see the public CAA answer (F14) |
 | POLY-97 | `_dmarc` edit and CAA records before the test mail | Done (but see F14) |
 | POLY-97 | `b2-setup.py --probe` (E9) and the new `polycarpic-read` key | Prod (before the first backup) |
-| POLY-97 | IPv6 scan from outside | **Pending**: the full scan is running from a network shown to have IPv6 (expects 22 only) |
+| POLY-97 | IPv6 scan from outside | Done: 22 alone open on IPv6, from a temporary server with a checked IPv6 path; two hotspot attempts were not results (`edge-2` on the box) |
 | POLY-97 | host key compared with the console boot log | **Not done**: accepted as first seen, staging only (F1). Needed before prod (OQ-INFRA-12) |
 | POLY-97 | `app` and `staging` records pinned to the server's addresses | Done for `A`; no `AAAA` (F7). They must not outlive the server |
 | POLY-97 | Caddy real-address proof; Caddy-to-auth live probe | The probe: done (M7). The real address: a forged header does not reach `auth`; Caddy judges the client's real address (O1, O2). The address as `auth` records it for a session: M12, not run |
