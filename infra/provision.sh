@@ -374,7 +374,7 @@ secrets_for() { # root services generated
     [ "$(stat -c %a "$root/$svc")" = 750 ] || chmod 0750 "$root/$svc"
     # every file already there, set-secret's included: owner only, the value is never opened
     for f in "$root/$svc"/*; do
-      [ -f "$f" ] && [ ! -L "$f" ] || continue
+      if [ ! -f "$f" ] || [ -L "$f" ]; then continue; fi
       [ "$(stat -c %u:%g "$f")" = "0:$gid" ] || { chown "0:$gid" "$f"; change "owner of ${f#"$ETC"/} set to 0:$gid"; }
     done
   done
