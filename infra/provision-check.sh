@@ -449,6 +449,18 @@ fi
 [ "$(dpkg-query -W -f='${Status}' gh 2> /dev/null)" != "install ok installed" ] || h26="$h26 the gh dpkg package is installed: a second, unpinned gh;"
 report H26 "gh" "$h26" "sudo bash provision.sh --stage host ... installs the pinned gh; remove another gh or the gh package by hand (sudo apt-get remove gh)"
 
+# ------------------------------------------------------------------ H27 core dumps (POLY-104, seceng)
+# The LIVE kernel values, not the file: core_pattern exactly |/bin/false (a pipe is not bound by a core limit of 0, so what it names matters),
+# fs.suid_dumpable 0, and no apport package, whose service would take core_pattern back.
+h27=''
+got27=$(sysctl -n kernel.core_pattern 2> /dev/null || true)
+[ "$got27" = '|/bin/false' ] || h27="$h27 kernel.core_pattern is '$got27' (want '|/bin/false');"
+got27=$(sysctl -n fs.suid_dumpable 2> /dev/null || true)
+[ "$got27" = 0 ] || h27="$h27 fs.suid_dumpable is '$got27' (want 0);"
+got27=$(dpkg-query -W -f='${Status}' apport 2> /dev/null || true)
+[ -z "$got27" ] || [[ "$got27" == *not-installed ]] || h27="$h27 the apport package is present ($got27);"
+report H27 "core dumps" "$h27" "sudo bash provision.sh --stage host ... purges apport and sets /etc/sysctl.d/50-polycarpic-core.conf"
+
 # The render home (POLY-160 R7): absent is `/` (as the ops tool does); one that exists is used only as a real directory, owned by root, mode 0755 and empty.
 rh=/
 rd=/var/lib/polycarpic/state/deploy/render-home

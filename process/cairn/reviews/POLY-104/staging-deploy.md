@@ -17,7 +17,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 | Staging reaches healthy; the outside scan | healthy: **measured**. Scan: **waits for `edge-2`**; by the lead's decision (F7) it expects 22, 80 and 443 on IPv4 and 22 only on IPv6 |
 | `provision-check` passes (the staging-only result) | **measured** with `git-51ea0e3b5566` |
 | OQ-INFRA-7, -8 and -9 each have a recorded answer | 7 answered but for the outside scan; 8 in progress; 9 recorded as deferred to prod, not measured |
-| This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.41. The issue's text says "INFRA v1.2"; the document is past that version |
+| This file lists every doc correction, and INFRA lands them | listed below; INFRA 1.3.42. The issue's text says "INFRA v1.2"; the document is past that version |
 
 **Waits for `edge-2`** (nothing here has been seen on a box): Caddy starting at all (F18's fix); its writes to `caddy` and `caddy-config` (F6); a certificate from a real CA for `staging`; ports 80 and 443 on the real bind address with `userland-proxy: false`; the staging allowlist and basic auth; the client address Caddy passes on and the Caddy-to-`auth` probe; the sign-in pages, static files and the `no-store` and `nosniff` headers in front of the real `web`; the outside scans on IPv4 and IPv6, with `curl -sI` and the refused password login; the runbook's Ctrl-C line on a real `edge-deploy`.
 
@@ -78,7 +78,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 F18, the cause: the capability was **measured** on the released image (caddy `sha256:36dff3bb…`); that it is what the kernel refused follows from capabilities(7), and qa reproduced the same error before the fix with a local build of the unfixed Dockerfile, started by a real `compose up` of `edge.yml`'s settings (`red-run.md`). `edge-deploy` takes `edge.yml` and the Caddy image from the tag's release, not from the operator tool. The edge quarantine is per digest, so nothing needs clearing: a rebuilt Caddy gives a new digest.
 | F19 | after 13 | `restart --staging caddy` is refused with `restart: unknown service caddy; available: auth, caddy, postgres, web, worker`: the message lists the service it refuses. The refusal itself is right (staging has no Caddy). The list is built from every long-running service, not from those the project allows. | measured; cause from code | open (wording) |
-| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | seceng: Medium, with a control (`security-review.md`, "Core dumps go to apport"); does not gate PR 1, required before prod; not built |
+| F20 | after 13 | The host's `core_pattern` is a pipe to apport (`\|/usr/share/apport/apport … -- %E`). The containers' core limits are 0, but by core(5) a core limit does not stop a piped pattern from being called, so the limits alone do not show that no dump is written. `/var/crash` was empty; no crash was provoked. | measured; the consequence from core(5), not tried | seceng: Medium, with a control (`security-review.md`, "Core dumps go to apport"); required before prod. By the lead's ruling it is in PR 1: the host stage purges apport and sets `kernel.core_pattern=\|/bin/false` and `fs.suid_dumpable=0`; `provision-check` H27 reads them live (INFRA 1.3.42). To be run on the box, before the reboot |
 
 ## Security review of the F11 fix (seceng)
 
@@ -171,7 +171,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-98 9 | `jobs.log` under the real backup and uploader | Prod |
 | POLY-98 10 | CI `provision` job time at the PR head | PR 1's CI run (not a box measurement) |
 | POLY-99 | spool ACLs on real LUKS ext4 | Done, by use (box measurements, 8) |
-| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20; seceng's control before prod) |
+| POLY-99 | `core: 0` and the host's `core_pattern` | Done: limits 0; `core_pattern` is a pipe to apport (F20; the control is built, not yet run on the box) |
 | POLY-99 | backup and uploader units under real systemd | Prod (installed, not enabled) |
 | POLY-99 | `docker compose run`'s timeout and `rm -f` | **Not run** |
 | POLY-99 | `secrets/host/` and the ownership of `jobs.log` and `last-upload` | Done as far as `provision-check` reads them; the move from the old path does not occur on a new box |
@@ -189,7 +189,7 @@ The 2026-11-23 comment about creating `app.` only after a prod deploy was withdr
 
 ## Doc corrections (INFRA)
 
-Every correction of this loop up to PR 1, INFRA 1.3.32 to 1.3.41. Steps not yet run are unchanged except where the code settles them.
+Every correction of this loop up to PR 1, INFRA 1.3.32 to 1.3.42. Steps not yet run are unchanged except where the code settles them.
 
 | Where | Correction | From |
 |---|---|---|
@@ -217,6 +217,7 @@ Every correction of this loop up to PR 1, INFRA 1.3.32 to 1.3.41. Steps not yet 
 | §2.2; §7.1 step 11 | archiving is on for prod only; D1 checks each project's own settings | F17 |
 | §2.2 | no file capability in any of our images; what the image job runs | F18 |
 | §7.1 step 11 | D6 is not among a staging-only box's waiting checks (1.3.41) | box result and code |
+| §2.1; §7.1 step 11 | core dumps: apport purged, the two kernel values, check H27 (1.3.42) | F20 |
 
 ## Wording to fix
 

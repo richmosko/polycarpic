@@ -265,6 +265,28 @@ no_swap() {
   fi
 }
 
+# No core dump leaves a crashing process (POLY-104, seceng's ruling). Ubuntu pipes core_pattern to apport, a root process on the host, and the
+# kernel does not apply a core limit of 0 to a pipe, so the containers' limits stop nothing there. apport goes first: its stop rewrites
+# core_pattern, and its service would take it back at every boot.
+no_core_dumps() {
+  local conf=/etc/sysctl.d/50-polycarpic-core.conf pattern='|/bin/false' status got
+  status=$(dpkg-query -W -f='${Status}' apport 2> /dev/null || true)
+  if [ -n "$status" ] && [[ "$status" != *not-installed ]]; then
+    apt-get purge -y apport > /dev/null
+    change "apport purged"
+  fi
+  put_file "$conf" 0644 "kernel.core_pattern=$pattern
+fs.suid_dumpable=0"
+  if [ "$(sysctl -n kernel.core_pattern)" != "$pattern" ] || [ "$(sysctl -n fs.suid_dumpable)" != 0 ]; then
+    sysctl -q -p "$conf"
+    got=$(sysctl -n kernel.core_pattern)
+    [ "$got" = "$pattern" ] || die "kernel.core_pattern is '$got' after applying $conf (want '$pattern')"
+    got=$(sysctl -n fs.suid_dumpable)
+    [ "$got" = 0 ] || die "fs.suid_dumpable is '$got' after applying $conf (want 0)"
+    change "core dump settings applied (sysctl)"
+  fi
+}
+
 data_volume() {
   local state=$1 key=$ETC/luks.key
   install -d -m 0755 "$ETC"
@@ -561,6 +583,7 @@ stage_host() {
   unattended_upgrades
   systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
   no_swap
+  no_core_dumps
   data_volume "$state"
   data_dirs
   state_files
