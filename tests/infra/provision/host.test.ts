@@ -330,6 +330,38 @@ cd /etc/polycarpic; stat -c '%n %a %u:%g' staging-secrets/*/plaid_secret staging
     expect(wrongOwners(r.out)).toEqual([]);
   });
 
+  // ---- POLY-104 S1 (seceng's F11 review): a link at a secrets root or service directory was followed, and its TARGET re-owned, with every file in it
+  // (staging-secrets/web -> ../secrets/web hands prod's web secrets to the staging gid). Refused like deploy_dirs does: stop, name it, leave it.
+  const OWNERS = (d: string) => `find ${d} -printf '%p %y %m %U:%G\\n' | sort`;
+  const S1: [string, string, string, string][] = [
+    // label, the link, what it points at (what must not change), how it is planted
+    ['a staging service directory linked to prod\'s', '/etc/polycarpic/staging-secrets/web', '/etc/polycarpic/secrets/web', 'rm -rf $L; ln -s ../secrets/web $L'],
+    ['the staging root linked to the prod root', '/etc/polycarpic/staging-secrets', '/etc/polycarpic/secrets', 'rm -rf $L; ln -s secrets $L'],
+    ['a prod service directory linked outside the tree', '/etc/polycarpic/secrets/auth', '/root/elsewhere', 'mv $L /root/elsewhere; ln -s /root/elsewhere $L; chgrp -R 12345 /root/elsewhere'],
+    ['the prod root linked outside the tree', '/etc/polycarpic/secrets', '/root/prod-moved', 'mv $L /root/prod-moved; ln -s /root/prod-moved $L; chgrp -R 12345 /root/prod-moved'],
+  ];
+  for (const [label, link, target, plant] of S1) {
+    it(`S1: provision refuses ${label}: exit 1 naming the link, the target's owners and modes untouched, the link left as found`, () => {
+      const r = run(`L=${link}; printf typed > /etc/polycarpic/secrets/web/plaid_secret; chmod 0440 /etc/polycarpic/secrets/web/plaid_secret; chgrp ${PROD_USERS.web} /etc/polycarpic/secrets/web/plaid_secret
+${plant}
+${OWNERS(`${target}/`)} > /tmp/before; ${HOSTRUN} > /tmp/o 2>&1${rc}; ${OWNERS(`${target}/`)} > /tmp/after; diff /tmp/before /tmp/after && echo TARGET-UNTOUCHED; [ -L $L ] && echo STILL-A-LINK; echo ==; tail -n 3 /tmp/o`, { image: HOST });
+      const [head, tail] = r.out.split('==\n') as [string, string];
+      expect(head.trim().split('\n'), r.out + r.err).toEqual(['rc=1', 'TARGET-UNTOUCHED', 'STILL-A-LINK']);
+      expect(tail).toContain(link);
+      expect(tail).toMatch(/is a link/);
+    });
+  }
+
+  it('S1 same shape: a generated secret file that is a link is never followed: its target keeps owner, mode and content', () => {
+    const link = '/etc/polycarpic/staging-secrets/web/db_password_app';
+    const target = '/etc/polycarpic/secrets/web/db_password_app';
+    const look = `stat -c '%a %u:%g' ${target}; sha256sum < ${target}`;
+    const r = run(`rm ${link}; ln -s ${target} ${link}; ${look}; ${HOSTRUN} > /tmp/o 2>&1; ${look}`, { image: HOST });
+    const out = r.out.trim().split('\n');
+    expect(out.slice(2), r.out + r.err).toEqual(out.slice(0, 2));
+    expect(out[0]).toBe(`440 0:${PROD_USERS.web}`);
+  });
+
   it('F11: provision-check passes H6 on the right staging layout, set-secret files included', () => {
     const r = check(`${rightStaging}; ${addLater}`);
     expect(find(r.out, 'FAIL', 'H6')?.text).toBeUndefined();

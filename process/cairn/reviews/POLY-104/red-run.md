@@ -99,6 +99,17 @@ Box suite: 222 run, 215 passed, 7 failed, all new `F11` tests; the `F11 control`
 
 Box suite (with both test fixes): 223 run, 222 passed, 1 failed: `infra/provision.sh is shellcheck clean`, SC2015 (info) at line 377, `[ -f "$f" ] && [ ! -L "$f" ] || continue`. CI's `shellcheck -x` step exits 1 on it. All `F11` tests pass. `-p` runs of `test_set_secret` (32), `test_list_secrets` (7), `test_provision` (24), `test_staging_auth` (12), `test_lint` (9), `test_dispatcher` (19), `test_status` (53), `test_restart` (9): all pass. `vitest.config.ts`: 677 passed, 3 skipped.
 
+### Seceng's S1 and S4
+
+**S1** (a link at a secrets root or service directory is followed and the target re-owned). Box suite on `7d6d38c7` plus these tests: 228 run, 222 passed, 6 failed: the shellcheck one above and 5 new `S1`. In each, the host stage exits 0 and the target's groups change.
+
+- Four tests, pinned as `deploy_dirs` behaves (exit 1, a message with the link's path and `is a link`, target untouched, link left): staging service dir to prod's; staging root to prod root; prod service dir outside the tree; prod root outside the tree.
+- **One more than the review lists:** the review says a file symlink is skipped. That holds for the new loop only. The `generated` loop after it runs `chown` and `chmod` on `$root/$pair` through a link: with `staging-secrets/web/db_password_app` linked to prod's, prod's file moves to `0:10101`. Pinned: the target keeps owner, mode and content (how it is refused is left open).
+
+**S4** (`tests/infra/provision-gid.test.ts`, no container, `vitest.config.ts`): 10 run, 4 failed: both scripts give the prod gids for `…/staging-secrets/` and `…//`.
+
+S2 (hardlinks) has no test.
+
 ### Can `deploy-real` use provision's layout?
 
 CI never ran it: `harness.ts` makes the staging secrets itself from its own table (`SECRETS`, 101xx). **Yes, for the secrets; no, for the whole host stage** (it wants a block volume for LUKS and installs packages and host settings on the runner). The seam is `secrets_for` with `gid_of`, `ensure_dir`, `change` and the `STAGING_SERVICES` / `STAGING_GENERATED` lists. `provision.sh` cannot be sourced (it parses arguments and dispatches at top level), so one of:
