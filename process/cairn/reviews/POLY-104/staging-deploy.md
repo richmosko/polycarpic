@@ -23,7 +23,7 @@ On the box now: staging is deployed and healthy (`status` GREEN); `provision-che
 
 **From the lead, outside the run notes:** after the server was created (step 7) the Principal deleted the Hetzner API token and the lead deleted the `hcloud` context from the laptop (C-78, 2026-11-25). The age recipient (step 10) was written from `~/polycarpic-backup.key.public` before the host stage. Steps 1 to 6 ran before step 7; the run notes hold no entry for them, so no difference from the runbook is recorded for them, and none is ruled out.
 
-**Still to run on the box without `edge-2`:** the marker measurement is running; the planted DNS record (E6) and then a reboot follow it.
+**Still to run on the box without `edge-2`:** the planted DNS record (E6) and, after the core-dump control (F20) is installed, a reboot.
 
 **Step 18 (first backup), named in the issue, cannot run on a staging-only box:** staging has no backup or upload service and is not backed up (F17). It waits for prod (POLY-105 has the first-run checks; OQ-INFRA-11 as worded expects a backup on the staging instance, which this design cannot run).
 
@@ -124,10 +124,11 @@ From 2026-11-26 05:27Z, operator tool `git-51ea0e3b5566`. A first attempt fed th
 3. `docker compose -p polycarpic-staging --project-directory / --env-file /dev/null ps --status running --services`: `auth`, `postgres`, `web`, `worker`; exit 0, no warning; Compose 5.7.1.
 4. Core limits soft and hard 0 in all four containers. `core_pattern` is a pipe (F20). `/var/crash` empty.
 5. Idle memory: `web` 50.87 MiB of 384, `auth` 74.62 MiB of 192 (38.87%), `worker` 38.22 MiB of 384, `postgres` 56.87 MiB of 1 GiB. No OOM kill; staging restarts 0. The stopped edge Caddy shows 11 restarts (F18).
-6. The render under a memory cap: `prod`, `staging` and `edge` each exit 0 at 1G, 256M, 128M, 64M, 48M, 32M and 24M, with one hash per file at every cap (`d07fceceda5817f9`, `6438b08c2fcafa8b`, `6747e89d07b18caf`). No run was killed, so these show neither the floor nor that the cap was in force.
+6. The render under a memory cap: `prod`, `staging` and `edge` each exit 0 at 1G, 256M, 128M, 64M, 48M, 32M and 24M, with one hash per file at every cap (`d07fceceda5817f9`, `6438b08c2fcafa8b`, `6747e89d07b18caf`). Positive control: `render prod` at 16M, 8M, 4M and 2M exits 1 each time. So the cap is in force, and the floor for `prod` lies between 16M (fails) and 24M (passes); the floor of `staging` and `edge` was not bracketed.
 7. `cli --staging user invite qa@example.com`: `refused: the instance has no user; use --bootstrap`, exit 2. With `--bootstrap`: `invitation recorded (bootstrap), expires 2026-12-03T05:28:21.243Z`, a link beginning `https://staging.polycarpic.com/` (not recorded), exit 0. The invitation row stays in staging.
 8. Spool: a probe written in `wal` (as 999), `dump` and `premigration` (as 10004) is read by 10005, whose `rm`, `touch` and `ls .inflight` are each `Permission denied`. The probes were removed and no file is left in the spool.
 9. a: `restart --staging web auth worker`: all healthy, exit 0. b: `restart --staging caddy`: refused, exit 2 (F19). c: `restart --staging postgres`: healthy, exit 0; 60 s later `web`, `auth` and `worker` were running with 0 restarts; `web` logged one `db.connection_lost` and no `process.crash`. d (the renamed secret): not run.
+10. The POLY-147 marker measurement: **PASS** (figures and setup in `marker-measure-vps.md`). The first attempt failed before measuring (no `git` in the client image). Afterwards the throwaway containers, network, trees and image were removed: only the four staging containers and the exited edge Caddy remain, and `provision-check` exits 3.
 
 ## Open questions
 
@@ -145,7 +146,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 |---|---|---|
 | POLY-138 | Caddy overwrites `X-Forwarded-For` with the real client address, so `/api/auth/*` does not answer 503 | `edge-2` |
 | POLY-97 | uploader ACLs before the first backup | the spool ACL check passes on the box (done); the uploader's use of them: prod |
-| POLY-97 | POLY-147 marker measurement on the VPS against a control (acceptance criterion moved here; limits 5 ms p95, 1 KB WAL) | **Running** (branch `71ba9813` against control `33faf77f`, throwaway Postgres on its own network); no result yet |
+| POLY-97 | POLY-147 marker measurement on the VPS against a control (acceptance criterion moved here; limits 5 ms p95, 1 KB WAL) | Done, **PASS**: p95 +1.259 ms (case S) and -0.004 ms (case L), WAL +231.1 B per transaction in both (`marker-measure-vps.md` in this directory) |
 | POLY-97 | "provision-check passes" means the staging-only result | Done |
 | POLY-97 | `dns-check.py` shown to fail on a planted record on the live zone (E6) | **Not run** as a planted record. It did fail on the live zone on the old `_dmarc` and the missing CAA, and it does not see the public CAA answer (F14) |
 | POLY-97 | `_dmarc` edit and CAA records before the test mail | Done (but see F14) |
@@ -178,7 +179,7 @@ From the comments on POLY-104. **Done**: seen on this box. **`edge-2`**: needs t
 | POLY-99 | the two POLY-95 secret-mode cases that need Linux | CI, not this box; their state was not checked in this loop |
 | POLY-100 | edge networks made by provisioning; the release-signing key and `RELEASE_SIGNERS` before the first deploy | Done |
 | POLY-100 | Caddy up from a signed release before staging is served | `edge-2` (`edge-1` failed, F18) |
-| POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | Measured: all three render at every cap down to 24M (box measurements, 6); no floor found, and no run showed that the cap bites. The cap and its test: next ops loop |
+| POLY-100 (A19) | `docker compose config` under a memory limit on all three files, then a cap | Measured: all three render at every cap down to 24M; `prod` fails at 16M and below, so the cap is in force (box measurements, 6). The cap and its test: next ops loop |
 | POLY-161 | Caddy in front of the real web server: pages, static files, headers, client address, allowlist with basic auth | `edge-2` |
 | POLY-160 | the runbook's Ctrl-C line on a real `edge-deploy` | `edge-2` |
 | POLY-160 | stopped containers stay stopped over a reboot after a stand-down | **Not run** |
