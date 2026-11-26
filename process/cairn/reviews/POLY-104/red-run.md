@@ -1,5 +1,31 @@
 # POLY-104 red runs
 
+## PR 1 gate, `dbdfa571a5`
+
+Run on a Mac on 2026-11-25. The commits after it up to `5ca11b67` change `process/cairn/reviews/POLY-104/` only. `changes.mjs` on `origin/main...HEAD`: `image`, `provision`, `backup`, `deploy` true; `node`, `layers`, `db`, `ci`, `e2e` false.
+
+| CI job and step | Result |
+|---|---|
+| guard: action pins, run-body expressions, gitleaks 8.30.1 over the PR range | pass (gitleaks: 55 commits to `5ca11b67`, no leaks) |
+| cairn (ledger lane): `cairn check`, the 4 ledger test files | ok; 70 passed |
+| lint: auth row, ESLint, migrations, freshness, types, audit, audit guards, compose policy, `vitest.config.ts` | pass; boundaries 11; audit 2 moderate (gate is high); guards 10; infra static 687 passed, 3 skipped |
+| unit: per-package (affected), web e2e, cross-package | no package affected; e2e not affected; cross-package 100 passed, 15 skipped |
+| provision: `shellcheck -x`; box suite | exit 0; **252 of 252** (189 s) |
+| provision: ops tests, by groups (lead's OK) | **667 passed** |
+| provision: operator tool tests, by groups | **93 passed** |
+| image: build, built-image check, derivatives | pass |
+| image: Trivy on app, Postgres, Caddy | pass on `--no-cache` derivative builds (with stale cached layers Postgres showed 58 HIGH) |
+| image: container tests (`vitest.image.config.ts`) | 109 run, **107 passed, 2 failed** (below) |
+| image: backup, uploader, restore, drill (`vitest.backup.config.ts`) | **112 of 112** (359 s; `drill.test.ts` 11) |
+
+**Ops groups.** CI's `unittest discover` is refused by `test_run_guard` and has no gate form (`--gate` belongs to `run_tests.py`, which runs the cairn suite only). 64 files, each matched by exactly one of: `test_[abc]*.py` 3 files / 43 tests, `test_deploy*.py` 47 / 398, `test_di*.py` 1 / 19, `test_[e-k]*.py` 4 / 36, `test_[l-r]*.py` 5 / 53, `test_[s-z]*.py` 4 / 118. Sum 667, the number `TestLoader.discover` loads from the directory. Operator: 6 files, `test_b*` 39, `test_d*` 47, `test_l*` 7; sum 93, as loaded. **CI's exact `discover` commands are the final proof and run on the PR.**
+
+**The 2 failures** (`postgres.test.ts`: an unrelated uid, and web or postgres across directories, must be refused a `0440` file) come from this Mac: on a bind mount a `0:10001` 0440 file is readable by uid 12345, and on a named volume the same file is refused. Neither the tests nor what they test differs from `main`. Not verified on Linux here.
+
+**Not run:** the `deploy-real` job (needs the CI runner; its fake `gh` changed in this branch, read and compiled only); `install-trivy.sh` (Trivy 0.76.2, the same version, run from its container on saved images) and `install-compose.sh` (local Compose 5.7.0, CI pins 5.7.1). Not triggered by this diff: `db`, layer checks, `tests/ci` suite, actionlint.
+
+**CI time (estimate, unmeasured).** `image` job: 772 s on run 45661985841, backup step included (439 s; container tests 154 s). `caddy-compose-edge.test.ts` adds about 90 to 120 s, mostly fixed waits (the 60 s healthcheck interval, two 10 s upstream retries): about **860 to 890 s of 1200**. `provision` job: 219 to 296 s in the last three runs read, already over its 200 s warning budget; the box suite grew from 210 to 252 tests since this loop's first run (189 s here) and the ops tests by the new files, so expect about 330 to 380 s of its 900 s limit (weaker estimate: no same-machine baseline from `main`).
+
 ## F3: `provision --stage host` exits 141
 
 ### Red
