@@ -12,7 +12,7 @@ On the box, as last recorded (after `edge-2`): staging and the shared Caddy (`ed
 |---|---|
 | Staging reaches healthy; the outside scan | **Met.** Healthy, and the full outside TCP scans show 22, 80 and 443 on IPv4 and 22 alone on IPv6 (the line as reworded for F7) |
 | `provision-check` passes (the staging-only result) | **Met**: exit 3 without a `FAIL`, also after the reboot and after `edge-2` |
-| OQ-INFRA-7, -8 and -9 each have a recorded answer | **Met**: 7 answered; 8 stays open, with a carrier issue for each unrun step; 9 deferred to prod (POLY-164), not measured |
+| OQ-INFRA-7, -8 and -9 each have a recorded answer | **Part-deferred, unticked**: 7 answered; 8 answered for the staging steps only, and open, with its carriers as INFRA names them (POLY-164, POLY-105, POLY-116, POLY-120, POLY-121, POLY-165); 9 not measured, deferred to prod (POLY-164) |
 | This file lists every doc correction, and INFRA lands them | **Met**: listed below; INFRA 1.3.47. The issue's text says "INFRA v1.2"; the document is past that version |
 
 **Follow-ups:** where a finding below is open or marked "follow-up", it is carried on **POLY-165** (deploy follow-ups before prod), which says which of them gate prod.
