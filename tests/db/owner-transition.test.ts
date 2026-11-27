@@ -89,6 +89,12 @@ describe('R6 the 1 -> 2 revocation, the raise path', () => {
 
     for (const i of outstanding) expect(revokedAt(i.id, t!), i.email).toBe('true');
     expectRecords(outstanding, b.entity, { actor: 'user', user: b.owner }, b.owner);
+    // seceng P2: the revocation's actor is computed as audit_membership computes it (0017's expression, not 0014's): the rows equal the
+    // membership.role_changed row of the same transaction. [red if: a stale copy labels a session-marked request 'session']
+    const role = must(`SELECT actor, actor_user_id::text FROM public.audit_event WHERE entity_id = '${b.entity}' AND kind = 'membership.role_changed' AND created_at = '${t!}'::timestamptz`, db).rows;
+    expect(role, 'the raise wrote one role_changed row').toHaveLength(1);
+    const revocations = must(`SELECT DISTINCT actor, actor_user_id::text FROM public.audit_event WHERE entity_id = '${b.entity}' AND kind = 'invitation.revoked' AND created_at = '${t!}'::timestamptz`, db).rows;
+    expect(revocations).toEqual(role);
     untouched(elsewhere);
     expect(invState(db, accepted.id).revoked).toBe('');
     expect(invState(db, earlier.id).revoked).toBe(before);

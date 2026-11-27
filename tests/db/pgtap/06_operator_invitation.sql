@@ -147,7 +147,7 @@ SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
     AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?user"?([^a-z_]|$)'), NULL::text[], 'C15: no app function inserts into user');
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
-    AND prosrc ~* 'set\s[^;]*revoked_at\s*='), ARRAY['confirm_email_challenge', 'issue_operator_invitation'], 'G1/C15: the app functions that write revoked_at: the issuer (invitation) and, from POLY-89 R2, confirm_email_challenge (enrolment_grant, never invitation)');
+    AND prosrc ~* 'set\s[^;]*revoked_at\s*='), ARRAY['confirm_email_challenge', 'issue_operator_invitation', 'owner_transition'], 'G1/C15: the app functions that write revoked_at: the issuer (invitation), from POLY-89 R2 confirm_email_challenge (enrolment_grant, never invitation) and, from POLY-90 R6, owner_transition (outstanding direct invitations at the 1 -> 2)');
 
 -- ---------------------------------------------------------------- C13 (POLY-146 AC3): poly_operator, catalog-exact (ruling R2)
 SELECT results_eq($$SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, rolconnlimit, rolinherit FROM pg_roles WHERE rolname = 'poly_operator'$$,
