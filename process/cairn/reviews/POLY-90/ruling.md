@@ -230,3 +230,10 @@ Each criterion of POLY-90 is ticked only on the evidence named; the verdict read
 - **T-R7a (V-4):** also assert no 40001 and that the loser's enrolment committed with no seat.
 - **§G adds:** the `tenancy_column_updatable` battery names `invitation.issued_via` and `entity.founding_owner_user_id` (qa); `definers.json` diff is four entries: `founder_holds_owner`, `keep_own_person_owner`, `effective_owner_count`, `owner_transition`.
 - **§F changes:** the existing-user accept conditions and R-23's token rule go to **POLY-129**, not POLY-112 (R-23 decided, SECURITY @ d99b9013, so L1 is closed). POLY-166 note: the gate's count and R6's count become one function if an unenrolled owner stops counting.
+
+## Addendum 2 — seceng's review (`security-review.md` @ f0d63083) and the lead's answers (DECISIONS @ 816190c1)
+
+- **§F POLY-112 adds (S3):** `change_request_id` is written only by `app.apply_change`, at insert; no login role holds INSERT or UPDATE on it; it is set once in `app.invitation_set_once()` as `issued_via` is (R5).
+- **§S adds T-R6f (S4, qa, pgTAP):** `qual` and `with_check` of `invitation_govern_update` and `invitation_bootstrap_revoke` equal their 0007 / 0009 text, and poly_govern's column grants on invitation are exactly those of 0007 + 0009. A failing revoke is fixed in `invitation_govern_transition_revoke`, never by loosening those two.
+- **L1** is struck: R-23 is decided as a condition on POLY-129 (SECURITY @ d99b9013). **L2** is adopted: R2, R4, R5 and R6 exempt no role. **L3** is adopted: POLY-90's tombstone criterion is re-worded in place, ticked on T-R8.
+- **R4 stays as Addendum 1 has it** (poly_authz definer); seceng's review accepted either form, and the definer gives one answer for every firing role. The `definers.json` diff is the four entries Addendum 1 lists; §V7 reads "four".

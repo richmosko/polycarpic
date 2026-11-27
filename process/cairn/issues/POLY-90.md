@@ -22,7 +22,7 @@ The M1 half of co-owner approval (ARCH §3.1b Scope, §11): the database gate th
 - [ ] founding_owner_user_id NOT NULL, set to the creator; a deferred constraint trigger refuses any commit where the founder does not hold owner.
 - [ ] invitation.issued_via is not updatable; revoked tokens are refused at acceptance.
 - [ ] The 1 → 2 revocation of direct invitations runs in the membership write's transaction, entity row FOR UPDATE before owner_count, effective owners only (A-24).
-- [ ] The user tombstone check refuses while the user founds a multi-owner entity.
+- [ ] The founder invariant refuses a tombstone-shaped removal of the user's memberships while the user founds a multi-owner entity (ruling R8, test T-R8); the tombstone's own pre-check is POLY-115's.
 - [ ] Tests: ARCH §3.1b Tests, the gate, founder and 1 → 2 items.
 - [ ] The self user's owner row on their own Person cannot be lowered or deleted; test: A demotes or removes themselves on their own Person → 23514. Without it, once the accept path exists a user can share their Person, demote themselves, be removed, and then fail `provisionPerson` on every request (seceng F1, `reviewed @ 8779392`). Lands before the accept path ships.
 
