@@ -1126,3 +1126,12 @@ Add new decisions ABOVE this comment, newest first.
 - Add the tools image to `renovate.json` now (the check is red every week, so it adds no signal until it is fixed).
 - Waive the finding as unreachable (the gate would then rest on a claim about today's entrypoint).
 **Approved by:** seceng-167 for the ruling (R1 to R4b); team-lead for the scope, including adding the pull-request scan and rewording two acceptance lines, under the Principal's instruction of 2026-11-27 to fix the build.
+
+### 2026-11-27 — POLY-90: a sign-in with no invitation token claims viewer rows only (SECURITY R-23 tightened)
+**Decision:** A claim that arrives without the invitation token (the provider callback, the magic-link verify) seats viewer rows only; a manager or owner invitation needs the token on every path. It is a condition on POLY-129, which is the first issue that lets an owner issue manager or owner invitations, and seceng rewrites R-23's mitigation to say so. Not decided here: existing-user acceptance (token plus consent), which stays a POLY-129 condition as already filed, and anything about R-22 beyond what POLY-90's ruling carries.
+**Why:** R-23 names an attacker who controls the invited address at the identity provider. Its written mitigation (a manager or owner invitation seats only after a second step is enrolled) does not stop that attacker, who enrols a second step of their own and is seated as owner (seceng-90, `process/cairn/reviews/POLY-90/seceng-conditions.md` §7 @ 2fffea15). Nothing is exposed today: the only issuer is the operator CLI, viewer-only.
+**Alternatives considered:**
+- Leave R-23 as written (the mitigation does not meet the threat it names).
+- Require the token for every role (a viewer who signs in with Google would have to come through the emailed link too; the viewer row gives read access only).
+**Cost:** an invited manager or owner signs up through the emailed link, by password, or by a provider once the callback carries the token.
+**Approved by:** team-lead under the Principal's delegation for POLY-90 (2026-11-27), on seceng-90's recommendation; reported in the loop's closing summary.
