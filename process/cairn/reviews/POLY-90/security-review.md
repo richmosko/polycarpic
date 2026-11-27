@@ -73,3 +73,17 @@ S3 and S4 are closed (the POLY-112 condition is in §F, and T-R6f pins the two p
 - **P2: `07_identity_marker.sql` #82, the readers of `app.tx_identity`.** The list becomes nineteen with `owner_transition` added, an equality. The read is accepted: own transaction's row only, a label only, and poly_govern holds no new grant. **One condition:** the actor expression in the hand-off is 0014's (`web`, `signup`, `auth`). The `audit_membership` in force is 0017's (`signup`, `auth`, `session` → `user`). Copied as it stands, a direct raise in a session-marked request writes `membership.role_changed` with actor `user` and `invitation.revoked` with actor `session` in the same transaction. **Change:** use 0017's expression verbatim. **Test (qa, in T-R6a):** on the poly_app raise path, the `invitation.revoked` row's `actor` and `actor_user_id` equal those of the `membership.role_changed` row written by the same transaction. Without that case, a stale copy passes every seam row.
 
 Neither is an exemption: both pins stay exact and gain one reviewed entry each.
+
+## Re-issued ruling (80607cfa): R7b and R7a's in-loop guard
+
+**Accepted; nothing blocks.**
+- **R7b closes the measured 40P01.** Before R7b, sign-up locked the invitation rows, then its viewer INSERT's foreign-key check took KEY SHARE on the entity. The raise locked the entity FOR UPDATE, then R6 tried to revoke the same invitation rows. Taking KEY SHARE on the entity first puts sign-up in the order every other path uses: entity, then invitations. KEY SHARE is the weakest lock that conflicts with the gate's and R6's FOR UPDATE, and sign-ups do not queue behind each other. Both interleavings are fail-safe:
+  - In (i), the viewer row is accepted before R6 runs, so R6 leaves it alone.
+  - In (ii), the step-2 re-read under FOR UPDATE drops the revoked row, and sign-up refuses with `invitation_required`.
+- **Step 2's `entity_id = ANY(locked)` restriction is right.** A row issued between the two statements is never claimed without its entity lock. Operator and bootstrap rows (`entity_id IS NULL`) keep their path.
+- **The privilege is unchanged.** The lock uses R6's existing poly_govern UPDATE column privilege and `entity_govern_lock` with WITH CHECK (false). No definer can write an entity row through it. Reach is unchanged too: claim and accept stay EXECUTE poly_auth only, and the token-less path needs an IdP-verified address with a live invitation. A held KEY SHARE delays owner changes on those entities for one sign-up transaction, under the definers' 5 s `lock_timeout`. That is negligible.
+- **R7a's in-loop guard** (`UPDATE … SET accepted_at … WHERE revoked_at IS NULL`, no row → CONTINUE) stops a seat from accepting a row that its own earlier owner seat, in the same loop, just revoked. The set-once rule would otherwise allow `accepted_at` to be set on a revoked row.
+
+Notes for the build review and qa, neither a ruling change:
+- **The replaced `claim_invitations` and `accept_invitations` must be 0009's bodies with only R7b's two changes.** That keeps the bootstrap predicate, `SET lock_timeout = '5s'` and the single `invitation_required` refusal. I diff them against 0009 at the build review.
+- **T-R7b (ii) holds the raise for under 5 s.** A longer hold makes sign-up fail with 55P03 (`lock_not_available`) instead of `invitation_required`. That still fails closed, but the case would no longer prove the re-read.
