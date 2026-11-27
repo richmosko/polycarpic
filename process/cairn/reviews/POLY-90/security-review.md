@@ -62,3 +62,7 @@ The addendum landed while this review was in progress. Against my findings:
 - **F-6 and V-1/V-3: now met as I wrote them.** The founder is null on a purged tombstone, there is no superuser exemption in R6, and `app.effective_owner_count` is not caller-relative. It is EXECUTE poly_govern only, a NOLOGIN role reached through allowlisted definers, so the condition from POLY-62 holds.
 
 Nothing blocks the build. S3's text and S4's assertion can land with tests-red; they do not need another ruling round.
+
+## Delta: addendum 2 (e5ba4b2d)
+
+S3 and S4 are closed (the POLY-112 condition is in §F, and T-R6f pins the two policies and the grants). Every finding is now closed, and the design is cleared for tests-red.
