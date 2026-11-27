@@ -1,7 +1,7 @@
 ---
 id: POLY-167
 title: Build red: tools image base pin
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -36,3 +36,7 @@ Second criterion reworded, 2026-11-27. devops-167 measured that the registry's c
 ### @team-lead — 2026-11-27
 
 PR opened: https://github.com/richmosko/polycarpic/pull/162. First CI run 46052776029 on 9d37b5b4: every job green; the `image` job built the tools image on the runner and scanned it with 0 findings (debian 12.15). Awaiting seceng-167's review record.
+
+### @team-lead — 2026-11-27
+
+Validate passed (seceng-167: pass, on CI run 46052776029); merging via PR #162. Closing. The post-merge half of the first criterion (the `main` build and staging on it) is checked by the lead after the merge and reported to the Principal.

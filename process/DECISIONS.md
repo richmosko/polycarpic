@@ -1117,3 +1117,12 @@ Add new decisions ABOVE this comment, newest first.
 - CAA: leave Universal SSL on (not accepted by seceng).
 - Signing key: a second enrolled key offline, or on a hardware token.
 **Approved by:** the Principal, 2026-11-27.
+
+### 2026-11-27 — POLY-167: the build's red scan fixed by upgrading at build, and the pull request now scans the tools image
+**Decision:** The tools image applies Debian updates in its final stage and its base moves to the registry's current digest; pull-request CI builds and scans it with the same script as the `main` build; two static tests keep every shipped Dockerfile under the apt rules and keep the two workflows' scan sets equal. The Renovate check that has never been green is not fixed here: it is a before-prod criterion on POLY-165.
+**Why:** The `main` build failed on CVE-2025-6020 in the tools image after a docs merge. The current official digest still carried the old libpam, so a pin bump alone stayed red; only the tools image was never scanned before a merge, so the failure could only appear on `main`. The CVE is not reachable in this image (seceng-167); the gate stays as it is.
+**Alternatives considered:**
+- Bump the digest only (measured red).
+- Add the tools image to `renovate.json` now (the check is red every week, so it adds no signal until it is fixed).
+- Waive the finding as unreachable (the gate would then rest on a claim about today's entrypoint).
+**Approved by:** seceng-167 for the ruling (R1 to R4b); team-lead for the scope, including adding the pull-request scan and rewording two acceptance lines, under the Principal's instruction of 2026-11-27 to fix the build.
