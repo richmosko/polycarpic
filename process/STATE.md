@@ -15,7 +15,14 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160) — ARCH 1.31.4, SECURITY 1.21.5, INFRA 1.3.47; staging and the shared Caddy (`edge-2`) run on the Hetzner box; follow-ups on POLY-165, POLY-164 and POLY-105._
+- **Feature:** Build red: tools image base pin
+- **Issue:** POLY-167 (cairn)
+- **Milestone:** POLY-M1
+- **Branch:** `feature/poly-167-tools-image-base-pin`
+- **Started:** 2026-11-27
+- **Goal:** the `build` workflow on `main` is green again: the tools image's Debian base carries the linux-pam fix, and a stale digest pin cannot sit unnoticed.
+- **Status:** In Progress
+- **Before it:** POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box.
 
 - **Next:** the next POLY-M1 issue from `scripts/cairn/cairn ls --status todo`. The Principal's six before-prod decisions are made (`process/DECISIONS.md` 2026-11-27) and their work is on POLY-165: the box is rebuilt before prod.
 
