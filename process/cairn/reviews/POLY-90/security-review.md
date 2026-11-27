@@ -66,3 +66,10 @@ Nothing blocks the build. S3's text and S4's assertion can land with tests-red; 
 ## Delta: addendum 2 (e5ba4b2d)
 
 S3 and S4 are closed (the POLY-112 condition is in §F, and T-R6f pins the two policies and the grants). Every finding is now closed, and the design is cleared for tests-red.
+
+## Standing-pin rulings (the build trips two pins that §G does not list)
+
+- **P1: `06_operator_invitation.sql` #80, the functions that write `revoked_at`.** The list becomes exactly `['confirm_email_challenge', 'issue_operator_invitation', 'owner_transition']`, an equality and never a superset. The pin exists so that each new writer of `revoked_at` is reviewed. `owner_transition` is ruled in R6: EXECUTE to nobody, its UPDATE limited by the R6 predicate and by `invitation_govern_transition_revoke`. Update the assertion's description to name R6.
+- **P2: `07_identity_marker.sql` #82, the readers of `app.tx_identity`.** The list becomes nineteen with `owner_transition` added, an equality. The read is accepted: own transaction's row only, a label only, and poly_govern holds no new grant. **One condition:** the actor expression in the hand-off is 0014's (`web`, `signup`, `auth`). The `audit_membership` in force is 0017's (`signup`, `auth`, `session` → `user`). Copied as it stands, a direct raise in a session-marked request writes `membership.role_changed` with actor `user` and `invitation.revoked` with actor `session` in the same transaction. **Change:** use 0017's expression verbatim. **Test (qa, in T-R6a):** on the poly_app raise path, the `invitation.revoked` row's `actor` and `actor_user_id` equal those of the `membership.role_changed` row written by the same transaction. Without that case, a stale copy passes every seam row.
+
+Neither is an exemption: both pins stay exact and gain one reviewed entry each.
