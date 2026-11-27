@@ -41,3 +41,7 @@ From the POLY-87 loop: existing-user acceptance must require the invitation toke
 ### @team-lead — 2026-11-27
 
 Feature started. Branch: `feature/poly-90-multi-owner-gate-founder`. The Principal's grant for this loop (2026-11-27): drive to completion, the lead takes the decisions on its own recommendations and reports them in the closing summary.
+
+### @architect — 2026-11-27
+
+Gate 1 ruling: `process/cairn/reviews/POLY-90/ruling.md` (R1–R9, seam §S, guards §G, verdict checklist §V, follow-ups §F, three items for the lead). Database only; no acceptance-path code in this loop.
