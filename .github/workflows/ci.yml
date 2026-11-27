@@ -715,6 +715,15 @@ jobs:
           bash infra/ci/image.sh scan polycarpic-postgres:ci
           bash infra/ci/image.sh scan polycarpic-caddy:ci
 
+      # POLY-167: every image build.yml scans is scanned here too (tests/ci/image-scan-parity.test.ts).
+      - name: Build the tools image
+        if: needs.changes.outputs.image == 'true'
+        run: docker build --no-cache --pull -f infra/backup/tools.Dockerfile -t polycarpic-tools:ci infra/backup
+
+      - name: Trivy scan of the tools image
+        if: needs.changes.outputs.image == 'true'
+        run: bash infra/ci/image.sh scan polycarpic-tools:ci
+
       - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage)
         if: needs.changes.outputs.image == 'true'
         env:
