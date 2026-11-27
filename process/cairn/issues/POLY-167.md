@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/backup/**, infra/ci/**, infra/compose/**, .github/workflows/**, renovate.json, tests/infra/**, tests/ci/**, process/cairn/reviews/**, process/cairn/issues/POLY-167.md, docs/SECURITY/**, docs/INFRA/**]
+paths: [infra/backup/**, infra/ci/**, infra/compose/**, .github/workflows/**, renovate.json, tests/infra/**, tests/ci/**, tests/image/**, process/cairn/reviews/**, process/cairn/issues/POLY-167.md, docs/SECURITY/**, docs/INFRA/**]
 labels: [ops, security, ci]
 priority: null
 pr: null
