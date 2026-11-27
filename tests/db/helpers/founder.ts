@@ -19,18 +19,20 @@ export const caught = async (p: Promise<unknown>): Promise<Refusal | null> => p.
 
 // `super` with a `user` writes that user's identity marker: app.keep_an_owner counts through app.owner_count, which is null with no
 // member in context, so a superuser with no marker cannot touch any owner row, and the rule under test is never reached.
-export type As = { role: 'poly_app'; user: string } | { role: 'poly_auth'; user: string; session: string } | { role: 'super'; user?: string };
+// `signup` is poly_auth with no marker, as a sign-up begins.
+export type As = { role: 'poly_app'; user: string } | { role: 'poly_auth'; user: string; session: string } | { role: 'super'; user?: string } | { role: 'signup' };
 export type Conn = { q: Q; commit: () => Promise<Refusal | null>; end: () => Promise<void> };
+export const pidOf = async (c: Conn): Promise<number> => (await c.q('SELECT pg_backend_pid() AS p')).rows[0].p as number;
 
 /** An open transaction, entered as `as`. `end()` rolls back whatever was not committed. */
 export async function open(db: string, as: As): Promise<Conn> {
-  const connectionString = as.role === 'super' ? server().superUrl.replace(/\/[^/]*$/, `/${db}`) : url(as.role, db);
+  const connectionString = as.role === 'super' ? server().superUrl.replace(/\/[^/]*$/, `/${db}`) : url(as.role === 'signup' ? 'poly_auth' : as.role, db);
   const c = new pgmod.Client({ connectionString });
   await c.connect();
   const q: Q = (text, values) => c.query({ text, values, queryMode: 'extended' });
   await q('BEGIN');
-  if (as.role !== 'super') await enterAs(q, db, as.role, as.user, as.role === 'poly_auth' ? as.session : null);
-  else if (as.user) await q(`INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), $1, NULL, 'session')`, [as.user]);
+  if (as.role === 'poly_app' || as.role === 'poly_auth') await enterAs(q, db, as.role, as.user, as.role === 'poly_auth' ? as.session : null);
+  else if (as.role === 'super' && as.user) await q(`INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), $1, NULL, 'session')`, [as.user]);
   return {
     q,
     commit: () => caught(q('COMMIT')),

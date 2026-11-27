@@ -102,7 +102,8 @@ GRANT SELECT ON e13 TO poly_govern;
 DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
 SELECT is(pg_temp.tried('SELECT id::text FROM public.entity WHERE id = (SELECT id FROM e13) FOR UPDATE'), (SELECT id::text FROM e13),
   'T-R6d positive: poly_govern, no user in context, can lock an entity row (mutation: either lock policy missing)');
-SELECT is(pg_temp.tried('UPDATE public.entity SET founding_owner_user_id = founding_owner_user_id WHERE id = (SELECT id FROM e13) RETURNING id::text'),
+-- the new value is a literal: poly_govern holds no SELECT on the column
+SELECT is(pg_temp.tried('UPDATE public.entity SET founding_owner_user_id = ''00000000-0000-4000-8000-000000009001'' WHERE id = (SELECT id FROM e13) RETURNING id::text'),
   '42501 new row violates row-level security policy for table "entity"',
   'T-R6d: and can update none (mutation: entity_govern_lock WITH CHECK (true))');
 

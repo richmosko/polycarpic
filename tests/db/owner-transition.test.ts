@@ -6,10 +6,11 @@ import { REAL_MIGRATIONS, freshDb, migrateCli } from './helpers/api';
 import { signUpEntry, tx } from './helpers/auth-tx';
 import {
   RAISE, business, businessOf, caught, committed, enrol, enrolled, enrolment, invState, invite, newUser, open, owners, raise,
-  roleOf, seat, waitingOnLock, type Conn, type Inv, type Refusal,
+  pidOf, roleOf, seat, waitingOnLock, type Conn, type Inv, type Refusal,
 } from './helpers/founder';
 import { tokenHash } from './helpers/invitation';
 import { must } from './helpers/sql';
+import { psql } from './helpers/pg';
 
 let db: string;
 beforeAll(async () => {
@@ -244,6 +245,16 @@ describe('R6 and R7, the seating path', () => {
     });
   }
 
+  it('R7a step 3: a user holding two claimed owner invitations on one entity is seated by one; the other stays revoked and is never accepted  [red if: the accepted_at UPDATE drops revoked_at IS NULL (the loop already fetched the row its own seat revoked)]', async () => {
+    const b = business(db);
+    const u = newUser(db, { enrolled: false });
+    const both = [1, 2].map(() => invite(db, b.entity, b.owner, { role: 'owner', email: u.email, claimedBy: u.id }));
+    await enrol(db, u.id);
+    expect([enrolled(db, u.id), roleOf(db, b.entity, u.id), owners(db, b.entity)]).toEqual([true, 'owner', 2]);
+    const states = both.map((i) => { const s = invState(db, i.id); return `accepted=${s.accepted !== ''} revoked=${s.revoked !== ''}`; }).sort();
+    expect(states).toEqual(['accepted=false revoked=true', 'accepted=true revoked=false']);
+  });
+
   it('a manager invitation seating at enrolment on a sole-owner entity revokes nothing  [red if: the trigger fires on every seat]', async () => {
     const b = business(db);
     const u = newUser(db, { enrolled: false });
@@ -252,6 +263,121 @@ describe('R6 and R7, the seating path', () => {
     await enrol(db, u.id);
     expect(roleOf(db, b.entity, u.id)).toBe('manager');
     untouched(other);
+  });
+});
+
+// ---------------------------------------------------------------------------- R7b: sign-up takes the entity before the invitation
+let signups = 0;
+const newSignupId = () => `00000000-0000-4000-8000-${String(907_000 + ++signups).padStart(12, '0')}`;
+const CLAIM = 'SELECT app.claim_invitations($1::bytea, $2)';
+const ACCEPT = 'SELECT app.accept_invitations($1::bytea)';
+/** No lock on this invitation row is held by anyone: a third session takes it without waiting. */
+const invitationFree = (id: string) => {
+  const r = psql(`BEGIN; SELECT 1 FROM public.invitation WHERE id = '${id}' FOR UPDATE NOWAIT; ROLLBACK;`, db);
+  return r.ok ? 'free' : r.sqlstate;
+};
+
+describe('R7 one lock order: a definer waiting for the entity row holds no invitation row', () => {
+  /** Another session holds the entity; `start` must block on it with the invitation row still free, then succeed once released. */
+  async function probe(entity: string, invitation: string, waiter: number, start: () => Promise<unknown>): Promise<void> {
+    const holder = await open(db, { role: 'super' });
+    let running: Promise<Refusal | null>;
+    try {
+      await holder.q('SELECT 1 FROM public.entity WHERE id = $1 FOR UPDATE', [entity]);
+      running = caught(start());
+      await waitingOnLock(db, [waiter]);
+      expect(invitationFree(invitation), 'the waiting definer has locked no invitation row').toBe('free');
+    } finally { await holder.end(); }
+    expect(await running!).toBeNull();
+  }
+
+  for (const fn of ['claim_invitations', 'accept_invitations'] as const) {
+    it(`R7b: ${fn} locks the entity before the invitation  [red if: its first statement does not lock the named entities FOR KEY SHARE (R7b step 1 dropped)]`, async () => {
+      const b = business(db);
+      const i = invite(db, b.entity, b.owner);
+      const s = await open(db, { role: 'signup' });
+      try {
+        const id = newSignupId();
+        const hash = tokenHash(i.token);
+        if (fn === 'accept_invitations') await signUpEntry(s.q, id, i.email);
+        await probe(b.entity, i.id, await pidOf(s), () => (fn === 'claim_invitations' ? s.q(CLAIM, [hash, i.email]) : s.q(ACCEPT, [hash])));
+        if (fn === 'claim_invitations') { await signUpEntry(s.q, id, i.email); await s.q(ACCEPT, [hash]); }
+        expect(await s.commit()).toBeNull();
+        expect(roleOf(db, b.entity, id)).toBe('viewer');
+      } finally { await s.end(); }
+    });
+  }
+
+  it('R7a: seat_claimed_invitations locks the entity before the invitation  [red if: R7a step 1 is dropped]', async () => {
+    const b = business(db);
+    const u = newUser(db, { enrolled: false });
+    const i = invite(db, b.entity, b.owner, { role: 'owner', email: u.email, claimedBy: u.id });
+    const e = await enrolment(db, u.id);
+    try {
+      await probe(b.entity, i.id, e.pid, () => e.finish());
+      expect(await e.commit()).toBeNull();
+    } finally { await e.end(); }
+    expect(roleOf(db, b.entity, u.id)).toBe('owner');
+  });
+
+  it('T-R7b positive: two sign-ups on one entity do not queue on each other  [red if: R7b locks the entity FOR UPDATE]', async () => {
+    const b = business(db);
+    const [i, j] = [invite(db, b.entity, b.owner), invite(db, b.entity, b.owner)];
+    const [a, c] = [await open(db, { role: 'signup' }), await open(db, { role: 'signup' })];
+    try {
+      await a.q(CLAIM, [tokenHash(i.token), i.email]);
+      await c.q("SET LOCAL lock_timeout = '1s'");
+      const second = await caught((async () => {
+        await c.q(CLAIM, [tokenHash(j.token), j.email]);
+        await signUpEntry(c.q, newSignupId(), j.email);
+        await c.q(ACCEPT, [tokenHash(j.token)]);
+      })());
+      expect(second).toBeNull();
+      expect(await c.commit()).toBeNull();
+    } finally { await a.end(); await c.end(); }
+  });
+});
+
+describe('T-R7b a viewer sign-up against the sole owner\'s raise on the same entity', () => {
+  it('T-R7b (i): the sign-up holds after its claim, the raise waits: both commit, the viewer is seated, no 40P01  [red if: R7b step 1 is dropped (the raise and the sign-up deadlock)]', async () => {
+    const b = soleWithViewer();
+    const mine = invite(db, b.entity, b.owner);
+    const open2 = invite(db, b.entity, b.owner, { role: 'owner' });
+    const id = newSignupId();
+    const signup = await open(db, { role: 'signup' });
+    const raising = await open(db, app(b.owner));
+    try {
+      await signup.q(CLAIM, [tokenHash(mine.token), mine.email]);
+      const pid = await pidOf(raising);
+      const raised = (async () => (await caught(raising.q(RAISE, [b.entity, b.viewer, 'owner']))) ?? (await raising.commit()))();
+      await waitingOnLock(db, [pid]);
+      const signed = (await caught((async () => { await signUpEntry(signup.q, id, mine.email); await signup.q(ACCEPT, [tokenHash(mine.token)]); })())) ?? (await signup.commit());
+      expect(signed, 'the sign-up: no 40P01, no refusal').toBeNull();
+      expect(await raised, 'the raise: no 40P01, no refusal').toBeNull();
+    } finally { await signup.end(); await raising.end(); }
+    expect([roleOf(db, b.entity, id), roleOf(db, b.entity, b.viewer)]).toEqual(['viewer', 'owner']);
+    const s = invState(db, mine.id);
+    expect({ accepted: s.accepted !== '', revoked: s.revoked !== '' }).toEqual({ accepted: true, revoked: false });
+    expect(invState(db, open2.id).revoked).not.toBe('');
+  });
+
+  it('T-R7b (ii): the raise holds, the sign-up waits at its claim and is refused invitation_required once the raise commits, no 40P01  [red if: the claim reads revoked_at before it waits]', async () => {
+    const b = soleWithViewer();
+    const mine = invite(db, b.entity, b.owner);
+    const signup = await open(db, { role: 'signup' });
+    const raising = await open(db, app(b.owner));
+    try {
+      expect((await raising.q(RAISE, [b.entity, b.viewer, 'owner'])).rowCount).toBe(1);
+      const pid = await pidOf(signup);
+      const claim = caught(signup.q(CLAIM, [tokenHash(mine.token), mine.email]));
+      await waitingOnLock(db, [pid]);
+      expect(await raising.commit()).toBeNull();
+      const x = await claim;
+      expect([x?.code, x?.message]).toEqual(['42501', 'invitation_required']);
+    } finally { await signup.end(); await raising.end(); }
+    expect(roleOf(db, b.entity, b.viewer)).toBe('owner');
+    const s = invState(db, mine.id);
+    expect({ accepted: s.accepted !== '', revoked: s.revoked !== '' }).toEqual({ accepted: false, revoked: true });
   });
 });
 
