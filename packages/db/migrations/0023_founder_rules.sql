@@ -1,6 +1,6 @@
 -- Custom migration (generate --custom). Runs as session_user poly_migrator with SET ROLE poly_owner active (src/migrate.ts).
 -- POLY-90 (ruling R2-R7 + addenda): the founder backfill, the founder invariant, the self-Person owner row, issued_via set once,
--- the 1 -> 2 revocation and the lock order of the seating path. No rule here exempts a role, superuser included. Ends on poly_owner.
+-- the 1 -> 2 revocation and one lock order (the entity before any invitation row) in the seating and sign-up definers. No rule here exempts a role, superuser included. Ends on poly_owner.
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- (1) The backfill (R3). It runs as the table owner, so FORCE is lifted for its two statements. audit_event is read too.
@@ -220,6 +220,100 @@ CREATE OR REPLACE FUNCTION app.seat_claimed_invitations() RETURNS void
     END LOOP;
   END
   $fn$;--> statement-breakpoint
+
+-- 0009's claim and accept with one change each way of the same lock order (R7b): the entities the live rows name are locked
+-- FOR KEY SHARE first, in id order, and only rows on a locked entity (or on none) are then claimed. KEY SHARE conflicts with
+-- the gate's and the transition's FOR UPDATE and not with itself, so sign-ups do not queue on each other.
+CREATE OR REPLACE FUNCTION app.claim_invitations(bytea, text) RETURNS void
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  SET lock_timeout = '5s'
+  AS $$
+  DECLARE
+    v_locked uuid[];
+  BEGIN
+    IF app.current_user_id() IS NOT NULL THEN
+      RAISE EXCEPTION 'invitation_required' USING ERRCODE = '42501';
+    END IF;
+    SELECT pg_catalog.array_agg(l.id) INTO v_locked FROM (
+      SELECT e.id FROM public.entity e
+      WHERE e.id IN (SELECT i.entity_id FROM public.invitation i
+        WHERE i.claimed_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > pg_catalog.now()
+          AND pg_catalog.lower(i.email) = pg_catalog.lower($2)
+          AND ($1 IS NULL OR i.token_hash = $1)
+          AND (i.issued_via <> 'bootstrap' OR NOT EXISTS (SELECT u.id FROM public."user" u)))
+      ORDER BY e.id FOR KEY SHARE) l;
+    PERFORM 1 FROM public.invitation i
+    WHERE i.claimed_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > pg_catalog.now()
+      AND pg_catalog.lower(i.email) = pg_catalog.lower($2)
+      AND ($1 IS NULL OR i.token_hash = $1)
+      AND (i.issued_via <> 'bootstrap' OR NOT EXISTS (SELECT u.id FROM public."user" u))
+      AND (i.entity_id IS NULL OR i.entity_id = ANY (v_locked))
+    ORDER BY i.id FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'invitation_required' USING ERRCODE = '42501';
+    END IF;
+  END
+  $$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION app.accept_invitations(bytea) RETURNS uuid
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  SET lock_timeout = '5s'
+  AS $$
+  DECLARE
+    v_uid uuid := app.current_user_id();
+    v_email text;
+    v_verified boolean;
+    r record;
+    v_n int := 0;
+    v_locked uuid[];
+  BEGIN
+    IF v_uid IS NULL THEN
+      RAISE EXCEPTION 'no user in context' USING ERRCODE = '42501';
+    END IF;
+    SELECT u.email, u.email_verified INTO v_email, v_verified FROM public."user" u
+    WHERE u.id = v_uid AND u.signup_txid = pg_catalog.pg_current_xact_id()::pg_catalog.text::pg_catalog.int8;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'not a user created by this transaction' USING ERRCODE = '42501';
+    END IF;
+    IF $1 IS NULL AND NOT v_verified THEN
+      RAISE EXCEPTION 'a verified email is required' USING ERRCODE = '42501';
+    END IF;
+    SELECT pg_catalog.array_agg(l.id) INTO v_locked FROM (
+      SELECT e.id FROM public.entity e
+      WHERE e.id IN (SELECT i.entity_id FROM public.invitation i
+        WHERE i.claimed_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > pg_catalog.now()
+          AND pg_catalog.lower(i.email) = pg_catalog.lower(v_email)
+          AND ($1 IS NULL OR i.token_hash = $1)
+          AND (i.issued_via <> 'bootstrap' OR NOT EXISTS (SELECT u.id FROM public."user" u WHERE u.id <> v_uid)))
+      ORDER BY e.id FOR KEY SHARE) l;
+    FOR r IN
+      SELECT i.id, i.entity_id, i.role FROM public.invitation i
+      WHERE i.claimed_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > pg_catalog.now()
+        AND pg_catalog.lower(i.email) = pg_catalog.lower(v_email)
+        AND ($1 IS NULL OR i.token_hash = $1)
+        AND (i.issued_via <> 'bootstrap' OR NOT EXISTS (SELECT u.id FROM public."user" u WHERE u.id <> v_uid))
+        AND (i.entity_id IS NULL OR i.entity_id = ANY (v_locked))
+      ORDER BY i.id FOR UPDATE
+    LOOP
+      v_n := v_n + 1;
+      IF r.entity_id IS NOT NULL AND r.role = 'viewer' THEN
+        INSERT INTO public.membership (entity_id, user_id, role) VALUES (r.entity_id, v_uid, 'viewer')
+        ON CONFLICT DO NOTHING;
+      END IF;
+      UPDATE public.invitation SET claimed_user_id = v_uid, claimed_at = pg_catalog.now(),
+        accepted_at = CASE WHEN r.entity_id IS NULL OR r.role = 'viewer' THEN pg_catalog.now() END
+      WHERE id = r.id;
+    END LOOP;
+    IF v_n = 0 THEN
+      RAISE EXCEPTION 'invitation_required' USING ERRCODE = '42501';
+    END IF;
+    UPDATE public."user" SET signup_txid = NULL WHERE id = v_uid;
+    RETURN (SELECT i.entity_id FROM public.invitation i
+            WHERE i.claimed_user_id = v_uid AND i.accepted_at IS NOT NULL AND i.entity_id IS NOT NULL
+            ORDER BY i.created_at DESC, i.id DESC LIMIT 1);
+  END
+  $$;--> statement-breakpoint
 
 SET ROLE poly_owner;--> statement-breakpoint
 REVOKE CREATE ON SCHEMA app FROM poly_authz, poly_govern;--> statement-breakpoint
