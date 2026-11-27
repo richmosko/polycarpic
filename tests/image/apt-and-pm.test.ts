@@ -5,22 +5,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { aptViolations } from '../infra/apt-rules.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const dockerfiles = () => readdirSync(ROOT).filter((f) => /^Dockerfile/.test(f));
 const joined = (f: string) => readFileSync(join(ROOT, f), 'utf8').replace(/\\\n/g, ' ').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-/** Check one RUN-ish line against the A1 rules. Returns the violations. */
-export function aptViolations(line: string): string[] {
-  const v: string[] = [];
-  if (/--allow-unauthenticated|--allow-insecure-repositories|--allow-downgrades|--allow-remove-essential|--allow-change-held-packages/.test(line)) v.push('allow-* flag');
-  if (/\[[^\]]*trusted\s*=\s*yes[^\]]*\]/i.test(line)) v.push('trusted=yes');
-  if (/Acquire::|APT::Get::/i.test(line)) v.push('Acquire::/APT::Get:: option');
-  if (/apt-key|add-apt-repository|signed-by|sources\.list|\/etc\/apt\/(sources|trusted|keyrings)/.test(line)) v.push('added source or key');
-  for (const m of line.matchAll(/\bapt(?:-get)?\b((?:\s+-\S+)*)\s+([a-z-]+)/g)) {
-    if (!['update', 'upgrade'].includes(m[2]!)) v.push(`apt ${m[2]} (only update and upgrade are ruled)`);
-  }
-  return v;
-}
 
 describe('A1: apt uses the base image\'s own signed sources, upgrade only', () => {
   it('the Dockerfile exists and calls apt-get upgrade (the ruled in-place upgrade)', () => {
