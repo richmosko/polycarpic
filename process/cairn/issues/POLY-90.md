@@ -1,17 +1,17 @@
 ---
 id: POLY-90
 title: Multi-owner gate + founder
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62]
 assignee: backend-lead
-paths: [packages/db/migrations/**, packages/tenancy/**]
+paths: [packages/db/migrations/**, packages/db/**, packages/tenancy/**, tests/**, process/cairn/issues/POLY-90.md, process/cairn/issues/POLY-90*.md, process/cairn/reviews/POLY-90/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, scripts/layers/**, .github/workflows/**, infra/ci/**]
 labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-12
+updated: 2026-11-27
 ---
 
 The M1 half of co-owner approval (ARCH §3.1b Scope, §11): the database gate that refuses direct gated writes once an entity has two owners, entity.founding_owner_user_id with its deferred trigger, invitation.issued_via, and the 1 → 2 revocation. The request flow ships in POLY-1.0 (POLY-112); until then a multi-owner entity's gated actions are refused, which is safe on staging.
@@ -37,3 +37,7 @@ One criterion added (seceng F1, the self-Person owner row). Standing condition f
 ### @team-lead — 2026-11-12
 
 From the POLY-87 loop: existing-user acceptance must require the invitation token plus consent, never an email match alone (`/change-email` can point an account at an invited address); the 1 → 2 revocation on acceptance and the sign-up stamp rule apply here. SECURITY R-22 and R-23 are reviewed at this issue: if a domain administrator is not trusted, require the token on the OAuth and magic-link paths too. Revoking an already-revoked invitation is refused by the set-once rule (42501), so a revoke action must be idempotent in the app.
+
+### @team-lead — 2026-11-27
+
+Feature started. Branch: `feature/poly-90-multi-owner-gate-founder`. The Principal's grant for this loop (2026-11-27): drive to completion, the lead takes the decisions on its own recommendations and reports them in the closing summary.

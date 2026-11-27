@@ -15,7 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-167 (Build red: tools image base pin) merged 2026-11-27 via PR [#162](https://github.com/richmosko/polycarpic/pull/162) — SECURITY 1.21.6, INFRA 1.3.48; follow-up on POLY-165. Before it, POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box._
+- **Feature:** Multi-owner gate + founder
+- **Issue:** `POLY-90` (cairn); sub-issues POLY-90a to POLY-90e
+- **Milestone:** POLY-M1
+- **Branch:** `feature/poly-90-multi-owner-gate-founder`
+- **Started:** 2026-11-27
+- **Goal:** the database records each entity's founder and refuses any commit where the founder is not an owner, revokes direct invitations when an entity goes from one owner to two, and protects a user's owner row on their own Person.
+- **Status:** In Progress
+
+_Standing context. POLY-167 (Build red: tools image base pin) merged 2026-11-27 via PR [#162](https://github.com/richmosko/polycarpic/pull/162) — SECURITY 1.21.6, INFRA 1.3.48; follow-up on POLY-165. Before it, POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box._
 
 - **Next:** the next POLY-M1 issue from `scripts/cairn/cairn ls --status todo`. The Principal's six before-prod decisions are made (`process/DECISIONS.md` 2026-11-27) and their work is on POLY-165: the box is rebuilt before prod.
 
