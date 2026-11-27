@@ -1,239 +1,227 @@
 # POLY-90 — Multi-owner gate + founder: ruling (architect)
 
-Gate 1 for POLY-90 (sub-issue POLY-90a). Base: `feature/poly-90-multi-owner-gate-founder` @ d591f5eb. Sources: ARCH §3.1b, §3.1c, §11;
-SECURITY C-28, A-24, R-22, R-23; migrations 0002, 0003, 0007, 0009, 0013, 0014; `tests/db/tenancy.test.ts`. Rules are R1–R9; the seam is
-§S; the guards it trips are §G; the verdict checklist is §V. Nothing here is measured: every runtime claim is tagged `(unmeasured)` and
-names the test that measures it at tests-red. A claim tagged `(unmeasured)` that the named test contradicts reopens that rule.
+Gate 1 for POLY-90 (sub-issue POLY-90a), **re-issued whole** on backend-lead-90's measured objection (40P01 in 3 of 3 runs: a raise to
+owner against a viewer sign-up on the same entity; test "R7 measurement: raise to owner against a viewer sign-up on the same entity").
+This text replaces the earlier ruling and both of its addenda. It folds in seceng's conditions (`seceng-conditions.md` @ 2fffea15), its
+review (`security-review.md` @ f0d63083) and the lead's answers (DECISIONS @ 816190c1). What changed from e5ba4b2d: R5 and R7 now cover
+the sign-up definers (R7b), R7 gains the builder's in-loop guard, and §S gains T-R7b plus qa's two seam notes. Sources: ARCH §3.1b,
+§3.1c, §11; SECURITY C-20, C-28, A-24, R-22, R-23; migrations 0002, 0003, 0007, 0009, 0013, 0014. A claim tagged `(unmeasured)` names the
+test that measures it; a contradicting result reopens that rule.
 
 ## What is in this loop and what is not
 
-In: the founder column and its commit-time invariant (R1–R3), the self-Person owner row (R4), `issued_via` set once and the revoked-token
-tests (R5), the 1 → 2 revocation as a trigger on every owner-making membership write plus the lock order in the one path that seats
-from an invitation today (R6–R7), the tombstone criterion met by the founder invariant (R8). Database only: no route, no screen, no
-TypeScript in `packages/tenancy` beyond what the generated Drizzle schema needs.
+In: the founder column and its commit-time invariant (R1–R3), the self-Person owner row (R4), `issued_via` set once and revoked rows
+refused (R5), the 1 → 2 revocation as a trigger on every owner-making membership write (R6), one lock order, entity before invitation,
+in every definer that locks invitation rows (R7), the tombstone criterion met by the founder invariant (R8). Database only: no route, no
+screen, no TypeScript beyond the generated Drizzle schema.
 
-Out: the request flow, `change_request`, `transfer_founder`, `force_change`, `polycarpic entity set-founder` (POLY-112); the held raise and
-its cancellation at 1 → 2 (POLY-91); the tombstone itself (POLY-115); entity purge (POLY-114). **No acceptance-path code lands here.**
-Today an invitation is accepted only inside sign-up (`app.claim_invitations` / `app.accept_invitations`, new user only) and a manager
-or owner seat only at enrolment (`app.seat_claimed_invitations`). There is no path for a signed-in user to accept. This loop lands the
-database rules that path will meet (R6's trigger fires on whatever membership write it makes; R5 refuses revoked rows; R7's lock order),
-and the conditions on that path go to its issue as follow-ups (§F). R-22 stays an accepted risk unchanged. R-23 is a decision for the lead
-(L1); the code it implies is a follow-up, not this loop.
+Out: the request flow, `change_request`, `transfer_founder`, `force_change`, `polycarpic entity set-founder` (POLY-112); the held raise
+and its cancellation at 1 → 2 (POLY-91); the tombstone itself (POLY-115); entity purge (POLY-114); existing-user acceptance and the
+R-23 token rule (POLY-129). Today an invitation is accepted only inside sign-up and a manager or owner seat only at enrolment; no
+signed-in user can accept. This loop changes those definers only for lock order (R7). R-22 stays an accepted risk unchanged.
 
 ## Rules
 
-**R1 — The column.** `entity.founding_owner_user_id uuid NOT NULL DEFAULT app.current_user_id() REFERENCES public."user"(id)` (ON DELETE
-no action). No login role holds INSERT or UPDATE on the column: poly_app's INSERT grant (type_id, name, tax_classification,
-self_user_id) and UPDATE grant (name, tax_classification) stay as they are, and poly_govern's INSERT grant (0014) stays without it. So the
-default is the only value any runtime role can write: the creator, the same `app.current_user_id()` that `app.seat_creator()` seats as
-owner. `provision_person` inherits it (its insert runs with the new user in the marker). poly_authz gains `SELECT (founding_owner_user_id,
-purged_at) ON public.entity` for R2. A supplied value is refused by privilege, 42501. An insert with no user in context still fails
-on the existing RLS check, before NOT NULL is tested (unmeasured; `tenancy.test.ts` "an entity insert with no user set raises 42501"
-measures it and must stay green unedited).
+**R1 — The column.** `entity.founding_owner_user_id uuid DEFAULT app.current_user_id() REFERENCES public."user"(id)` (ON DELETE no
+action), with two checks:
+- `entity_founder_tombstone_check ((purged_at IS NULL) = (founding_owner_user_id IS NOT NULL))`: every live entity has a founder; a
+  purged one has none (POLY-114 clears it with the rest of the tombstone).
+- `entity_person_founder_check (self_user_id IS NULL OR founding_owner_user_id = self_user_id)`: a Person's founder is its own user.
 
-**R2 — The invariant.** `app.founder_holds_owner()` RETURNS trigger, LANGUAGE plpgsql, SECURITY DEFINER, owner poly_authz,
-`SET search_path = ''`, EXECUTE to nobody (allowlist `execute: []`). Read-only. Two constraint triggers, DEFERRABLE INITIALLY DEFERRED,
-FOR EACH ROW:
-- `entity_z91_founder_holds_owner` AFTER INSERT OR UPDATE ON public.entity. The name sorts after `entity_seat_creator`, so a caller who
-  runs `SET CONSTRAINTS ALL IMMEDIATE` before creating an entity is not refused for an owner row not yet written.
+No login role holds INSERT or UPDATE on the column: poly_app's entity grants and poly_govern's INSERT grant (0014) stay without it. The
+default is the only value a runtime role can write: the creator, the same `app.current_user_id()` that `app.seat_creator()` seats as
+owner, inherited by `provision_person`. poly_authz gains `SELECT (founding_owner_user_id, purged_at) ON public.entity`. An insert with no
+user in context still fails on the existing RLS check first (unmeasured; `tenancy.test.ts` "an entity insert with no user set raises
+42501" measures it, unedited).
+
+**R2 — The invariant.** `app.founder_holds_owner()` RETURNS trigger, plpgsql, SECURITY DEFINER, owner poly_authz, `SET search_path = ''`,
+execute `[]`. Read-only. Two constraint triggers, DEFERRABLE INITIALLY DEFERRED, FOR EACH ROW:
+- `entity_z91_founder_holds_owner` AFTER INSERT OR UPDATE ON public.entity (sorts after `entity_seat_creator`, so `SET CONSTRAINTS ALL
+  IMMEDIATE` before an entity insert is not refused for an owner row not yet written).
 - `membership_91_founder_holds_owner` AFTER UPDATE OR DELETE ON public.membership.
 
-Body: the entity id is `NEW.id` (entity) or `OLD.entity_id` (membership). Read the entity row's founder and `purged_at` in one statement.
-No row, or `purged_at IS NOT NULL`: return. Otherwise, if no membership row has (entity, founder, role = 'owner'), raise. It applies to
-**every role, superuser included**, as `user_90_stamp_cleared` does: no exemption is ruled here. The founder therefore cannot lower or
-give up owner by any path until POLY-112's `transfer_founder` moves the column, which ARCH §3.1b already requires.
+Body: entity id is `NEW.id` or `OLD.entity_id`; read the entity's founder and `purged_at` in one statement. No row → raise. Purged →
+return. No membership row (entity, founder, role = 'owner') → raise 23514 `the founding owner must hold owner`. **Every role, superuser
+included; no exemption** (lead, L2).
 
-**R3 — The backfill.** Three migrations, so the Drizzle snapshot matches the schema at every step:
-- `0022_entity_founder` (generated): the column, nullable, with its FK. `packages/db/src/schema/tenancy.ts` gains the column.
-- `0023_founder_rules` (custom): the backfill, then every rule in R2, R4–R7. The backfill runs as poly_owner, so the file wraps it in
-  `ALTER TABLE public.entity NO FORCE ROW LEVEL SECURITY` / `public.membership NO FORCE …` and restores FORCE on both before its next
-  statement. Value per entity: the `self_user_id` when that user holds owner on it; else the owner row with the earliest `created_at`,
-  ties by `membership.id`. Then a check: if any entity, purged or not, still has a null founder, the migration raises
-  `founder backfill: an entity has no owner to found it` (23514) and the whole run rolls back. The migration never invents a founder
-  and never deletes a row; an operator facing the refusal fixes or removes the ownerless entity by hand. Staging holds test data only, and
-  `keep_an_owner` has kept an owner on every unpurged entity since 0003; whether staging has an ownerless row is (unmeasured) and only the
-  staging migrate measures it.
-- `0024_entity_founder_not_null` (generated): SET NOT NULL and SET DEFAULT `app.current_user_id()` (schema: `.notNull().default(sql…)`).
+**R3 — The migrations and the backfill.** Three files, so the Drizzle snapshot matches the schema at each step:
+- `0022_entity_founder` (generated): the column, nullable, with its FK; `packages/db/src/schema/tenancy.ts` gains it.
+- `0023_founder_rules` (custom): the backfill, then every rule in R2 and R4–R7. The backfill runs as poly_owner inside
+  `ALTER TABLE public.entity NO FORCE ROW LEVEL SECURITY` / `public.membership NO FORCE …`, with FORCE restored on both before the
+  next statement. Value per live entity: a Person takes `self_user_id`; any other the subject of its earliest `membership.created`
+  audit row with role owner who still holds owner, else the earliest owner row (ties by `membership.id`). A live entity with no
+  answer, or a Person whose user holds no owner, raises 23514 `founder backfill: an entity has no owner to found it` and the run rolls
+  back. The migration never invents a founder and never deletes a row. Whether staging has such a row is (unmeasured); the staging
+  migrate measures it.
+- `0024_entity_founder_checks` (generated): the two checks and the default.
 
-**R4 — The self-Person owner row (seceng F1).** `app.keep_own_person_owner()` RETURNS trigger, plpgsql, **invoker**, `SET search_path = ''`,
-owned by poly_owner. Trigger `membership_15_own_person_owner` BEFORE UPDATE OR DELETE ON public.membership FOR EACH ROW, so it fires after
-the gate (`_10_`) and before `keep_an_owner` (`_20_`). If `OLD.role = 'owner'` and (DELETE or `NEW.role <> 'owner'`): read the entity's
-`self_user_id` in a statement; no row visible → 42501 `entity not available`; `self_user_id = OLD.user_id` → 23514. No role is exempt,
-superuser included. Account deletion (POLY-115) and purge (POLY-114) rule their own exemption when they exist (§F).
+**R4 — The self-Person owner row (seceng F1).** `app.keep_own_person_owner()` RETURNS trigger, plpgsql, SECURITY DEFINER, owner poly_authz,
+`SET search_path = ''`, execute `[]`. Trigger `membership_15_own_person_owner` BEFORE UPDATE OR DELETE ON public.membership FOR EACH ROW:
+after the gate (`_10_`), before `keep_an_owner` (`_20_`). If `OLD.role = 'owner'` and (DELETE or `NEW.role <> 'owner'`): read the
+entity's `self_user_id`; no row → 42501 `entity not available`; `self_user_id = OLD.user_id` → 23514 `a user keeps owner on their own
+Person`. No role is exempt; POLY-114 / POLY-115 rule their own exemption with seceng.
 
-**R5 — `issued_via` and revoked tokens.** `app.invitation_set_once()` (0007, invoker) is replaced with one added first check:
-`NEW.issued_via IS DISTINCT FROM OLD.issued_via` → 42501. Every role, superuser included. No grant changes: no role holds
-UPDATE (issued_via) today, and a pgTAP assertion pins that. Revoked tokens: `claim_invitations`, `accept_invitations` and
-`seat_claimed_invitations` already filter `revoked_at IS NULL`; no code changes, the criterion is met by tests (§S, T-R5b/c).
+**R5 — `issued_via` and revoked rows.** `app.invitation_set_once()` (0007, invoker) is replaced with one added first check: `NEW.issued_via
+IS DISTINCT FROM OLD.issued_via` → 42501 `an invitation's issued_via never changes`, every role. No grant changes; a pgTAP assertion pins
+that no role holds UPDATE (issued_via). Revoked rows: `claim_invitations`, `accept_invitations` and `seat_claimed_invitations` keep
+`revoked_at IS NULL` in their locked (`FOR UPDATE`) query, never in an earlier unlocked read; R7 changes their lock order only.
 
-**R6 — The 1 → 2 revocation.** `app.owner_transition()` RETURNS trigger, plpgsql, SECURITY DEFINER, owner poly_govern,
-`SET search_path = ''`, EXECUTE to nobody. Trigger `membership_80_owner_transition` AFTER INSERT OR UPDATE OF role ON public.membership
-FOR EACH ROW. Being a trigger, it runs in the transaction of every membership write that makes an owner: today the sole owner's direct
-raise (poly_app UPDATE) and `seat_claimed_invitations` at enrolment; later the existing-user accept, `promote_held_roles` and
-`apply_change`, none of which can forget to call it. Body, each step its own statement:
-1. A superuser session that has not switched role (`rolsuper` of `session_user` and `current_setting('role') = 'none'`, the 0013
-   pattern) returns: fixtures and restores. A test of the transition therefore never seats its second owner as superuser.
-2. Return unless `NEW.role = 'owner'` and (INSERT, or `OLD.role <> 'owner'`).
-3. `PERFORM 1 FROM public.entity WHERE id = NEW.entity_id FOR UPDATE`; not found → 42501 `entity not available`.
-4. `n := app.owner_count(NEW.entity_id)`, read after the lock. Null → 42501 `entity not available`. `n < 2` → return. Owners are
-   `membership.role = 'owner'` rows, which are effective owners only: §3.1c parks a held raise in `pending_role` and leaves `role` at
-   viewer, so A-24 holds without a filter here.
-5. `UPDATE public.invitation SET revoked_at = now() WHERE entity_id = NEW.entity_id AND issued_via = 'owner' AND revoked_at IS NULL AND
-   accepted_at IS NULL RETURNING id, inviter_user_id, role`. Claimed-but-unseated rows are included (they seat at enrolment with no
-   expiry check); expired rows are included. For each row: one `audit_event` (`entity_id` = the entity, `kind` =
-   `invitation.revoked`, actor computed as `app.audit_membership()` computes it, `actor_user_id` = `app.current_user_id()`, payload
-   `{invitation_id, reason: 'owner_transition'}`), and, when `inviter_user_id` is not null, one `notification` to the inviter (`kind` =
-   `invitation.revoked`, payload `{invitation_id, entity_id, role, reason: 'owner_transition'}`).
+**R6 — The 1 → 2 revocation.** `app.owner_transition()` RETURNS trigger, plpgsql, SECURITY DEFINER, owner poly_govern, `SET search_path =
+''`, execute `[]`. Trigger `membership_80_owner_transition` AFTER INSERT OR UPDATE OF role ON public.membership FOR EACH ROW, every role:
+it runs in whichever transaction makes an owner (today the sole owner's raise and the enrolment seat; later the existing-user accept,
+`promote_held_roles`, `apply_change`). Body, each step its own statement:
+1. Return unless `NEW.role = 'owner'` and (INSERT, or `OLD.role <> 'owner'`).
+2. `PERFORM 1 FROM public.entity WHERE id = NEW.entity_id FOR UPDATE`; not found → 42501 `entity not available`.
+3. `n := app.effective_owner_count(NEW.entity_id)`; `n < 2` → return. Owners are `role = 'owner'` rows: §3.1c parks a held raise in
+   `pending_role`, so this counts effective owners only (A-24).
+4. `UPDATE public.invitation SET revoked_at = now() WHERE entity_id = NEW.entity_id AND issued_via = 'owner' AND revoked_at IS NULL AND
+   accepted_at IS NULL RETURNING id, inviter_user_id`. Claimed and expired rows are included. Per row: one `audit_event` (`kind`
+   `invitation.revoked`, the entity, actor as `app.audit_membership()` computes it, `actor_user_id` = `app.current_user_id()`, payload
+   `{invitation_id, reason: 'owner_transition'}`) and, when `inviter_user_id` is not null, one `notification` to the inviter (`kind`
+   `invitation.revoked`, payload `{invitation_id, entity_id, reason: 'owner_transition'}`; no role, no email).
 
-It fires on every later owner addition too (`n > 2`); with the gate refusing direct invitations at `n ≠ 1`, there is nothing left to
-revoke and the step is a no-op. "Direct" is `issued_via = 'owner'` alone until POLY-112 adds `change_request_id`; that issue adds
-`AND change_request_id IS NULL` (§F).
+At `n > 2` the gate has already refused new direct invitations, so step 4 is a no-op. "Direct" is `issued_via = 'owner'` alone until
+POLY-112 adds `change_request_id` (§F).
 
-Grants and policies for R6, nothing broader: EXECUTE on `app.owner_count(uuid)` to poly_govern; `UPDATE (founding_owner_user_id) ON
-public.entity` to poly_govern (row locking needs an UPDATE privilege, and this is the column §3.1b already gives poly_govern for
-`transfer_founder`); policies `entity_govern_lock_read` FOR SELECT TO poly_govern USING (true) and `entity_govern_lock` FOR UPDATE TO
-poly_govern USING (true) **WITH CHECK (false)**, so poly_govern can lock any entity row and update none until POLY-112 replaces the check;
-`invitation_govern_transition_revoke` FOR UPDATE TO poly_govern USING (issued_via = 'owner' AND entity_id IS NOT NULL AND revoked_at IS
-NULL AND accepted_at IS NULL) WITH CHECK (issued_via = 'owner' AND revoked_at IS NOT NULL). That SELECT … FOR UPDATE under RLS needs both a
-SELECT policy and an UPDATE USING policy is (unmeasured); T-R6a measures it.
+New: `app.effective_owner_count(p_entity uuid) RETURNS int`, plpgsql or sql, VOLATILE, SECURITY DEFINER, owner poly_authz, `search_path
+= ''`, execute `[poly_govern]`: the count of `role = 'owner'` rows, whoever calls. `app.owner_count` gets no new grantee. Grants and
+policies, nothing broader: `UPDATE (founding_owner_user_id) ON public.entity` to poly_govern (row locks need an UPDATE privilege; this is
+the column §3.1b gives poly_govern for `transfer_founder`); `entity_govern_lock_read` FOR SELECT TO poly_govern USING (true);
+`entity_govern_lock` FOR UPDATE TO poly_govern USING (true) **WITH CHECK (false)**, so poly_govern locks any entity row and updates none
+until POLY-112 replaces the check; `invitation_govern_transition_revoke` FOR UPDATE TO poly_govern USING (issued_via = 'owner' AND
+entity_id IS NOT NULL AND revoked_at IS NULL AND accepted_at IS NULL) WITH CHECK (issued_via = 'owner' AND revoked_at IS NOT NULL).
+`invitation_govern_update` and `invitation_bootstrap_revoke` do not change (T-R6f). That a row lock under RLS needs both the SELECT and
+the UPDATE USING policy is (unmeasured); T-R6a measures it.
 
-**R7 — The lock order in the seating path.** `app.seat_claimed_invitations()` is replaced (same owner, signature, allowlist entry):
-1. First statement: lock, in `entity.id` order, `FOR UPDATE`, every entity named by the user's claimed, unaccepted, unrevoked manager or
+**R7 — One lock order: the entity row before any invitation row, in every definer that locks invitation rows.**
+
+*R7a — `app.seat_claimed_invitations()`* (makes owners; replaced, same owner, signature and allowlist entry):
+1. First statement: lock `FOR UPDATE`, in `entity.id` order, every entity named by the user's claimed, unaccepted, unrevoked manager or
    owner invitations.
-2. Then the existing loop, which re-reads those invitations in a new statement and so skips any row another transaction revoked while
-   this one waited.
-3. Inside the loop, `UPDATE … SET accepted_at` comes **before** the membership INSERT, so R6's "outstanding" predicate never matches
-   the row being seated.
+2. Then the loop, which re-reads those invitations `FOR UPDATE` in a new statement and so skips any row revoked while it waited.
+3. In the loop: `UPDATE … SET accepted_at = now() WHERE id = r.id AND revoked_at IS NULL`; no row → `CONTINUE` with no membership
+   write (a row the loop fetched and the user's own earlier owner seat revoked). Then the membership INSERT. Accepting first means R6
+   never matches the row being seated.
 
-Every path then takes the entity row before any invitation row. Two invitees seating owner invitations on one entity at once: the second
-waits on the entity lock, re-reads its invitation as revoked, and seats nothing; the end state is two owners and the other revoked, with
-no deadlock (unmeasured; T-R7a measures it). Without step 1 each counts two owners under its own snapshot and both seat (three
-owners), or they deadlock on each other's invitation row.
+*R7b — `app.claim_invitations(bytea, text)` and `app.accept_invitations(bytea)`* (seat viewers only; replaced, same owner, signatures and
+allowlist entries; the bootstrap predicate of 0009 kept as is):
+1. First statement: lock `FOR KEY SHARE`, in `entity.id` order, the entities named by the live rows the function's existing predicate
+   matches, and keep their ids.
+2. Then today's invitation `FOR UPDATE` query, restricted to `entity_id IS NULL OR entity_id = ANY (<the ids locked in step 1>)`. A row
+   whose entity was not locked (issued between the two statements, token-less path only) is not claimed or seated; if none is left,
+   the existing `invitation_required` refusal applies.
 
-**R8 — The tombstone.** Account deletion does not exist yet. Its tombstone removes the user's memberships (POLY-115), and R2 refuses any
-commit that removes a founder's owner row, so the tombstone is refused while the user founds any entity with another owner, and a
-sole-owned entity is refused by `keep_an_owner` before it. This loop proves it with a tombstone-shaped write (T-R8). POLY-115's own
-pre-check ("no multi-owner founder", already its criterion) gives the clear error; no new follow-up.
+KEY SHARE, not FOR UPDATE: a viewer seat never changes the owner count. KEY SHARE conflicts with the gate's and R6's FOR UPDATE, which
+puts sign-up in the same order as the raise, and does not conflict with itself, so sign-ups do not queue on each other. The viewer
+INSERT's foreign-key check takes the same KEY SHARE, already held. No new grant: the lock uses R6's poly_govern UPDATE privilege and
+`entity_govern_lock*` policies (unmeasured; T-R7b measures it).
 
-**R9 — Existing tests the design changes.** Founder O can no longer lower their own role. Two tests in `tests/db/tenancy.test.ts` change,
-owned by qa:
-- "on a two-owner entity an owner may still remove a viewer, lower their own role…": the lowering owner becomes O2 (not the founder).
-- "two owners lowering their own role on two connections at once…": O2 lowers first and holds; O then lowers and is refused. Assert O's
-  error **message** is `an entity keeps at least one owner` (keep_an_owner, after the lock), not the founder's. Dropping the entity lock
-  turns O's refusal into the founder's commit-time error, so the message is what still proves the lock.
+Every path now takes the entity before invitation rows: the raise (user row FOR SHARE, entity, invitations), the enrolment seat (user
+row, entity, invitations), sign-up (entity, invitations), a manual revoke (invitation only). No cycle (seceng's review checked the first
+three; T-R7a and T-R7b measure them).
+
+**R8 — The tombstone.** Account deletion does not exist yet. Its tombstone removes the user's memberships (POLY-115); R2 refuses any
+commit that removes a founder's owner row, so it is refused while the user founds an entity with another owner, and `keep_an_owner`
+refuses a sole-owned one before that. Proved by a tombstone-shaped write (T-R8). POLY-115's own pre-check gives the clear error.
+
+**R9 — Existing tests the design changes** (qa). In `tests/db/tenancy.test.ts`:
+- "on a two-owner entity an owner may still remove a viewer, lower their own role…": the lowering owner becomes O2, not the founder.
+- "two owners lowering their own role on two connections at once…": O2 lowers first and holds; O then lowers and is refused with
+  message `an entity keeps at least one owner` (keep_an_owner after the lock). Without the entity lock, O's refusal becomes the
+  founder's commit-time error, so the message proves the lock.
+- "purged_at is all-or-nothing": the purge also clears `founding_owner_user_id` (R1's tombstone check).
 
 ## §S — The seam
 
-Every refusal test asserts SQLSTATE **and** message; every guard has a positive case beside it.
+Every refusal asserts SQLSTATE **and** message; every guard has a positive case. In T-R2a/b/d the superuser transaction carries a
+member's marker, so `keep_an_owner` can count; T-R6e stays unmarked. "Enrols" means a write that fires `two_factor_80_sync` or
+`passkey_80_sync` for the invitee (`tests/db/helpers/second-step.ts`). No transition test seats its second owner as superuser except
+T-R6e.
 
 | Id | Guard | How it is reached | SQLSTATE | Message (exact) | Positive case |
 |---|---|---|---|---|---|
-| T-R1a | founder column, insert | poly_app INSERT naming `founding_owner_user_id` | 42501 | `permission denied for table entity` | A creates an entity; founder = A |
-| T-R1b | founder column, update | poly_app UPDATE SET `founding_owner_user_id` | 42501 | `permission denied for table entity` | owner renames the entity |
-| T-R2a | `app.founder_holds_owner()` | founder A lowers self on a two-owner entity: the UPDATE succeeds, the COMMIT fails | 23514 | `the founding owner must hold owner` | co-owner B lowers self and commits |
-| T-R2b | same, deferred | superuser lowers A's row and restores it in one transaction | — | commits | — |
-| T-R2c | same, trigger order | `SET CONSTRAINTS ALL IMMEDIATE`, then create an entity | — | commits | — |
-| T-R3 | backfill | migration test: rows seeded at 0021, then the rest | 23514 | `founder backfill: an entity has no owner to found it` | self user chosen on a Person; earliest owner elsewhere |
-| T-R4 | `app.keep_own_person_owner()` | A, on their own Person with a second owner B, demotes self; then deletes self | 23514 | `a user keeps owner on their own Person` | B lowers self on A's Person; A lowers self on a Business A does not found |
-| T-R5a | `app.invitation_set_once()` | superuser UPDATE of `issued_via` | 42501 | `an invitation's issued_via never changes` | owner revokes the same row |
-| T-R5b | revoked token, sign-up | sign-up with the token of a revoked invitation | 42501 | `invitation_required` | same flow, unrevoked twin, seats |
-| T-R5c | revoked after claim | owner revokes a claimed owner invitation; invitee enrols | — | no membership, `accepted_at` null | unrevoked twin seats at enrolment |
-| T-R6a | `app.owner_transition()`, raise path | sole owner O raises enrolled V to owner; O's outstanding direct invitations (unclaimed, claimed, expired, any role) | — | each `revoked_at` = that transaction's `now()`; one audit and one inviter notification each | an invitation on O's other entity, an operator row and an accepted row are untouched; a raise to manager revokes nothing |
-| T-R6b | seat path | X's owner invitation seats at enrolment | — | others revoked; X's own row accepted, not revoked | — |
+| T-R1a | column, insert | poly_app INSERT naming `founding_owner_user_id` | 42501 | `permission denied for table entity` | A creates an entity; founder = A |
+| T-R1b | column, update | poly_app UPDATE SET `founding_owner_user_id` | 42501 | `permission denied for table entity` | owner renames the entity |
+| T-R1c | Person check | superuser sets a Person's founder to its other owner | 23514 | constraint `entity_person_founder_check` | — |
+| T-R2a | `founder_holds_owner` | founder A lowers self on a two-owner entity: UPDATE succeeds, COMMIT fails; also committed in a poly_auth-marked and a superuser transaction | 23514 | `the founding owner must hold owner` | co-owner B lowers self and commits |
+| T-R2b | deferred | superuser lowers A's row and restores it in one transaction | — | commits | — |
+| T-R2c | trigger order | `SET CONSTRAINTS ALL IMMEDIATE`, then create an entity | — | commits | — |
+| T-R2d | every role | superuser deletes the founder's owner row on a two-owner entity | 23514 | `the founding owner must hold owner` (at commit) | — |
+| T-R3 | backfill | migration test: rows seeded at 0021, then 0022–0024 | 23514 | `founder backfill: an entity has no owner to found it` | Person takes its user; elsewhere the audited creator, else the earliest owner |
+| T-R4 | `keep_own_person_owner` | A, on their own Person with second owner B, demotes self; deletes self; superuser does each | 23514 | `a user keeps owner on their own Person` (at the statement) | B lowers self on A's Person; A removes a viewer; A lowers self on a Business A does not found |
+| T-R5a | `invitation_set_once` | superuser UPDATE of `issued_via` | 42501 | `an invitation's issued_via never changes` | owner revokes the same row |
+| T-R5b | revoked, sign-up | sign-up with a revoked invitation's token | 42501 | `invitation_required` | unrevoked twin seats |
+| T-R5c | revoked after claim | owner revokes a claimed owner invitation; invitee enrols | — | no membership; `accepted_at` null | unrevoked twin seats at enrolment |
+| T-R5d | revoke vs enrol | T1 revokes a claimed owner invitation and holds; T2 enrols and blocks; T1 commits | — | T2 commits with no seat | — |
+| T-R6a | `owner_transition`, raise | sole owner O raises enrolled V to owner; O's outstanding direct invitations: unclaimed, claimed, expired, any role | — | each `revoked_at` = that transaction's `now()`; one audit and one inviter notification each | O's other entity, an operator row and an accepted row untouched; a raise to manager revokes nothing |
+| T-R6b | seat path | X's owner invitation seats at enrolment | — | the others revoked; X's own row accepted, not revoked | — |
 | T-R6c | back to one | after O2 leaves, O's new direct invitation is revoked at the next 1 → 2 | — | revoked | — |
-| T-R6d | definer reach | pgTAP: poly_govern UPDATE of an entity row is refused by `entity_govern_lock` | 42501 | `new row violates row-level security policy for table "entity"` | the lock itself (T-R6a) |
-| T-R7a | R7 lock order | X and Y, each with a claimed owner invitation on E, enrol on two connections | — | exactly two owners; the loser's invitation revoked; no 40P01 on either | — |
-| T-R8 | tombstone shape | founder A deletes every own membership, one transaction, entity has owner B | 23514 | `the founding owner must hold owner` | B does the same and commits |
+| T-R6d | lock-only policy | pgTAP: poly_govern UPDATE of an entity row | 42501 | `new row violates row-level security policy for table "entity"` | the lock itself (T-R6a) |
+| T-R6e | no user, one statement | superuser, unmarked, INSERTs two owner rows on a sole-owner entity with a direct invitation open | — | revoked | — |
+| T-R6f | neighbour policies | pgTAP: `qual` / `with_check` of `invitation_govern_update` and `invitation_bootstrap_revoke` equal their 0007 / 0009 text; poly_govern's invitation column grants exactly those of 0007 + 0009 | — | — | — |
+| T-R7a | seat order | X and Y, each with a claimed owner invitation on E, enrol on two connections | — | both commit; no 40P01 or 40001; exactly two owners; the loser's row revoked, its enrolment committed with no seat | — |
+| T-R7b | sign-up order | the builder's measurement, both orders, with a barrier: (i) sign-up holds after claim, the raise blocks, both commit; (ii) the raise holds, sign-up blocks at claim, the raise commits | (ii) 42501 | (ii) `invitation_required` (its row revoked) | (i) the viewer seated, the raise applied; no 40P01 in either order |
+| T-R8 | tombstone shape | founder A deletes every own membership in one transaction; the entity has owner B | 23514 | `the founding owner must hold owner` | B does the same and commits |
 
-`entity not available` (42501) is R4's and R6's fail-closed branch; it is not reachable from a fixture without breaking RLS, so it is
-asserted by reading the function source in pgTAP, not by a runtime case. "Enrols" means any write that fires `two_factor_80_sync` or
-`passkey_80_sync` for the invitee, as `tests/db/helpers/second-step.ts` already drives.
+`entity not available` (42501) in R4 and R6 is the fail-closed branch no fixture reaches without breaking RLS; pgTAP reads the source.
 
 ## §G — Standing guards this design trips
 
 | Guard | Why | Owner |
 |---|---|---|
-| `packages/db/sql/definers.json` + `tests/db/helpers/definers.ts` (C-15 allowlist) | new `app.founder_holds_owner()` (poly_authz, []), `app.owner_transition()` (poly_govern, []); `app.owner_count(uuid)` execute gains poly_govern | builder; seceng reviews |
-| `tests/db/pgtap/04_tenancy.sql` lines 32–38 | pins `owner_count` EXECUTE to poly_app, poly_worker | qa |
-| `tests/db/pgtap/09_poly_govern_grants.sql` | pins poly_govern on entity exactly, and exactly three policies naming it on entity | qa |
-| `tests/db/pgtap/02_rls_catalog.sql`, `05_invitation.sql` | policy and trigger inventories on entity, membership, invitation | qa |
-| generated freshness (`tests/ci/generated-freshness.test.ts`, drizzle-kit regenerate) | 0022 and 0024 come from `schema/tenancy.ts`; meta snapshots must match | builder |
-| `DB_AREAS` in `infra/ci/changes.mjs` + `tests/ci/db-areas.test.ts` | every new `tests/db/*.test.ts` joins an area: the founder and transition files join `tenancy`, the migration test joins the area that lists `migration-0017` | qa |
-| `tests/db/tenancy.test.ts` (R9) | two tests change | qa |
-| layer lint (`layers.json`, `eslint.config.js`) | not tripped: no new package, no new import edge | — |
+| `packages/db/sql/definers.json` + `tests/db/helpers/definers.ts` | exactly four new entries: `app.founder_holds_owner()` (poly_authz, []), `app.keep_own_person_owner()` (poly_authz, []), `app.effective_owner_count(p_entity uuid)` (poly_authz, [poly_govern]), `app.owner_transition()` (poly_govern, []); the three replaced definers keep theirs | builder; seceng reviews |
+| `tests/db/pgtap/09_poly_govern_grants.sql` | pins poly_govern on entity exactly, and exactly three policies naming it there | qa |
+| `tests/db/pgtap/02_rls_catalog.sql`, `04_tenancy.sql`, `05_invitation.sql` | policy and trigger inventories on entity, membership, invitation | qa |
+| `tenancy_column_updatable` battery | names `invitation.issued_via` and `entity.founding_owner_user_id` | qa |
+| generated freshness (`tests/ci/generated-freshness.test.ts`) | 0022 and 0024 come from `schema/tenancy.ts`; meta snapshots match | builder |
+| `DB_AREAS` (`infra/ci/changes.mjs`) + `tests/ci/db-areas.test.ts` | a new founder or transition test file joins `tenancy`; the migration test joins the area that lists `migration-0017` | qa |
+| `tests/db/tenancy.test.ts` (R9) | three tests change | qa |
+| layer lint | not tripped: no new package or import edge | — |
 
 ## §V — Pre-registered verdict checklist
 
-Each criterion of POLY-90 is ticked only on the evidence named; the verdict reads the tree at its sha.
-
-1. Founder: T-R1a/b, T-R2a/b/c, T-R3 green; the catalog shows the column NOT NULL with the default, no login role with INSERT/UPDATE
-   on it, poly_govern's UPDATE on it bound by `WITH CHECK (false)`.
-2. `issued_via` / revoked tokens: T-R5a/b/c green; pgTAP pins no UPDATE (issued_via) for any role.
-3. 1 → 2: T-R6a–d and T-R7a green; the function body takes the lock before `owner_count` (read the source at the sha).
-4. Tombstone: T-R8 green.
-5. Tests: §3.1b Tests items in scope here map to the rows above; the request-flow, held-raise and force items stay with POLY-112 / 91.
-6. F1: T-R4 green.
-7. Guards: every §G row changed in the same PR; `definers.json` diff is exactly the three entries.
-8. Mutation runs, one per guard, each shown red: drop the founder trigger; drop the F1 trigger; drop the `issued_via` check; drop R6's
-   lock; drop R7 step 1; swap R7 step 3; drop the entity lock in `keep_an_owner` (R9 race test).
+1. Founder: T-R1a–c, T-R2a–d, T-R3 green; the catalog shows the default, both checks, no login role with INSERT or UPDATE on the
+   column, and poly_govern's UPDATE on it bound by `WITH CHECK (false)`.
+2. `issued_via` and revoked rows: T-R5a–d green; pgTAP pins no UPDATE (issued_via) for any role.
+3. 1 → 2: T-R6a–f, T-R7a, T-R7b green; at the sha, each of the three replaced definers and `owner_transition` takes the entity lock in
+   its first locking statement, before any invitation lock or count.
+4. Tombstone: T-R8. 5. Tests: §3.1b items in scope map to §S; the request-flow, held-raise and force items stay with POLY-112 / 91.
+6. F1: T-R4. 7. Guards: every §G row changed in the same PR; the `definers.json` diff is exactly the four entries.
+8. Mutations, each shown red: drop the founder trigger; drop the F1 trigger; drop the `issued_via` check; drop R6's lock; drop R7a step
+   1; swap R7a step 3; drop R7a's `revoked_at IS NULL` guard; drop R7b step 1; drop the entity lock in `keep_an_owner` (R9 race).
 
 **Assertions that would pass a wrong build.**
 
 | Weak assertion | Wrong build it passes | Required instead |
 |---|---|---|
-| founder refusal checks SQLSTATE 23514 only | keep_an_owner or F1 refuses instead; no founder trigger at all | assert the message, and that the statement succeeded and the COMMIT failed |
-| T-R5a run as poly_app | grant refusal (`permission denied`) hides a missing trigger | run as superuser; assert the message |
+| founder refusal checks 23514 only | keep_an_owner or F1 refuses instead; no founder trigger | the message, and statement-succeeds / commit-fails |
+| T-R5a run as poly_app | the grant refusal hides a missing trigger | superuser; the message |
 | T-R6 checks only that `revoked_at` is set | revocation in a later transaction or a job | `revoked_at` equals the membership write's `now()` |
-| T-R6b checks the other rows only | X's own invitation revoked and accepted (R7 step 3 swapped) | X's row: `accepted_at` set, `revoked_at` null |
-| T-R7a checks owner count only | deadlock aborts one side; its invitation stays claimed and unrevoked | no 40P01; the loser's row revoked |
-| T-R4 on a sole-owner Person | keep_an_owner refuses with the same 23514 | a second owner on the Person; assert the message |
-| R9 race asserts 23514 only | entity lock removed; founder trigger refuses at commit | assert `an entity keeps at least one owner` |
-| T-R6a seeds the second owner as superuser | step 1 skips; test passes vacuously or is red for the wrong reason | second owner via the raise or the seat path only |
-| T-R3 run on an empty database | backfill and refusal never execute | rows seeded before 0022, as `migration-0017.test.ts` does |
+| T-R6b checks the other rows only | X's own row revoked and accepted (R7a step 3 swapped) | X's row accepted, not revoked |
+| T-R7a / T-R7b check outcome only | a deadlock aborts one side | no 40P01 or 40001 on either connection |
+| T-R4 on a sole-owner Person | keep_an_owner refuses with the same 23514 | a second owner; the message; at the statement |
+| R9 race asserts 23514 only | entity lock removed; the founder trigger refuses at commit | `an entity keeps at least one owner` |
+| T-R6a seeds the second owner as superuser | the test never exercises the raise or seat path | second owner via the raise or the seat |
+| T-R3 on an empty database | backfill and refusal never run | rows seeded before 0022, as `migration-0017.test.ts` does |
 
-## §F — Follow-ups (the lead files; none in POLY-M1 unless its gate needs it)
+## §F — Follow-ups (the lead files)
 
-- **POLY-112** (comment): add `AND change_request_id IS NULL` to R6's predicate; replace `entity_govern_lock`'s `WITH CHECK (false)` with
-  `transfer_founder`'s narrow check; the existing-user accept definer requires the token plus consent (never an email match alone),
-  takes the entity lock before any invitation lock, marks the invitation accepted before the membership write, and refuses a revoked
-  row. A revoke action in the app is idempotent (set-once returns 42501 on a second revoke).
-- **POLY-91** (comment): extend `app.owner_transition()` to cancel direct-path held raises under the same lock; `promote_held_roles` locks
-  the entity before reading `owner_count`.
-- **POLY-115** (comment): R2 and R4 refuse the tombstone's membership removal; rule an account-deletion exemption, if any, with seceng.
-- **POLY-114** (comment): a purged entity keeps its founder id; R2 skips purged rows; the FK refuses deleting a founding user.
+- **POLY-112** (comment): add `AND change_request_id IS NULL` to R6's predicate; `change_request_id` is written only by
+  `app.apply_change`, at insert, by no login role, and set once in `app.invitation_set_once()`; replace `entity_govern_lock`'s `WITH
+  CHECK (false)` with `transfer_founder`'s narrow check; a revoke in the app is idempotent (set-once returns 42501 on a second revoke).
+- **POLY-129** (comment): the existing-user accept requires the token plus an explicit consent action (never an email match alone),
+  follows R7's order (entity first; accepted before the membership write; revoked rows refused under the lock), and fires R6 by being a
+  membership write. The R-23 token rule is already there (SECURITY @ d99b9013).
+- **POLY-91** (comment): extend `owner_transition` to cancel direct-path held raises under the same lock; `promote_held_roles` locks the
+  entity before counting; a held owner raise does not revoke, its promotion does.
+- **POLY-166** (comment): if an unenrolled owner stops counting as effective, the gate's count and `effective_owner_count` become one.
+- **POLY-115** (comment): R2 and R4 refuse the tombstone's membership removal; any account-deletion exemption is ruled with seceng.
+- **POLY-114** (comment): the purge clears the founder (R1's tombstone check); R2 skips purged rows; the FK refuses deleting a founder.
 - **POLY-116** (comment, restore drill): R2 checks at commit for every role, so a restore loads entity and membership in one
   transaction or with triggers disabled.
-- **ARCH** (this loop, architect, after seceng's review): §3.1b gate text to match the code (default-deny for every role but the named
-  definers and a superuser; entity row FOR UPDATE, not FOR SHARE), the founder default, R4, R5 and R6's trigger form.
 
-## For the lead
+## Decided by the lead (DECISIONS @ 816190c1)
 
-- **L1 — R-23 (domain administrator).** Recommendation: require the invitation token for manager and owner invitations on every sign-up
-  path, OAuth and magic link included; viewer invitations keep the verified-email claim. An administrator-minted address that claims an
-  owner invitation becomes a co-owner whom the real owner can then remove only through POLY-112's approval and force path. The change is
-  one predicate in `claim_invitations` / `accept_invitations` plus the web flow carrying the token through OAuth; file it in POLY-1.0,
-  blocking the first production deploy (POLY-164), since staging has no outside users. Alternative: accept R-23 as is.
-- **L2 — No superuser exemption on R2, R4, R5.** Recommendation: keep none, as `user_90_stamp_cleared` has none; the cost is the restore
-  note to POLY-116 and fixtures that never seat a founder-less state.
-- **L3 — Criterion wording.** Recommendation: re-word "The user tombstone check refuses…" to "The founder invariant refuses a
-  tombstone-shaped removal while the user founds a multi-owner entity (R8)", and tick it on T-R8.
-
-## Addendum 1 — seceng's conditions (`seceng-conditions.md` @ 2fffea15) folded in; each line replaces the rule it names
-
-- **R1/R3 (F-6, F-3).** No NOT NULL: `CHECK entity_founder_tombstone_check ((purged_at IS NULL) = (founding_owner_user_id IS NOT NULL))`, so every live entity has a founder and a purged one has none (POLY-114 nulls it). 0024 adds this check and the default. Backfill per live entity: a Person takes `self_user_id`; any other the subject of its earliest `membership.created` audit row with role owner who still holds owner, else the earliest owner row. A live entity with no answer, or a Person whose user holds no owner, refuses with R3's message.
-- **R1 (F-2).** Add `CHECK entity_person_founder_check (self_user_id IS NULL OR founding_owner_user_id = self_user_id)`. T-R1c: superuser sets a Person's founder to its other owner → 23514, constraint `entity_person_founder_check`.
-- **R2 (F-4, F-5).** No row for the entity → raise R2's message (not return). T-R2d: superuser deletes the founder's owner row on a two-owner entity → refused at commit with R2's message. T-R2a is also committed in a poly_auth-marked and a superuser transaction.
-- **R4 (P-1).** `app.keep_own_person_owner()` becomes a SECURITY DEFINER owned by poly_authz, `search_path = ''`, execute `[]`, on the allowlist; no row → 42501 `entity not available`. T-R4 adds the superuser case (same refusal) and the positive "A removes a viewer from their Person".
-- **R6 (V-2, V-3): no superuser exemption, and a count nobody can null.** Step 1 is deleted. Step 4 reads `app.effective_owner_count(p_entity uuid) RETURNS int`, new, poly_authz, SECURITY DEFINER, VOLATILE, `search_path = ''`, execute `[poly_govern]`: count of `role = 'owner'` rows, whoever calls. `app.owner_count` gets no new grantee. T-R6e: superuser, no user in context, seats two owners in one INSERT on a sole-owner entity with a direct invitation outstanding → revoked. Fixtures that seat a second owner as superuser now revoke that entity's open direct invitations; qa checks the seeds.
-- **R6 notification payload (V-6):** `{invitation_id, entity_id, reason}`; no role, no email.
-- **T-R5d (I-3c):** T1 revokes a claimed owner invitation and holds; T2 enrols and blocks; T1 commits; T2 commits with no seat.
-- **T-R7a (V-4):** also assert no 40001 and that the loser's enrolment committed with no seat.
-- **§G adds:** the `tenancy_column_updatable` battery names `invitation.issued_via` and `entity.founding_owner_user_id` (qa); `definers.json` diff is four entries: `founder_holds_owner`, `keep_own_person_owner`, `effective_owner_count`, `owner_transition`.
-- **§F changes:** the existing-user accept conditions and R-23's token rule go to **POLY-129**, not POLY-112 (R-23 decided, SECURITY @ d99b9013, so L1 is closed). POLY-166 note: the gate's count and R6's count become one function if an unenrolled owner stops counting.
-
-## Addendum 2 — seceng's review (`security-review.md` @ f0d63083) and the lead's answers (DECISIONS @ 816190c1)
-
-- **§F POLY-112 adds (S3):** `change_request_id` is written only by `app.apply_change`, at insert; no login role holds INSERT or UPDATE on it; it is set once in `app.invitation_set_once()` as `issued_via` is (R5).
-- **§S adds T-R6f (S4, qa, pgTAP):** `qual` and `with_check` of `invitation_govern_update` and `invitation_bootstrap_revoke` equal their 0007 / 0009 text, and poly_govern's column grants on invitation are exactly those of 0007 + 0009. A failing revoke is fixed in `invitation_govern_transition_revoke`, never by loosening those two.
-- **L1** is struck: R-23 is decided as a condition on POLY-129 (SECURITY @ d99b9013). **L2** is adopted: R2, R4, R5 and R6 exempt no role. **L3** is adopted: POLY-90's tombstone criterion is re-worded in place, ticked on T-R8.
-- **R4 stays as Addendum 1 has it** (poly_authz definer); seceng's review accepted either form, and the definer gives one answer for every firing role. The `definers.json` diff is the four entries Addendum 1 lists; §V7 reads "four".
+L1 (R-23) is a condition on POLY-129. L2: no role exemption on R2, R4, R5, R6. L3: POLY-90's tombstone criterion is re-worded in place
+and ticked on T-R8. ARCH §3.1b states these rules (ARCH 1.32.0); R7b needs no ARCH change, since §3.1b already says every path that
+seats from an invitation locks the entity first.
