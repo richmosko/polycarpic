@@ -87,3 +87,29 @@ Neither is an exemption: both pins stay exact and gain one reviewed entry each.
 Notes for the build review and qa, neither a ruling change:
 - **The replaced `claim_invitations` and `accept_invitations` must be 0009's bodies with only R7b's two changes.** That keeps the bootstrap predicate, `SET lock_timeout = '5s'` and the single `invitation_required` refusal. I diff them against 0009 at the build review.
 - **T-R7b (ii) holds the raise for under 5 s.** A longer hold makes sign-up fail with 55P03 (`lock_not_available`) instead of `invitation_required`. That still fails closed, but the case would no longer prove the re-read.
+
+## Build review @ 43ac3376 (migrations 0022–0024, definers.json, schema/tenancy.ts)
+
+**Verdict: pass on security. Nothing blocks.** I read the source; I ran no tests. The behaviour evidence is qa's battery and CI run 46071636627, which was in progress when I read.
+
+| Condition / note | Result | Where |
+|---|---|---|
+| F-1 founder written by the database | met | 0024 DEFAULT `app.current_user_id()`. 0023 grants no INSERT/UPDATE on the column to any login role. poly_govern's UPDATE on it is bound by `entity_govern_lock` WITH CHECK (false). |
+| F-2 a Person's founder is its user | met | `entity_person_founder_check` (0024). |
+| F-3 backfill | met | A Person takes its own user only if that user holds owner, otherwise NULL and the migration refuses. Others take the earliest audit `membership.created` row of a current owner, then the earliest owner row. `migrate()` applies every file in one transaction, so the NO FORCE window cannot outlive a failure. |
+| F-4, F-5 deferred invariant, no exemption | met | `founder_holds_owner`: poly_authz definer, re-reads the entity and membership, no `owner_count`. No row → raise. A purged entity is skipped by state. No role branch. Triggers fire on entity INSERT/UPDATE and on membership UPDATE/DELETE, DEFERRABLE INITIALLY DEFERRED. |
+| F-6 tombstone | met | `entity_founder_tombstone_check`. |
+| I-1 `issued_via` set once | met | The first check in `invitation_set_once`, invoker, every role. |
+| I-3 revoked rows refused | met | Every locked query in the three definers keeps `revoked_at IS NULL`. The seat's in-loop UPDATE re-checks it. |
+| V-1 to V-3 the revocation trigger | met | `membership_80_owner_transition` AFTER INSERT OR UPDATE OF role, not deferred, no superuser branch. The entity is locked FOR UPDATE before `effective_owner_count`. Null → 42501. `n < 2` → return. |
+| V-4 lock order | met | Seat: entity FOR UPDATE in id order, then invitations. Claim and accept: entity FOR KEY SHARE in id order, then invitations restricted to `entity_id IS NULL OR = ANY(locked)`. With no entity locked, `ANY(NULL)` matches nothing and fails closed. |
+| V-5 scope | met | Same entity, `issued_via = 'owner'`, not revoked, not accepted; expiry and claim are not filtered. |
+| V-6 privilege, standing condition | met | The new invitation policy is as ruled. The two existing policies are untouched (T-R6f pins them). `owner_transition`: `search_path = ''`, PUBLIC revoked, poly_owner's file-scoped EXECUTE revoked by its grantor. The definers.json diff is exactly the four ruled entries. |
+| P-1 self-Person row | met | `keep_own_person_owner`: poly_authz definer, no row → 42501, own message, no role branch, `_15_` between the gate and `keep_an_owner`. |
+| P2 audit actor | met | `owner_transition`'s actor expression is 0017's `audit_membership`, character for character. |
+| Note: claim/accept = 0009 + R7b only | met | A mechanical diff against the 0009 bodies shows only the `v_locked` declaration, the KEY SHARE statement and the `= ANY(v_locked)` line in each. The bootstrap predicate, `lock_timeout` and the refusals are unchanged. |
+| Seat = 0013 + R7a only | met | Read side by side: the entity lock statement and the guarded `accepted_at` UPDATE with CONTINUE. |
+
+**One note (low, accepted, no change):** `entity_govern_lock_read` (SELECT TO poly_govern USING (true)) widens what poly_govern definers can read, from the caller's own Person (`entity_provision_read`) to every entity row. Only the granted columns are readable, (id, self_user_id). A row lock needs a SELECT policy, and a narrower key would need a caller-settable setting. The read is reachable only through allowlisted definers, the same footing as the POLY-62 standing condition. POLY-112 should key it narrower when `transfer_founder` replaces `entity_govern_lock`'s check.
+
+SECURITY updated (1.21.8): C-20 (the self-Person row), the §4.2.2 founder bullet (the commit-time check for every role, the creator default, a Person's founder, the tombstone), C-28 (the revocation trigger, the count, the lock order, `issued_via`).

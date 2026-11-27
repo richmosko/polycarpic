@@ -26,7 +26,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.21.7</span>
+    <span><strong>Version:</strong> 1.21.8</span>
     <span><strong>Last updated:</strong> 2026-11-27</span>
   </div>
 </header>
@@ -532,7 +532,7 @@ flowchart TB
     <li><strong>Audit and notice.</strong> Each step writes an <code>audit_event</code>: <code>change.requested</code>, <code>.approved</code>, <code>.declined</code>, <code>.withdrawn</code>, <code>.expired</code> and <code>.applied</code>. Every owner is notified on request and on outcome. Pending requests, including an invitee's email address, are visible to owners only.</li>
     <li><strong>The founding owner (R-19 ruling).</strong> Each entity records one founding owner, <code>entity.founding_owner_user_id</code>, set to its creator. For a Person entity that is its own user.
       <ul>
-        <li><strong>Always an owner.</strong> A trigger refuses any state where the founder does not hold owner.</li>
+        <li><strong>Always an owner.</strong> A deferred constraint trigger, <code>app.founder_holds_owner()</code> (a <code>poly_authz</code> definer), re-reads the entity and its memberships at commit and refuses any commit where the founder does not hold owner. It applies to every role, superuser included. A purged entity has no founder and is skipped. The column defaults to the creator, and no login role holds INSERT or UPDATE on it. A Person's founder is always its own user (<code>entity_person_founder_check</code>). The same check refuses an account tombstone that would remove a founder's owner row on an entity that has another owner.</li>
         <li><strong>Breaking a removal deadlock.</strong> Once a request to remove or demote a co-owner is <code>declined</code> or <code>expired</code>, the founder may force it through <code>app.force_change(change_id)</code>, a <code>poly_govern</code> definer.
           <ul>
             <li>It requires that the caller is the founder, that the kind is a co-owner removal or demotion, and that the status is declined or expired.</li>
@@ -1096,7 +1096,7 @@ flowchart TB
           <li>a holder's owner reads 0 rows from <code>equity_holding</code> directly on a held entity where they are not a member;</li>
           <li><code>allocated_income</code> returns totals equal to Σ(tagged income × stake), and 0 rows for an entity outside <code>held_entities()</code>.</li>
         </ul></p></td><td>T-74, T-75</td><td>POLY-1.0 (tax allocation); <code>my_stakes</code> with the cap-table editor</td></tr>
-      <tr><td>C-20</td><td>Only owners change membership. A trigger keeps at least one owner (except during purge). Every change writes an <code>audit_event</code>. With more than one owner, the actions in §4.2.2 go through C-28.
+      <tr><td>C-20</td><td>Only owners change membership. A trigger keeps at least one owner (except during purge). The owner row of a user on their own Person (<code>entity.self_user_id</code>) can be neither lowered nor deleted, by any role, superuser included: <code>app.keep_own_person_owner()</code> refuses at the statement (23514). Every change writes an <code>audit_event</code>. With more than one owner, the actions in §4.2.2 go through C-28.
         <ul>
           <li><strong>The first membership.</strong> An entity's first owner row is written only by <code>app.seat_creator()</code>, an AFTER INSERT trigger on <code>entity</code>, SECURITY DEFINER, owned by <code>poly_govern</code>. It seats <code>app.current_user_id()</code> as owner and raises <code>42501</code> when no user is set. Its INSERT policy on <code>membership</code> is <code>TO poly_govern</code> and checks <code>user_id = app.current_user_id() AND role = 'owner'</code>. No <code>poly_app</code> policy lets a user seat themselves on an existing entity, so an entity left without members cannot be claimed. Policies added later for other <code>poly_govern</code> definers are OR'd with this one, so each must be role-targeted and narrow on its own.</li>
           <li><strong>Every other membership write.</strong> <code>poly_app</code> holds UPDATE (<code>role</code>) and DELETE on <code>membership</code>, owner only, and no INSERT. A new member is seated only by the invitation-accept definer, against a live invitation addressed to them, so a direct insert can neither skip the invitee's consent nor the second-step gate (C-03).</li>
@@ -1110,7 +1110,7 @@ flowchart TB
           <li><code>app.apply_change</code> is owned by <code>poly_govern</code>. It recomputes the approvers at apply time and re-validates the payload.</li>
           <li>Requests expire after 14 days. Step-up on request, approve and decline. An audit event at every step.</li>
           <li>The invite email is sent only on apply.</li>
-          <li>At the 1 → 2 owner transition, every outstanding direct-path invitation is revoked in the same transaction, under a lock on the entity row (OQ-31, §4.2.2). A direct-path invitation is one with <code>issued_via = 'owner'</code> and no <code>change_request_id</code> (ARCH A-24). Operator and bootstrap rows carry no entity, so the transition never touches them.</li>
+          <li>At the 1 → 2 owner transition, every outstanding direct-path invitation is revoked in the same transaction, under a lock on the entity row (OQ-31, §4.2.2). A direct-path invitation is one with <code>issued_via = 'owner'</code> and no <code>change_request_id</code> (ARCH A-24). Operator and bootstrap rows carry no entity, so the transition never touches them. The revocation is <code>app.owner_transition()</code>, an AFTER trigger on every membership write that makes an owner, for every role (a direct raise, a seat at enrolment, and later the existing-user accept, the held-raise promotion and <code>apply_change</code>). It locks the entity row, counts owners with <code>app.effective_owner_count</code> (not relative to the caller), and from two owners on revokes every outstanding direct row of the entity, claimed or not, expired or not, with one <code>invitation.revoked</code> audit row and an inviter notification each. Every definer that locks invitation rows takes the entity row first, in id order: <code>FOR UPDATE</code> at enrolment, <code>FOR KEY SHARE</code> at sign-up. Accepting is written before the membership, so the row being seated is never revoked. <code>issued_via</code> never changes, for any role.</li>
           <li>The founding owner, with <code>app.force_change</code>, can force only co-owner removal or demotion, after a decline or expiry. Transfer is founder-only, and the founder must hold owner.</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP:
         <ul>
