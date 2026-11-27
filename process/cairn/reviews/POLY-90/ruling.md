@@ -217,3 +217,16 @@ Each criterion of POLY-90 is ticked only on the evidence named; the verdict read
   note to POLY-116 and fixtures that never seat a founder-less state.
 - **L3 — Criterion wording.** Recommendation: re-word "The user tombstone check refuses…" to "The founder invariant refuses a
   tombstone-shaped removal while the user founds a multi-owner entity (R8)", and tick it on T-R8.
+
+## Addendum 1 — seceng's conditions (`seceng-conditions.md` @ 2fffea15) folded in; each line replaces the rule it names
+
+- **R1/R3 (F-6, F-3).** No NOT NULL: `CHECK entity_founder_tombstone_check ((purged_at IS NULL) = (founding_owner_user_id IS NOT NULL))`, so every live entity has a founder and a purged one has none (POLY-114 nulls it). 0024 adds this check and the default. Backfill per live entity: a Person takes `self_user_id`; any other the subject of its earliest `membership.created` audit row with role owner who still holds owner, else the earliest owner row. A live entity with no answer, or a Person whose user holds no owner, refuses with R3's message.
+- **R1 (F-2).** Add `CHECK entity_person_founder_check (self_user_id IS NULL OR founding_owner_user_id = self_user_id)`. T-R1c: superuser sets a Person's founder to its other owner → 23514, constraint `entity_person_founder_check`.
+- **R2 (F-4, F-5).** No row for the entity → raise R2's message (not return). T-R2d: superuser deletes the founder's owner row on a two-owner entity → refused at commit with R2's message. T-R2a is also committed in a poly_auth-marked and a superuser transaction.
+- **R4 (P-1).** `app.keep_own_person_owner()` becomes a SECURITY DEFINER owned by poly_authz, `search_path = ''`, execute `[]`, on the allowlist; no row → 42501 `entity not available`. T-R4 adds the superuser case (same refusal) and the positive "A removes a viewer from their Person".
+- **R6 (V-2, V-3): no superuser exemption, and a count nobody can null.** Step 1 is deleted. Step 4 reads `app.effective_owner_count(p_entity uuid) RETURNS int`, new, poly_authz, SECURITY DEFINER, VOLATILE, `search_path = ''`, execute `[poly_govern]`: count of `role = 'owner'` rows, whoever calls. `app.owner_count` gets no new grantee. T-R6e: superuser, no user in context, seats two owners in one INSERT on a sole-owner entity with a direct invitation outstanding → revoked. Fixtures that seat a second owner as superuser now revoke that entity's open direct invitations; qa checks the seeds.
+- **R6 notification payload (V-6):** `{invitation_id, entity_id, reason}`; no role, no email.
+- **T-R5d (I-3c):** T1 revokes a claimed owner invitation and holds; T2 enrols and blocks; T1 commits; T2 commits with no seat.
+- **T-R7a (V-4):** also assert no 40001 and that the loser's enrolment committed with no seat.
+- **§G adds:** the `tenancy_column_updatable` battery names `invitation.issued_via` and `entity.founding_owner_user_id` (qa); `definers.json` diff is four entries: `founder_holds_owner`, `keep_own_person_owner`, `effective_owner_count`, `owner_transition`.
+- **§F changes:** the existing-user accept conditions and R-23's token rule go to **POLY-129**, not POLY-112 (R-23 decided, SECURITY @ d99b9013, so L1 is closed). POLY-166 note: the gate's count and R6's count become one function if an unenrolled owner stops counting.
