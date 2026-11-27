@@ -4,14 +4,14 @@ title: M1 integration check
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-62, POLY-90, POLY-86, POLY-87, POLY-88, POLY-89, POLY-91, POLY-104, POLY-105, POLY-128, POLY-129, POLY-133, POLY-134]
+blocked_by: [POLY-62, POLY-90, POLY-86, POLY-87, POLY-88, POLY-89, POLY-91, POLY-104, POLY-128, POLY-129, POLY-133, POLY-134]
 assignee: qa-engineer
 paths: [tests/integration/**, apps/web/tests/**]
 labels: [qa]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-24
+updated: 2026-11-27
 ---
 
 The ARCH §11 POLY-M1 close check, run end to end on staging through the real deploy path. It closes the milestone and does not re-test what the feature issues prove.

@@ -1099,3 +1099,21 @@ Add new decisions ABOVE this comment, newest first.
 - A further `edge-3` in this loop for the HTTP/3 line (another build, signature and deploy for an advert of a closed port).
 - Hold the issue open until OQ-INFRA-8 is answered in full (it cannot be before prod, the home box and the Vercel topology exist).
 **Approved by:** the Principal for the scan server and its token; team-lead for the rest, under the Principal's delegation of 2026-11-25; open to reversal.
+
+### 2026-11-27 — Before prod: the Principal's six decisions from the staging deploy
+**Decision:** The six questions POLY-104 left to the Principal, each put with its mechanism, the attacker's reach, the options and the lead's recommendation. The work is on POLY-165 unless named otherwise.
+- **Host key (F1): the box is rebuilt before prod, with the host key checked at first boot,** before the first connection. Checking the present key afterwards was not chosen as the answer: an attacker who had root on the first day could have replaced the key, so the box cannot vouch for itself. A method for the first-boot check is built first, and puts no private key where containers can read it (C-71).
+- **IPv6 (F7): prod is IPv4-only, and the Cloud Firewall admits nothing over IPv6,** ports 80, 443 and 22. The home line has no IPv6, so SSH over IPv6 serves no one we know. seceng confirms the port 22 part in the POLY-165 loop, as it was not in the POLY-104 ruling.
+- **Postgres at deploy (F25b): accepted.** Every deploy recreates Postgres, prod included; INFRA §4.6 states it. The fresh image is how Debian fixes reach the database (C-83).
+- **Backup measurements (F17): the order becomes first prod deploy with no real data, then POLY-105, then the restore drill (POLY-116), then real household data.** POLY-105 no longer blocks POLY-106 and is blocked by POLY-164. devops says whether the checks that need only the bucket (the lock, the key's capabilities, the refused deletes) can run before the prod deploy.
+- **CAA (F14): Universal SSL is turned off in Cloudflare** (the Principal, 2026-11-27). Measured after: the public answer from three resolvers and the zone's name server is the three pinned records. `dns-check.py` reading the public answer stays owed. Narrowing to Let's Encrypt alone with the account address follows after the rebuild, since the ACME account lives on the box.
+- **Lost release-signing key: a written re-enrolment procedure, rehearsed once,** at the rebuild. One signing key remains. The procedure also serves a stolen key, and states whether a release signed by a retired key can still be rolled back to.
+**Why:** Prod shares the box and will hold household financial data. Each choice is the smaller surface or the complete answer where the cost was time and not money, and the box is still empty.
+**Alternatives considered:**
+- Host key: verify the present key through the Hetzner console only; accept for prod.
+- IPv6: keep port 22 open over IPv6; serve prod over IPv6 (container networking, address rules and limits by block, a second outside scan).
+- Postgres: keep the running image when its inputs are unchanged (pipeline work, and fixes arrive later).
+- Backup: give staging a backup service for the measurement (a build loop, a second bucket and keys; prod's own first run is still measured).
+- CAA: leave Universal SSL on (not accepted by seceng).
+- Signing key: a second enrolled key offline, or on a hardware token.
+**Approved by:** the Principal, 2026-11-27.
