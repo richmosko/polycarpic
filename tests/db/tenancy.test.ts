@@ -38,7 +38,10 @@ let n = 0;
 const count = (sql: string) => Number(must(sql, db).rows[0][0]);
 const ownersOf = (e: string) => count(`SELECT count(*) FROM public.membership WHERE entity_id = '${e}' AND role = 'owner'`);
 
-/** A scratch Business created by `owner` through poly_app (name read back, as ids cannot be supplied); `members` are seated as superuser. */
+/**
+ * A scratch Business created by `owner` through poly_app (name read back, as ids cannot be supplied); `members` are seated as superuser.
+ * POLY-90: `owner` is the founder. A second owner seated here revokes that entity's open direct invitations (owner_transition exempts no role).
+ */
 async function scratch(owner: string, members: [string, string][] = []): Promise<string> {
   const name = `qa-scratch-${++n}`;
   const id = await tenant(owner, async (tx) => {
@@ -217,7 +220,7 @@ describe('tombstone, column grants and keys (criterion 3, ruling O3/O4)', () => 
   // Mutation: drop the purged-check constraint, or allow purged_at on a row that still has a name.
   it('purged_at is all-or-nothing with the nulled columns: a named row cannot be purged, a fully nulled row can', () => {
     expect(psql(`UPDATE public.entity SET purged_at = now() WHERE id = '${E}'`, db).sqlstate).toBe('23514');
-    const ok = psql(`BEGIN; UPDATE public.entity SET name = NULL, type_id = NULL, tax_classification = NULL, self_user_id = NULL, purged_at = now() WHERE id = '${F}'; ROLLBACK;`, db);
+    const ok = psql(`BEGIN; UPDATE public.entity SET name = NULL, type_id = NULL, tax_classification = NULL, self_user_id = NULL, founding_owner_user_id = NULL, purged_at = now() WHERE id = '${F}'; ROLLBACK;`, db);
     expect(ok.ok, ok.err).toBe(true);
     expect(psql(`UPDATE public.entity SET name = NULL WHERE id = '${E}'`, db).sqlstate, 'nulling the name without purged_at').toBe('23514');
   });
@@ -229,6 +232,8 @@ describe('tombstone, column grants and keys (criterion 3, ruling O3/O4)', () => 
       [`UPDATE public.entity SET type_id = (SELECT id FROM public.entity_type WHERE system_key = 'trust') WHERE id = $1`, [E]],
       [`UPDATE public.entity SET self_user_id = $2 WHERE id = $1`, [E, O]],
       [`UPDATE public.entity SET purged_at = now() WHERE id = $1`, [E]],
+      [`UPDATE public.entity SET founding_owner_user_id = $2 WHERE id = $1`, [E, M]], // POLY-90 R1
+      [`UPDATE public.invitation SET issued_via = 'operator' WHERE entity_id = $1`, [E]], // POLY-90 R5
       [`UPDATE public.membership SET user_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, X, V]],
       [`UPDATE public.membership SET entity_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, F, V]],
       [`UPDATE public.invitation SET inviter_user_id = $2 WHERE entity_id = $1`, [E, X]],
@@ -285,10 +290,11 @@ describe('membership writes and the owner gates (criterion 4, ruling O1/O2)', ()
   });
 
   // Mutation: make the gate refuse everything on a multi-owner entity, including lowering and removal of non-owners.
+  // POLY-90 R9: the owner who lowers their own role is O2; O founds the entity and keeps owner.
   it('on a two-owner entity an owner may still remove a viewer, lower their own role and revoke an invitation', async () => {
     const e = await scratch(O, [[O2, 'owner'], [V, 'viewer']]);
     expect(await sqlstate(tenant(O, (tx) => q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('no error');
-    expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, O])))).toBe('no error');
+    expect(await sqlstate(tenant(O2, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, O2])))).toBe('no error');
     expect(ownersOf(e)).toBe(1);
   });
 
@@ -300,18 +306,19 @@ describe('membership writes and the owner gates (criterion 4, ruling O1/O2)', ()
       VALUES ($1, 'ok@qa.test', 'viewer', $2, decode(repeat('dd', 32), 'hex'), now() + interval '1 day')`, [e, O])))).toBe('no error');
   });
 
-  // Mutation: drop the entity row lock (FOR UPDATE) from keep_an_owner / gate_owner_changes; both self-demotions then succeed and the entity has no owner.
+  // Mutation: drop the entity row lock (FOR UPDATE) from keep_an_owner / gate_owner_changes; O's statement then succeeds and only the
+  // founder check refuses it, at commit, with another message. So the MESSAGE is what proves the lock (POLY-90 R9).
   it('two owners lowering their own role on two connections at once leave exactly one owner (the entity row lock serialises them)', async () => {
     const e = await scratch(O, [[O2, 'owner']]);
     let release!: () => void;
     const started = new Promise<void>((res) => { release = res; });
     const lower = (tx: any, who: string) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, who]);
-    const first = tenant(O, async (tx) => { await lower(tx, O); release(); await new Promise((r) => setTimeout(r, 1500)); }).then(() => 'ok', code);
+    const outcome = (p: Promise<unknown>) => p.then(() => 'ok', (x: any) => `${code(x)} ${x?.cause?.message ?? x?.message}`);
+    const first = outcome(tenant(O2, async (tx) => { await lower(tx, O2); release(); await new Promise((r) => setTimeout(r, 1500)); }));
     await started;
-    const second = tenant(O2, (tx) => lower(tx, O2)).then(() => 'ok', code);
-    const results = await Promise.all([first, second]);
-    expect(ownersOf(e), `results ${results}`).toBe(1);
-    expect(results.filter((r) => r === '23514'), 'the loser is refused by the last-owner guard').toHaveLength(1);
+    const second = outcome(tenant(O, (tx) => lower(tx, O)));
+    expect(await Promise.all([first, second])).toEqual(['ok', '23514 an entity keeps at least one owner']);
+    expect(ownersOf(e)).toBe(1);
   });
 
   // Mutation: let the membership SELECT policy read `entity_id = any(visible_entities())` alone (a viewer then lists everyone).

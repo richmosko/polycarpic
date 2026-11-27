@@ -28,11 +28,11 @@ export const DB_AREAS = {
       /^apps\/worker\/src\/jobs\//, /^packages\/mail\//],
   },
   tenancy: {
-    tests: T(['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap']),
+    tests: T(['tenancy', 'founder', 'owner-transition', 'matrix', 'wrappers', 'battery', 'pgtap']),
     paths: [/^packages\/tenancy\//, /^tests\/db\/pgtap\//],
   },
   migrate: {
-    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'gate-check-role-setting', 'migration-0017', 'runner', 'template-clone']),
+    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'gate-check-role-setting', 'migration-0017', 'migration-0022', 'runner', 'template-clone']),
     paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
