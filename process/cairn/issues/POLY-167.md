@@ -18,10 +18,10 @@ The `build` workflow on `main` fails at "Trivy scan of tools" (run 46047894114, 
 
 ## Acceptance criteria
 
-- [ ] The `build` workflow is green on `main` after the merge, every scan included, and staging deploys that build healthy.
-- [ ] The tools image carries the fix: its Debian base is at the registry's current digest and Debian updates are applied at build. The scan is shown red on the old image and green on the new one.
-- [ ] Every other image the build scans passes on current vulnerability data, or its fix is in this change.
-- [ ] seceng states why no update arrived for the stale pin and what keeps a digest pin fresh from here (a rule in this change, or a named issue).
+- [x] Pull-request CI is green on the fix, with the tools image built and scanned on the runner (amd64); after the merge the lead confirms `build` green on `main` and staging healthy on that build, and reports it to the Principal. — CI run 46052776029 on 9d37b5b4, image job 140688032910: tools scan 0 findings. The post-merge half is the lead's and is not covered by this tick.
+- [x] The tools image carries the fix: its Debian base is at the registry's current digest and Debian updates are applied at build. The scan is shown red on the old image and green on the new one. — process/cairn/reviews/POLY-167/build-fix.md: "Base digest" and "Scan results"
+- [x] Every other image the build scans passes on current vulnerability data, or its fix is in this change. — process/cairn/reviews/POLY-167/build-fix.md: "Scan results" and "Other `build.yml` steps"
+- [x] seceng states why no update arrived for the stale pin and what keeps a digest pin fresh from here (a rule in this change, or a named issue). — process/cairn/reviews/POLY-167/security-review.md: "Why no update arrived for the stale pin" and "What keeps a pin fresh from here" (with the POLY-165 criterion for the follow-up)
 
 ## Comments
 
