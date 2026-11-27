@@ -1,6 +1,6 @@
 # The uploader's image (POLY-99 R4): rclone at the version the upload argv was measured with, plus curl and the CA bundle.
 # Build context is infra/backup/. The rclone release zip is checked against a SHA-256 pinned here, per architecture.
-FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS fetch
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS fetch
 ARG TARGETARCH
 ARG RCLONE_VERSION=v1.76.0
 ARG RCLONE_SHA256_AMD64=b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7
@@ -17,6 +17,7 @@ RUN set -eu; \
     echo "$want  /rclone.zip" | sha256sum -c -; \
     unzip -j /rclone.zip "rclone-${RCLONE_VERSION}-linux-${arch}/rclone" -d /out
 
-FROM debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e
+# Debian security fixes land between base-image digests, so the shipped stage upgrades in place from the base image's own signed sources (C-80).
+RUN apt-get update && apt-get -y --no-install-recommends upgrade && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=fetch /out/rclone /usr/local/bin/rclone
