@@ -49,3 +49,16 @@ Ruling read: `process/cairn/reviews/POLY-90/ruling.md` @ bef08baf, against `sece
 ## SECURITY in this loop
 
 I update C-20 (the self-Person row), the founding-owner bullets (§4.2.2: a commit-time check for every role; a Person's founder is fixed, after S1) and C-28 (the revocation is a trigger on every owner-making write; entity row before invitation rows), at the build review against the real migrations, so the doc matches the code.
+
+## Delta: addendum 1 (eca10ccc), read after the review above was written
+
+The addendum landed while this review was in progress. Against my findings:
+- **S1: closed.** `entity_person_founder_check`; the backfill takes `self_user_id` for a Person and refuses when that user holds no owner; T-R1c.
+- **S2: closed.** T-R2d, T-R4's superuser case, R4 as a poly_authz definer. Add "add a superuser exemption to R2 / R4" to §V8's mutants at tests-red (qa).
+- **S3: half open.** POLY-166 is noted. The POLY-112 condition on `change_request_id` (written only by `app.apply_change` at insert, no login-role grant, set once) is still missing from §F. Text only.
+- **S4: open.** Pin `invitation_govern_update` and `invitation_bootstrap_revoke` unchanged, plus poly_govern's invitation column grants (qa, pgTAP). Seam only.
+- **S5: closed** (L1 struck).
+- **S6: moot.** R2 now raises on no row.
+- **F-6 and V-1/V-3: now met as I wrote them.** The founder is null on a purged tombstone, there is no superuser exemption in R6, and `app.effective_owner_count` is not caller-relative. It is EXECUTE poly_govern only, a NOLOGIN role reached through allowlisted definers, so the condition from POLY-62 holds.
+
+Nothing blocks the build. S3's text and S4's assertion can land with tests-red; they do not need another ruling round.
