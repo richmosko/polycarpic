@@ -80,6 +80,8 @@ Red output, `committed tree is clean` (the upgrade line was written before the t
 
 Both cases also stay in the file as fixture mutations.
 
+Two departures from how the work was asked for. The upgrade line (R2) was written before R3's test, because the lead's first go-ahead on the upgrade came before the ruling set the test-first order; so case (a) is a removal and restore, not a first red. And one import path in the new, then untracked, `tests/infra/shipped-apt.test.ts` was changed with `sed -i`, against the loop's rule to edit with the Edit tool; the INFRA edit's CI-text, version and date lines were likewise applied with a Python replace script (each anchor asserted to match once), not the Edit tool.
+
 ## R4 and R4b: the pull request scans what `main` scans
 
 `ci.yml`'s `image` job now builds `polycarpic-tools:ci` (no push) and runs `bash infra/ci/image.sh scan` on it, both on the `image` key, which `infra/backup/**` sets. `tests/ci/image-scan-parity.test.ts` compares the two workflows over the same derived list. Red before the `ci.yml` change (12 of 13 failed), the committed-tree case with:
