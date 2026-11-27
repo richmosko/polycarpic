@@ -1,7 +1,7 @@
 ---
 id: POLY-167
 title: Build red: tools image base pin
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [infra/backup/**, infra/ci/**, infra/compose/**, .github/workflows/**, renovate.json, tests/infra/**, tests/ci/**, tests/image/**, process/cairn/reviews/**, process/cairn/issues/POLY-167.md, docs/SECURITY/**, docs/INFRA/**]
 labels: [ops, security, ci]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/162
 created: 2026-11-27
 updated: 2026-11-27
 ---
@@ -32,3 +32,7 @@ Feature started. Branch: `feature/poly-167-tools-image-base-pin`.
 ### @team-lead — 2026-11-27
 
 Second criterion reworded, 2026-11-27. devops-167 measured that the registry's current `debian:bookworm-slim` digest (e67eeead…, built 2026-11-23) still carries libpam 1.5.2-6+deb12u2: the fix is in bookworm-security only, so no official digest of the tag carries it today. The fix is the digest bump plus `apt-get upgrade` in the tools image's final stage (seceng-167's R1 and R2).
+
+### @team-lead — 2026-11-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/162. First CI run 46052776029 on 9d37b5b4: every job green; the `image` job built the tools image on the runner and scanned it with 0 findings (debian 12.15). Awaiting seceng-167's review record.
