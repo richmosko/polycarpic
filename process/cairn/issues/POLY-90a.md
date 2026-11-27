@@ -1,7 +1,7 @@
 ---
 id: POLY-90a
 title: Founder gate ruling
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-90
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-90.md, process/cairn/reviews/POLY-90/**, proce
 stage: plan
 estimate.cost_usd: "7.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "4.1007"
+actual.tokens: 6393439
+actual.gate_cycles: 2
+actual.wall_clock: 15
+ratio: "0.59"
 labels: []
 priority: null
 pr: null
