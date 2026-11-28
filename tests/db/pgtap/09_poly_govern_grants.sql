@@ -30,10 +30,11 @@ SELECT ok(NOT has_table_privilege('poly_govern', 'public."user"', 'SELECT') AND 
   AND NOT has_table_privilege('poly_govern', 'public."user"', 'INSERT') AND NOT has_table_privilege('poly_govern', 'public."user"', 'DELETE'), 'poly_govern holds no table-level privilege on user');
 SELECT is((SELECT count(*)::int FROM pg_policies WHERE tablename = '"user"' OR tablename = 'user'), 0, 'user has no policy (so the column grants are the whole reach)');
 
--- public.entity: INSERT (type_id, name, self_user_id), SELECT (id, self_user_id), nothing more (0014:54-63).
+-- public.entity: INSERT (type_id, name, self_user_id), SELECT (id, self_user_id) (0014:54-63) and, POLY-90 R6, UPDATE (founding_owner_user_id):
+-- the privilege a row lock needs, bound by a policy whose WITH CHECK is false.
 CREATE TEMP TABLE want_entity (col text, priv text);
-INSERT INTO want_entity VALUES ('type_id','INSERT'), ('name','INSERT'), ('self_user_id','INSERT'), ('id','SELECT'), ('self_user_id','SELECT');
-SELECT is(pg_temp.col_gaps('public.entity', 'want_entity'), '{}'::text[], 'poly_govern on entity: exactly INSERT (type_id, name, self_user_id) and SELECT (id, self_user_id)');
+INSERT INTO want_entity VALUES ('type_id','INSERT'), ('name','INSERT'), ('self_user_id','INSERT'), ('id','SELECT'), ('self_user_id','SELECT'), ('founding_owner_user_id','UPDATE');
+SELECT is(pg_temp.col_gaps('public.entity', 'want_entity'), '{}'::text[], 'poly_govern on entity: exactly INSERT (type_id, name, self_user_id), SELECT (id, self_user_id) and UPDATE (founding_owner_user_id)');
 SELECT ok(NOT has_table_privilege('poly_govern', 'public.entity', 'SELECT') AND NOT has_table_privilege('poly_govern', 'public.entity', 'UPDATE')
   AND NOT has_table_privilege('poly_govern', 'public.entity', 'INSERT') AND NOT has_table_privilege('poly_govern', 'public.entity', 'DELETE'), 'poly_govern holds no table-level privilege on entity');
 
@@ -44,14 +45,16 @@ SELECT is(pg_temp.col_gaps('public.entity_type', 'want_type'), '{}'::text[], 'po
 SELECT ok(NOT has_table_privilege('poly_govern', 'public.entity_type', 'SELECT') AND NOT has_table_privilege('poly_govern', 'public.entity_type', 'INSERT')
   AND NOT has_table_privilege('poly_govern', 'public.entity_type', 'UPDATE'), 'poly_govern holds no table-level privilege on entity_type');
 
--- Policies naming poly_govern on those tables: exactly the three, with their command and predicate.
+-- Policies naming poly_govern on those tables: exactly the five, with their command and predicate.
 SELECT is((SELECT array_agg(tablename||'.'||policyname||':'||cmd||':'||coalesce(qual, '')||':'||coalesce(with_check, '') ORDER BY policyname)
     FROM pg_policies WHERE tablename IN ('entity', 'entity_type') AND 'poly_govern' = ANY (roles)),
-  ARRAY['entity.entity_provision_insert:INSERT::(self_user_id = app.current_user_id())',
+  ARRAY['entity.entity_govern_lock:UPDATE:true:false',
+        'entity.entity_govern_lock_read:SELECT:true:',
+        'entity.entity_provision_insert:INSERT::(self_user_id = app.current_user_id())',
         'entity.entity_provision_read:SELECT:(self_user_id = app.current_user_id()):',
         'entity_type.entity_type_govern_read:SELECT:(system_key = ''person''::text):'],
-  'policies naming poly_govern on entity and entity_type are exactly entity_provision_insert, entity_provision_read, entity_type_govern_read');
-SELECT is((SELECT count(*)::int FROM pg_policies WHERE tablename IN ('entity', 'entity_type') AND policyname !~ '^(entity_provision|entity_type_govern)' AND ('poly_govern' = ANY (roles) OR 'public' = ANY (roles))), 0,
+  'policies naming poly_govern on entity and entity_type are exactly the lock pair (POLY-90: the UPDATE check is false until POLY-112), entity_provision_insert, entity_provision_read, entity_type_govern_read');
+SELECT is((SELECT count(*)::int FROM pg_policies WHERE tablename IN ('entity', 'entity_type') AND policyname !~ '^(entity_provision|entity_type_govern|entity_govern_lock)' AND ('poly_govern' = ANY (roles) OR 'public' = ANY (roles))), 0,
   'no other policy on entity or entity_type applies to poly_govern or to PUBLIC');
 
 ROLLBACK;

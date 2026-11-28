@@ -37,12 +37,17 @@ export const entity = pgTable(
     taxClassification: text('tax_classification'),
     selfUserId: uuid('self_user_id').unique().references(() => user.id),
     purgedAt: tstz('purged_at'),
+    // POLY-90 (R1): no login role holds INSERT or UPDATE on the column, so the default (the creator) is all a runtime role can write.
+    foundingOwnerUserId: uuid('founding_owner_user_id').default(sql`app.current_user_id()`).references(() => user.id),
   },
   (t) => [
     check(
       'entity_tombstone_check',
       sql`(${t.purgedAt} IS NULL) = (${t.name} IS NOT NULL AND ${t.typeId} IS NOT NULL AND ${t.taxClassification} IS NOT NULL)`,
     ),
+    // A live entity has a founder and a purged one has none; a Person's founder is its own user.
+    check('entity_founder_tombstone_check', sql`(${t.purgedAt} IS NULL) = (${t.foundingOwnerUserId} IS NOT NULL)`),
+    check('entity_person_founder_check', sql`${t.selfUserId} IS NULL OR ${t.foundingOwnerUserId} = ${t.selfUserId}`),
     check(
       'entity_tax_classification_check',
       sql`${t.taxClassification} IN ('individual','trust_grantor','trust_non_grantor','business_pass_through','business_c_corp','parent_joint_filers','parent_pass_through')`,

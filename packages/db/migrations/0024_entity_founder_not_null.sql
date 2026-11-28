@@ -1,0 +1,3 @@
+ALTER TABLE "entity" ALTER COLUMN "founding_owner_user_id" SET DEFAULT app.current_user_id();--> statement-breakpoint
+ALTER TABLE "entity" ADD CONSTRAINT "entity_founder_tombstone_check" CHECK (("entity"."purged_at" IS NULL) = ("entity"."founding_owner_user_id" IS NOT NULL));--> statement-breakpoint
+ALTER TABLE "entity" ADD CONSTRAINT "entity_person_founder_check" CHECK ("entity"."self_user_id" IS NULL OR "entity"."founding_owner_user_id" = "entity"."self_user_id");

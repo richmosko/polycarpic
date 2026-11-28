@@ -11,7 +11,7 @@ labels: [ops, backup, ga-gate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-24
+updated: 2026-11-27
 ---
 
 DECISIONS 2026-11-06 / INFRA §6.7: the first passing drill against real backup objects, run off the box with the read key and the age key from the password manager, plus the bad-migration path of §6.4 timed end to end against the 60-minute RTO (Principal Q8, 2026-11-08). A drill not run in 45 days raises an issue and an email.
@@ -32,3 +32,7 @@ From the POLY-99 verdict (process/cairn/reviews/POLY-99/verdict.md §8, §9; rul
 ### @team-lead — 2026-11-23
 
 From POLY-100 (2026-11-23, Principal agreed): the 60-minute timing of the bad-migration rollback runbook is measured here, in the timed restore drill. POLY-100 proves only the runbook's inputs (its T13).
+
+### @team-lead — 2026-11-27
+
+From POLY-90 (ruling `process/cairn/reviews/POLY-90/ruling.md` §F @ 80607cfa). Restore drill: the founder invariant (R2) checks at commit for every role, superuser included, so a restore loads entity and membership in one transaction or with triggers disabled.

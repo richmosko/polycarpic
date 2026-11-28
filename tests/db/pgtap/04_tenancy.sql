@@ -71,8 +71,8 @@ SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tg
 SELECT is((SELECT array_agg(c.relname::text || '.' || t.tgname || ':' || CASE WHEN (t.tgtype & 2) = 2 THEN 'before' ELSE 'after' END ORDER BY t.tgname COLLATE "C")
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
     WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace AND c.relname IN ('membership', 'invitation') AND (t.tgtype & 1) = 1),
-  ARRAY['invitation.invitation_05_second_step:before', 'invitation.invitation_10_gate_owner_changes:before', 'invitation.invitation_20_set_once:before', 'membership.membership_05_second_step:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_90_audit:after'],
-  'row triggers on membership and invitation are named so that gate (10) fires before keep_an_owner (20) and the audit (90, AFTER) last (mutation: rename one)');
+  ARRAY['invitation.invitation_05_second_step:before', 'invitation.invitation_10_gate_owner_changes:before', 'invitation.invitation_20_set_once:before', 'membership.membership_05_second_step:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_15_own_person_owner:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_80_owner_transition:after', 'membership.membership_90_audit:after', 'membership.membership_91_founder_holds_owner:after'],
+  'row triggers on membership and invitation are named so that gate (10) fires before the own-Person guard (15, POLY-90 R4) and keep_an_owner (20), then AFTER: the owner transition (80), the audit (90) and the deferred founder check (91) (mutation: rename one)');
 
 -- privileges: no DELETE anywhere for the app or the worker on entity, invitation, notification, audit_event; workers read only
 SELECT is((SELECT array_agg(t || ':' || r ORDER BY t COLLATE "C", r COLLATE "C") FROM unnest(ARRAY['entity', 'invitation', 'notification', 'audit_event']) t

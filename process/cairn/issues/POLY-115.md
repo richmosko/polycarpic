@@ -11,7 +11,7 @@ labels: [auth, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-16
+updated: 2026-11-27
 ---
 
 On a request to delete their account, the user sees every entity where they are sole owner and chooses per entity: transfer to a named existing member, purge, or abort the whole deletion (PRD §5; ARCH §3.4a; SECURITY §4.6, C-52, A-30). Choices come first, effects last. A founder of a multi-owner entity names a successor. Placed in POLY-1.0 (PM recommendation, adopted).
@@ -33,3 +33,7 @@ On a request to delete their account, the user sees every entity where they are 
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131): `app.reset_second_step` must refuse a tombstoned user once deletion exists (seceng C-f; build review N3 in `process/cairn/reviews/POLY-89/build-review.md`).
+
+### @team-lead — 2026-11-27
+
+From POLY-90 (ruling `process/cairn/reviews/POLY-90/ruling.md` §F @ 80607cfa). The founder invariant (R2) and the own-Person rule (R4) refuse the tombstone's membership removal. The explicit early refusal while the user founds a multi-owner entity belongs here (`process/DECISIONS.md`, 2026-11-27, L3). Any account-deletion exemption is ruled with seceng.

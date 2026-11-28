@@ -58,5 +58,9 @@
   { "function": "app.mail_failed(p_mail uuid, p_status integer)", "owner": "poly_govern", "execute": ["poly_worker"] },
   { "function": "app.purge_mail_outbox()", "owner": "poly_purge", "execute": ["poly_worker"] },
   { "function": "app.note_codes_replaced()", "owner": "poly_govern", "execute": [] },
-  { "function": "app.note_password_changed()", "owner": "poly_govern", "execute": [] }
+  { "function": "app.note_password_changed()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.founder_holds_owner()", "owner": "poly_authz", "execute": [] },
+  { "function": "app.keep_own_person_owner()", "owner": "poly_authz", "execute": [] },
+  { "function": "app.effective_owner_count(p_entity uuid)", "owner": "poly_authz", "execute": ["poly_govern"] },
+  { "function": "app.owner_transition()", "owner": "poly_govern", "execute": [] }
 ]

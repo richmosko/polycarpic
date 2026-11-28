@@ -15,7 +15,11 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-167 (Build red: tools image base pin) merged 2026-11-27 via PR [#162](https://github.com/richmosko/polycarpic/pull/162) — SECURITY 1.21.6, INFRA 1.3.48; follow-up on POLY-165. Before it, POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box._
+_None. POLY-90 (Multi-owner gate + founder) merged 2026-11-28 via PR [#163](https://github.com/richmosko/polycarpic/pull/163) — ARCH 1.32.0, SECURITY 1.21.8; follow-ups on POLY-91, POLY-112, POLY-114, POLY-115, POLY-116, POLY-129 and POLY-166. Every entity records its founder, a commit that leaves the founder without owner is refused for every role, direct invitations are revoked when an entity goes from one owner to two, and a user's owner row on their own Person cannot be lowered or removed. Not measured: the founder backfill on staging's data (it refuses and rolls back whole if a live entity has no owner; the read-only check is in `process/cairn/reviews/POLY-90/verdict.md`). Decided under the Principal's delegation (`process/DECISIONS.md`, 2026-11-27): a sign-in with no invitation token seats viewer rows only, a condition on POLY-129 (SECURITY R-23)._
+
+- **Next:** POLY-91 (Held role raise) and POLY-129 (Entities screen, design first) are unblocked; POLY-88 (Google and GitHub sign-in) needs the Principal's OAuth apps for its staging proof.
+
+_Standing context. POLY-167 (Build red: tools image base pin) merged 2026-11-27 via PR [#162](https://github.com/richmosko/polycarpic/pull/162) — SECURITY 1.21.6, INFRA 1.3.48; follow-up on POLY-165. Before it, POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box._
 
 - **Next:** the next POLY-M1 issue from `scripts/cairn/cairn ls --status todo`. The Principal's six before-prod decisions are made (`process/DECISIONS.md` 2026-11-27) and their work is on POLY-165: the box is rebuilt before prod.
 

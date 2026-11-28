@@ -155,6 +155,27 @@
       "when": 1795280081234,
       "tag": "0021_method_hold_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795814213731,
+      "tag": "0022_entity_founder",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795814214106,
+      "tag": "0023_founder_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795814218602,
+      "tag": "0024_entity_founder_not_null",
+      "breakpoints": true
     }
   ]
 }
