@@ -32,5 +32,4 @@ Persons whose own user holds no owner. Both must be empty.
 - 0023 also lifts and restores FORCE on `audit_event`, which the backfill reads; within R3's intent; pgTAP 02 pins FORCE afterwards.
 - `SKIP LOCKED` in R6 is caught by pgTAP 13's source scan only; a static pin is the right guard for an absent clause.
 
-**For the lead.** CI on the final head (9e870dbb or later) runs at finish. The §F comments for POLY-114, 115, 116 and 166, plus seceng's
-POLY-112 note, are still to file.
+**For the lead.** CI on the final head (9e870dbb or later) runs at finish. The §F follow-ups are filed (0b62498e).
