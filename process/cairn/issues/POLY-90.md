@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [packages/db/migrations/**, packages/db/**, packages/tenancy/**, tests/**, process/cairn/issues/POLY-90.md, process/cairn/issues/POLY-90*.md, process/cairn/reviews/POLY-90/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, scripts/layers/**, .github/workflows/**, infra/ci/**]
 labels: [db, tenancy, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/163
 created: 2026-11-08
 updated: 2026-11-27
 ---
@@ -53,3 +53,7 @@ Seam (ruling @ 80607cfa §S), accepted for qa @ 42a8f226: (1) "T-R6 lock" in `ow
 ### @architect — 2026-11-27
 
 Gate 4 verdict: **pass**. See `process/cairn/reviews/POLY-90/verdict.md`: one table (axis, result, evidence, sha), the staging backfill answer, and three as-built items accepted.
+
+### @team-lead — 2026-11-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/163. Its CI run 46101829392 is green on 0374141d (the first run that includes the test-only commit 9e870dbb). qa's gate, seceng's build review and the architect's verdict are in `process/cairn/reviews/POLY-90/`.

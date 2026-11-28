@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-90-multi-owner-gate-founder`
 - **Started:** 2026-11-27
 - **Goal:** the database records each entity's founder and refuses any commit where the founder is not an owner, revokes direct invitations when an entity goes from one owner to two, and protects a user's owner row on their own Person.
-- **Status:** In Review
+- **Status:** In Review, PR [#163](https://github.com/richmosko/polycarpic/pull/163)
 
 _Standing context. POLY-167 (Build red: tools image base pin) merged 2026-11-27 via PR [#162](https://github.com/richmosko/polycarpic/pull/162) — SECURITY 1.21.6, INFRA 1.3.48; follow-up on POLY-165. Before it, POLY-104 (First staging deploy) merged 2026-11-26 via PRs [#159](https://github.com/richmosko/polycarpic/pull/159) and [#160](https://github.com/richmosko/polycarpic/pull/160); staging and the shared Caddy (`edge-2`) run on the Hetzner box._
 
