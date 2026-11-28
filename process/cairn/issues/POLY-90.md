@@ -1,7 +1,7 @@
 ---
 id: POLY-90
 title: Multi-owner gate + founder
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62]
@@ -57,3 +57,7 @@ Gate 4 verdict: **pass**. See `process/cairn/reviews/POLY-90/verdict.md`: one ta
 ### @team-lead — 2026-11-27
 
 PR opened: https://github.com/richmosko/polycarpic/pull/163. Its CI run 46101829392 is green on 0374141d (the first run that includes the test-only commit 9e870dbb). qa's gate, seceng's build review and the architect's verdict are in `process/cairn/reviews/POLY-90/`.
+
+### @team-lead — 2026-11-27
+
+Validate passed (qa gate @ 8bced45c, seceng build review @ 3f353291 and delta @ 6ae1c35c, architect verdict @ 108b2fd2, PR CI run 46101829392 green); merging via PR #163. Closing.
