@@ -19,12 +19,12 @@ The M1 half of co-owner approval (ARCH §3.1b Scope, §11): the database gate th
 ## Acceptance criteria
 
 - [x] The multi-owner direct-write gate — landed in POLY-62 as `app.gate_owner_changes()` (PR #109): BEFORE UPDATE OR DELETE on membership and BEFORE INSERT on invitation, default-deny for every role except the named definer roles and a superuser, refusing when `app.owner_count` is not 1 (null included), with the entity row locked FOR UPDATE (the lock `keep_an_owner` takes), not FOR SHARE — tests/db/tenancy.test.ts, the two-owner gate cases. What remains here is the rest of this list.
-- [ ] founding_owner_user_id NOT NULL, set to the creator; a deferred constraint trigger refuses any commit where the founder does not hold owner.
-- [ ] invitation.issued_via is not updatable; revoked tokens are refused at acceptance.
-- [ ] The 1 → 2 revocation of direct invitations runs in the membership write's transaction, entity row FOR UPDATE before owner_count, effective owners only (A-24).
-- [ ] The founder invariant refuses a tombstone-shaped removal of the user's memberships while the user founds a multi-owner entity (ruling R8, test T-R8); the tombstone's own pre-check is POLY-115's.
-- [ ] Tests: ARCH §3.1b Tests, the gate, founder and 1 → 2 items.
-- [ ] The self user's owner row on their own Person cannot be lowered or deleted; test: A demotes or removes themselves on their own Person → 23514. Without it, once the accept path exists a user can share their Person, demote themselves, be removed, and then fail `provisionPerson` on every request (seceng F1, `reviewed @ 8779392`). Lands before the accept path ships.
+- [x] founding_owner_user_id NOT NULL, set to the creator; a deferred constraint trigger refuses any commit where the founder does not hold owner. — tests/db/founder.test.ts: T-R1, T-R2a, T-R2d; tests/db/pgtap/13_founder.sql: "Addendum 1: no NOT NULL; the tombstone check carries it" and "both founder checks exist and are validated"
+- [x] invitation.issued_via is not updatable; revoked tokens are refused at acceptance. — tests/db/founder.test.ts: T-R5a (superuser and poly_app); tests/db/owner-transition.test.ts: T-R5b, T-R5c, T-R5d
+- [x] The 1 → 2 revocation of direct invitations runs in the membership write's transaction, entity row FOR UPDATE before owner_count, effective owners only (A-24). — tests/db/owner-transition.test.ts: T-R6a, T-R6b, T-R6e, T-R7a, T-R7b; tests/db/pgtap/13_founder.sql: "V-3: owner_transition locks the entity row before it counts owners"
+- [x] The founder invariant refuses a tombstone-shaped removal of the user's memberships while the user founds a multi-owner entity (ruling R8, test T-R8); the tombstone's own pre-check is POLY-115's. — tests/db/founder.test.ts: T-R8
+- [x] Tests: ARCH §3.1b Tests, the gate, founder and 1 → 2 items. — tests/db/tenancy.test.ts: the two-owner gate cases; tests/db/founder.test.ts: T-R1 to T-R2d; tests/db/owner-transition.test.ts: T-R6a, T-R6c, T-R7a
+- [x] The self user's owner row on their own Person cannot be lowered or deleted; test: A demotes or removes themselves on their own Person → 23514. Without it, once the accept path exists a user can share their Person, demote themselves, be removed, and then fail `provisionPerson` on every request (seceng F1, `reviewed @ 8779392`). Lands before the accept path ships. — tests/db/founder.test.ts: T-R4 (demote and delete, by A and by a superuser, plus the positive cases)
 
 ## Comments
 
