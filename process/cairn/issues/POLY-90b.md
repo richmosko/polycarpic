@@ -1,7 +1,7 @@
 ---
 id: POLY-90b
 title: Founder gate security review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-90
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-90.md, process/cairn/reviews/POLY-90/**, proce
 stage: review
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 2
-labels: []
+actual.cost_usd: "7.8821"
+actual.tokens: 14545592
+actual.gate_cycles: 4
+actual.wall_clock: 40
+ratio: "0.88"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-27

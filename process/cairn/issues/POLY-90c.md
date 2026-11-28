@@ -1,7 +1,7 @@
 ---
 id: POLY-90c
 title: Founder gate tests
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-90
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-90.md, process/cairn/reviews/POLY-90/**, proce
 stage: execute
 estimate.cost_usd: "12.00"
 estimate.gate_cycles: 3
-labels: []
+actual.cost_usd: "7.9987"
+actual.tokens: 32968901
+actual.gate_cycles: 4
+actual.wall_clock: 366
+ratio: "0.67"
+labels: [bloat]
 priority: null
 pr: null
 created: 2026-11-27
