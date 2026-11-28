@@ -49,3 +49,7 @@ Gate 1 ruling: `process/cairn/reviews/POLY-90/ruling.md` (R1–R9, seam §S, gua
 ### @architect — 2026-11-27
 
 Seam (ruling @ 80607cfa §S), accepted for qa @ 42a8f226: (1) "T-R6 lock" in `owner-transition.test.ts` seats owners as superuser. It is the mutation probe for R6's own lock, because every real path already holds the entity lock by then, through the gate or R7a step 1. It is not criterion evidence: T-R6a/b stay on the raise and seat paths. (2) The R7b step 1 mutant counts as red on T-R7b (i) and the claim/accept lock probes. T-R7b (ii) passes without step 1, so it is not counted for that mutant.
+
+### @architect — 2026-11-27
+
+Gate 4 verdict: **pass**. See `process/cairn/reviews/POLY-90/verdict.md`: one table (axis, result, evidence, sha), the staging backfill answer, and three as-built items accepted.
