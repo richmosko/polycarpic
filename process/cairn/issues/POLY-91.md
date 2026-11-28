@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-24
+updated: 2026-11-27
 ---
 
 A raise to manager or owner for an unenrolled member is parked on membership.pending_role while they keep viewer access, and promoted only by app.promote_held_roles() at enrolment (ARCH §3.1c; SECURITY A-25; DESIGN Waiting for second step).
@@ -72,3 +72,7 @@ seceng-150's assessment of the per-entity gate from the POLY-150 loop is at `pro
 ### @team-lead — 2026-11-24
 
 **Scope cut by the Principal, 2026-11-25** (`process/DECISIONS.md`): this issue builds the held raise and the two 0013 fixes (N4 and the narrowed policy), which are POLY-M1's definition of done. The per-entity second-step lock placed here on 2026-11-19 is built in its own POLY-M2 issue, blocked by this one and blocking POLY-110 and POLY-144. **The ruling for this issue still designs both as one mechanism,** as the Principal asked, so the lock's issue builds to it with no second design. The comments above about the lock and its greyed-out state are that issue's sources. Preferred before POLY-129 (N4: an invited viewer is otherwise marked accepted without the raise).
+
+### @team-lead — 2026-11-27
+
+From POLY-90 (ruling `process/cairn/reviews/POLY-90/ruling.md` §F @ 80607cfa). Extend `app.owner_transition()` to cancel direct-path held raises under the same lock. `promote_held_roles` locks the entity before counting owners. A held owner raise does not revoke; its promotion does.

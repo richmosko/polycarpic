@@ -34,3 +34,7 @@ From the M1 regroup (2026-11-25; architect's and product-manager's reviews). (1)
 ### @team-lead — 2026-11-27
 
 From POLY-90 (seceng-90, `process/cairn/reviews/POLY-90/seceng-conditions.md` §7; decided in `process/DECISIONS.md`, 2026-11-27). Two conditions on this issue. (1) A claim with no invitation token (provider callback, magic-link verify) seats viewer rows only; a manager or owner invitation needs the token on every path (SECURITY R-23). (2) Existing-user acceptance: the signed-in user accepts with the token and an explicit consent action, never an email match alone; the acceptance definer locks the entity first and is a membership write under POLY-90's rules (R-22).
+
+### @team-lead — 2026-11-27
+
+From POLY-90 (ruling `process/cairn/reviews/POLY-90/ruling.md` §F @ 80607cfa). The existing-user accept follows R7's order: entity lock first, the invitation marked accepted before the membership write, revoked rows refused under the lock; it fires the 1 → 2 revocation by being a membership write. This adds to the two conditions in the comment above.

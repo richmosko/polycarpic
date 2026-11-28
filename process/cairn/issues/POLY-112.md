@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-27
 ---
 
 On an entity with more than one owner, inviting a member or raising a role, removing or demoting a co-owner, and any cap-table edit take effect only once every other owner approves (P5b, R-19; ARCH §3.1b; SECURITY §4.2.2, A-20, A-22, C-28). Placed in POLY-1.0, not M1 as the PM drafted (lead ruling, 2026-11-08, per ARCH §11): the M1 database gate refuses these actions on multi-owner entities until this ships. POLY-70 carries the viewer experience.
@@ -30,3 +30,9 @@ On an entity with more than one owner, inviting a member or raising a role, remo
 - [ ] One open request per kind and target (a held raise counts); re-raise at most once per 7 days; the gate extends to equity_holder_label.
 - [ ] polycarpic entity set-founder (operator, audited, notifies every owner).
 - [ ] Tests: ARCH §3.1b Tests, request and force items, plus the integration items (no email before apply; 403 without step-up).
+
+## Comments
+
+### @team-lead — 2026-11-27
+
+From POLY-90 (ruling `process/cairn/reviews/POLY-90/ruling.md` §F @ 80607cfa). Add `AND change_request_id IS NULL` to the 1 → 2 revocation's predicate (R6). `change_request_id` is written only by `app.apply_change`, at insert, by no login role, and set once in `app.invitation_set_once()`. Replace `entity_govern_lock`'s `WITH CHECK (false)` with `transfer_founder`'s narrow check. A revoke in the app is idempotent (set-once returns 42501 on a second revoke). From seceng-90's build review (`security-review.md` § Build review @ 3f353291): `entity_govern_lock_read` lets poly_govern definers read `id` and `self_user_id` on every entity, accepted because a row lock needs a SELECT policy; narrow it when `transfer_founder` lands.
