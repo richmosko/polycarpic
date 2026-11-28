@@ -113,3 +113,9 @@ Notes for the build review and qa, neither a ruling change:
 **One note (low, accepted, no change):** `entity_govern_lock_read` (SELECT TO poly_govern USING (true)) widens what poly_govern definers can read, from the caller's own Person (`entity_provision_read`) to every entity row. Only the granted columns are readable, (id, self_user_id). A row lock needs a SELECT policy, and a narrower key would need a caller-settable setting. The read is reachable only through allowlisted definers, the same footing as the POLY-62 standing condition. POLY-112 should key it narrower when `transfer_founder` replaces `entity_govern_lock`'s check.
 
 SECURITY updated (1.21.8): C-20 (the self-Person row), the §4.2.2 founder bullet (the commit-time check for every role, the creator default, a Person's founder, the tombstone), C-28 (the revocation trigger, the count, the lock order, `issued_via`).
+
+## Delta: gate 3 (gate.md @ 8bced45c, tests 9e870dbb)
+
+`packages/db` has not changed since 43ac3376, so the build review stands. The mutants show my conditions red where I asked: the superuser exemptions on R2, R4, R5 and R6, both of the claim and seat filters, the caller-relative count, and unclaimed-only and unexpired-only revocation. Accepted as recorded:
+- **SKIP LOCKED in R6 is caught only by the pgTAP source scan (13).** With the entity locked first on every path, no behavioural interleaving reaches a locked invitation row. The source pin is the right guard against a future path that skips the entity lock.
+- **The `keep_an_owner` lock survivor and T-R5b's weak claim case are fixed in 9e870dbb.** Neither changes the build.
