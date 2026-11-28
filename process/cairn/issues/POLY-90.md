@@ -1,7 +1,7 @@
 ---
 id: POLY-90
 title: Multi-owner gate + founder
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62]
