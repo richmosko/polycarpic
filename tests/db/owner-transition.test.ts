@@ -119,7 +119,7 @@ describe('R6 the 1 -> 2 revocation, the raise path', () => {
     expect([audits([i.id]), notices([i.id])]).toEqual([[], []]);
   });
 
-  it('T-R6a positive: a raise to manager, and a viewer seat, revoke nothing  [red if: the trigger does not test NEW.role = owner]', async () => {
+  it('T-R6a positive: a raise to manager, and a viewer seat, revoke nothing  [red if: the revocation fires on any membership write, with neither NEW.role nor the owner count tested]', async () => {
     const b = business(db);
     const i = invite(db, b.entity, b.owner, { role: 'owner' });
     const v = newUser(db).id;
@@ -169,6 +169,28 @@ describe('R6 the 1 -> 2 revocation, the raise path', () => {
       expect(await two.commit()).toBeNull();
     } finally { await one.end(); await two.end(); }
     expect(owners(db, b.entity)).toBe(3);
+  });
+});
+
+describe('the last-owner guard\'s own lock (ruling §V8)', () => {
+  // For poly_app the gate locks the entity first, so keep_an_owner's lock cannot be told from it. A superuser is exempt from the gate,
+  // and removes owners here through keep_an_owner's lock alone (it carries a marker so the guard can count).
+  it('while a gate-exempt owner removal is uncommitted, another on the same entity waits and is then refused by keep_an_owner  [red if: keep_an_owner drops FOR UPDATE on the entity row]', async () => {
+    const b = soleWithViewer();
+    await raise(db, b.owner, b.entity, b.viewer); // owners: the founder and one other
+    const LOWER = `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`;
+    const one = await open(db, { role: 'super', user: b.owner });
+    const two = await open(db, { role: 'super', user: b.owner });
+    try {
+      expect((await one.q(LOWER, [b.entity, b.viewer])).rowCount).toBe(1);
+      const pid = await pidOf(two);
+      const second = caught(two.q(LOWER, [b.entity, b.owner]));
+      await waitingOnLock(db, [pid]);
+      expect(await one.commit()).toBeNull();
+      const x = await second;
+      expect([x?.code, x?.message]).toEqual(['23514', 'an entity keeps at least one owner']);
+    } finally { await one.end(); await two.end(); }
+    expect(owners(db, b.entity)).toBe(1);
   });
 });
 
@@ -255,7 +277,7 @@ describe('R6 and R7, the seating path', () => {
     expect(states).toEqual(['accepted=false revoked=true', 'accepted=true revoked=false']);
   });
 
-  it('a manager invitation seating at enrolment on a sole-owner entity revokes nothing  [red if: the trigger fires on every seat]', async () => {
+  it('a manager invitation seating at enrolment on a sole-owner entity revokes nothing  [red if: the revocation fires on any membership write, with neither NEW.role nor the owner count tested]', async () => {
     const b = business(db);
     const u = newUser(db, { enrolled: false });
     invite(db, b.entity, b.owner, { role: 'manager', email: u.email, claimedBy: u.id });
@@ -402,6 +424,10 @@ describe('R5 a revoked invitation is refused at every acceptance step', () => {
       const b = business(db);
       const dead = invite(db, b.entity, b.owner);
       await committed(db, app(b.owner), async (q) => expect((await q(REVOKE, [dead.id])).rowCount).toBe(1));
+      if (claim) { // the claim alone refuses: in the full flow, accept_invitations' own refusal would hide a claim that took the row
+        const at = await caught(tx(db, 'poly_auth', (q) => q('SELECT app.claim_invitations($1::bytea, $2)', [tokenHash(dead.token), dead.email])));
+        expect([at?.code, at?.message]).toEqual(['42501', 'invitation_required']);
+      }
       const refused = signUp(dead.email, dead.token, claim);
       const x = await refused.done;
       expect([x?.code, x?.message]).toEqual(['42501', 'invitation_required']);
